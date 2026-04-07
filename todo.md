@@ -39,18 +39,57 @@
 - [x] `AppShell.tsx` + `Sidebar.tsx` — Layout mit linker Navigation (Du folgst / Durchsuchen / Mein Account)
 - [x] `Icons.tsx` — inline SVG-Icons (Heart, Compass, User)
 - [x] `BrowseScreen.tsx` + `AccountScreen.tsx` — Platzhalter-Screens mit Logout
-- [ ] **End-to-End-Verifikation durch User** (Sidebar-Navigation + Karten-Grid mit echten Daten testen)
+- [x] **End-to-End-Verifikation durch User** (2026-04-07: Karten + Tastatur-Nav bestätigt)
 
 ## Phase 3 — Streamlink + mpv (Live-Wiedergabe)
-- [ ] `src/main/playback/streamlink.ts` — Subprozess-Spawning, `--twitch-disable-ads`,
-      OAuth-Header für Sub-only Inhalte, optional TTV.LOL-Plugin
-- [ ] `src/main/playback/mpvController.ts` — Spawn mpv mit `--input-ipc-server`,
-      Unix-Socket JSON-IPC (Win: Named Pipe), `pause`/`seek`/`quit`-Befehle,
-      `observe_property time-pos`
-- [ ] IPC: `playback:start-live`, `playback:stop`
-- [ ] Channel-Detail-Screen mit „Live ansehen"-Button
-- [ ] Quality-Picker
-- [ ] End-to-End: 5 min Live-Stream ohne Werbe-Unterbrechung
+
+### Vorab (Dev-Setup, Windows)
+- [ ] **User:** `mpv` installieren und im PATH verfügbar machen (`winget install mpv` oder
+      Binary von mpv.io) — `mpv --version` muss in Shell funktionieren
+- [ ] **User:** `streamlink` installieren (`winget install streamlink` oder
+      `pip install streamlink`) — `streamlink --version` muss funktionieren
+- [ ] **User:** Kurz manuell testen:
+      `streamlink --twitch-disable-ads twitch.tv/<live-channel> best --player mpv`
+      → soll ein mpv-Fenster mit Live-Stream öffnen. Wenn das klappt, ist der Pipeline-Baseline
+      verifiziert und wir können im Code darauf aufbauen.
+
+### Backend (Main-Prozess)
+- [ ] `src/main/playback/types.ts` — `PlaybackState`, `PlaybackEvent`, `Quality`
+- [ ] `src/main/playback/streamlink.ts` — `spawnStreamlink({channelLogin, quality, oauthToken})`,
+      gibt `ChildProcess` mit stdout-Stream zurück, `--twitch-disable-ads`,
+      `--twitch-api-header=Authorization=OAuth <token>`, stderr in Logger
+- [ ] `src/main/playback/mpvController.ts`:
+  - [ ] Plattform-Weiche: `win32` → Named Pipe `\\.\pipe\twitch4sd-mpv-<pid>`,
+        sonst Unix Socket unter `os.tmpdir()`
+  - [ ] `start(stdin)` — spawnt mpv mit `--input-ipc-server=<path> --fullscreen --hwdec=auto -`
+  - [ ] IPC-Client verbindet mit Retry (100–200 ms Delay nach spawn)
+  - [ ] Commands: `pause(bool)`, `seek(sec)`, `quit()`, `observeProperty(name)`
+  - [ ] `EventEmitter`-Events: `'started'`, `'time-pos'`, `'ended'`, `'error'`
+- [ ] `src/main/playback/playbackService.ts` — bindet streamlink + mpv zusammen,
+      verwaltet `currentPlayback: { streamlink, mpv, channelLogin }`, räumt beim Stop auf
+- [ ] IPC-Kanäle (in `handlers.ts`):
+  - [ ] `playback:start-live` → `{channelLogin, quality}` → `Promise<{playbackId}>`
+  - [ ] `playback:stop`
+  - [ ] `playback:event` (main → renderer, `{kind, payload?}`)
+
+### Renderer (UI)
+- [ ] Preload + `t4sd.d.ts` erweitern: `window.t4sd.playback.{startLive, stop, onEvent}`
+- [ ] `src/renderer/src/screens/ChannelScreen.tsx` — Detail-Screen:
+  - [ ] Hero mit Thumbnail/Avatar + Kanalname + Titel + Spiel + Viewer
+  - [ ] Button „Live ansehen" (default `best`)
+  - [ ] Quality-Picker als Dropdown/Liste (`best`, `720p`, `480p`, `audio_only`) — MVP optional,
+        kann mit Default `best` beginnen und später nachgezogen werden
+  - [ ] „Zurück"-Button (B / Escape)
+- [ ] Routing in `AppShell.tsx` erweitern: `selectedChannel: FollowedChannelInfo | null` State,
+      wenn gesetzt → `ChannelScreen` statt `FollowingScreen` anzeigen
+- [ ] `FocusableCard.onSelect` → setzt `selectedChannel`
+- [ ] Spatial-Nav: B-Taste / Escape im ChannelScreen → zurück zu FollowingScreen
+
+### Verifikation
+- [ ] 5 min Live-Stream ohne Werbe-Unterbrechung auf Windows (Dev-Setup)
+- [ ] Beim Stop: mpv-Fenster schließt sich sauber, streamlink-Prozess terminiert,
+      keine Zombie-Prozesse im Task-Manager
+- [ ] Logout/Login und erneutes Starten funktioniert ohne App-Neustart
 
 ## Phase 4 — VOD-Browsing + -Wiedergabe
 - [ ] Helix `GET /videos?user_id=…&type=archive` (paginiert)

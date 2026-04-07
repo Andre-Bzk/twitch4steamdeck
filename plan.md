@@ -58,58 +58,72 @@ mit Resume. Verteilung als Flatpak.
 Wiedergabe läuft **außerhalb** Electron in einem mpv-Vollbildfenster.
 Electron startet/stoppt mpv, sendet Befehle, lauscht auf `time-pos` für Verlaufsspeicherung.
 
-## Verzeichnisstruktur (Soll)
+## Verzeichnisstruktur (Ist-Stand + Soll)
 
 ```
 twitch4steamdeck/
-├── package.json
-├── electron.vite.config.ts
-├── electron-builder.yml
+├── package.json                          ✅
+├── electron.vite.config.ts               ✅
+├── electron-builder.yml                  ✅
+├── .env.example                          ✅
 ├── flatpak/
-│   └── tv.twitch4steamdeck.App.yml
+│   └── tv.twitch4steamdeck.App.yml       ⏳ Phase 6
 ├── src/
 │   ├── main/
-│   │   ├── index.ts                     ✅
+│   │   ├── index.ts                      ✅ (Auth + Helix instanziiert)
 │   │   ├── auth/
-│   │   │   ├── deviceCodeFlow.ts        ✅
-│   │   │   ├── tokenStore.ts            ✅
-│   │   │   └── authService.ts           ✅
+│   │   │   ├── deviceCodeFlow.ts         ✅
+│   │   │   ├── tokenStore.ts             ✅
+│   │   │   └── authService.ts            ✅
 │   │   ├── twitch/
-│   │   │   ├── helixClient.ts           ⏳ Phase 2
-│   │   │   └── types.ts                 ⏳ Phase 2
+│   │   │   ├── helixClient.ts            ✅
+│   │   │   └── types.ts                  ✅
 │   │   ├── playback/
-│   │   │   ├── streamlink.ts            ⏳ Phase 3
-│   │   │   └── mpvController.ts         ⏳ Phase 3
+│   │   │   ├── streamlink.ts             ⏳ Phase 3
+│   │   │   └── mpvController.ts          ⏳ Phase 3
 │   │   ├── store/
-│   │   │   ├── db.ts                    ⏳ Phase 5
-│   │   │   ├── historyRepo.ts           ⏳ Phase 5
-│   │   │   └── settingsRepo.ts          ⏳ Phase 5
+│   │   │   ├── db.ts                     ⏳ Phase 5
+│   │   │   ├── historyRepo.ts            ⏳ Phase 5
+│   │   │   └── settingsRepo.ts           ⏳ Phase 5
 │   │   └── ipc/
-│   │       └── handlers.ts              ✅ (nur Auth)
+│   │       └── handlers.ts               ✅ (Auth + twitch:get-followed)
 │   ├── preload/
-│   │   └── index.ts                     ✅
+│   │   └── index.ts                      ✅ (auth + twitch APIs)
 │   └── renderer/
-│       ├── index.html                   ✅
+│       ├── index.html                    ✅
 │       └── src/
-│           ├── main.tsx                 ✅
-│           ├── App.tsx                  ✅
+│           ├── main.tsx                  ✅
+│           ├── App.tsx                   ✅ (Routing: LoginScreen / AppShell)
 │           ├── screens/
-│           │   ├── LoginScreen.tsx      ✅
-│           │   ├── HomeScreen.tsx       ⏳ Phase 2
-│           │   ├── ChannelScreen.tsx    ⏳ Phase 3/4
+│           │   ├── LoginScreen.tsx       ✅
+│           │   ├── AppShell.tsx          ✅ (Sidebar + Main-Content, Region-Nav)
+│           │   ├── FollowingScreen.tsx   ✅ (ersetzt die ursprünglich geplante HomeScreen.tsx)
+│           │   ├── BrowseScreen.tsx      ✅ (Platzhalter)
+│           │   ├── AccountScreen.tsx     ✅ (Platzhalter + Logout)
+│           │   ├── ChannelScreen.tsx     ⏳ Phase 3/4 (Detail-Screen mit „Live ansehen")
 │           │   └── PlayerLaunchScreen.tsx ⏳ Phase 3
 │           ├── components/
-│           │   ├── FocusableCard.tsx    ⏳ Phase 2
-│           │   └── SpatialNav/          ⏳ Phase 2
+│           │   ├── Sidebar.tsx           ✅
+│           │   ├── Icons.tsx             ✅ (inline SVG: Heart/Compass/User)
+│           │   └── FocusableCard.tsx     ✅ (Block-Layout)
 │           ├── input/
-│           │   └── gamepad.ts           ⏳ Phase 2
+│           │   └── gamepad.ts            ✅
 │           ├── types/
-│           │   └── t4sd.d.ts            ✅
+│           │   └── t4sd.d.ts             ✅
 │           └── styles/
-│               └── global.css           ✅
+│               └── global.css            ✅
 └── resources/
-    └── icons/
+    └── icons/                            ⏳
 ```
+
+**Architektur-Abweichungen vom Original-Plan (bewusst):**
+- `HomeScreen.tsx` wurde durch `FollowingScreen.tsx` ersetzt und in ein `AppShell.tsx`-Layout
+  mit linker `Sidebar.tsx` (3 Tabs: Du folgst / Durchsuchen / Mein Account) eingebettet.
+- Spatial-Navigation ist eine **eigene Implementierung** (Region-basiert: `sidebar` ↔ `main`),
+  kein `@noriginmedia/norigin-spatial-navigation`. Grund: einfacher, keine externe Dependency,
+  volle Kontrolle über das Region-Switch-Verhalten.
+- `FocusableCard` nutzt **Block-Layout** (nicht Flex), weil Flex im Zusammenspiel mit
+  `aspect-ratio` und Grid-Zellen Schrumpf-Artefakte hatte.
 
 ## Kernkomponenten — Spezifikation
 
@@ -123,19 +137,54 @@ twitch4steamdeck/
 - Client-ID via `MAIN_VITE_TWITCH_CLIENT_ID` (`.env` im Projektroot, electron-vite lädt sie).
 - Scope MVP: `user:read:follows`.
 
-### Helix-Client (⏳ Phase 2)
-MVP-Endpoints:
-- `GET /users` (eigener User)
-- `GET /channels/followed?user_id=…` (paginiert via `after`)
+### Helix-Client (✅ implementiert)
+Implementierte Endpoints (in `src/main/twitch/helixClient.ts`):
+- `GET /users` (eigener User → `cachedUserId`)
+- `GET /users?id=…` (batched, für Avatare der Followed-Kanäle)
+- `GET /channels/followed?user_id=…` (paginiert via `after`, safety-cap 500)
 - `GET /streams?user_id=…` (batched, max 100 IDs/Call)
-- `GET /videos?user_id=…&type=archive`
+- ⏳ `GET /videos?user_id=…&type=archive` (noch offen für Phase 4)
 
 Header: `Client-Id: <id>`, `Authorization: Bearer <access_token>`.
+`getFollowedWithLiveStatus()` merged Followed + Live + Avatare zu `FollowedChannelInfo[]` und
+sortiert live-zuerst, dann alphabetisch.
 
 ### Streamlink + mpv (⏳ Phase 3)
-- `streamlink --twitch-disable-ads --twitch-api-header=Authorization=OAuth <token> --stdout twitch.tv/<channel> best`
-- Pipe an `mpv -` mit `--input-ipc-server=/tmp/twitch4sd-mpv.sock --fullscreen --hwdec=vaapi`
-- Auf Windows: Named Pipe statt Unix-Socket.
+
+**Kommandos (Linux / Flatpak-Target):**
+```
+streamlink \
+  --twitch-disable-ads \
+  --twitch-api-header=Authorization=OAuth <token> \
+  --stdout twitch.tv/<channel> best
+  | mpv - \
+    --input-ipc-server=/tmp/twitch4sd-mpv.sock \
+    --fullscreen --hwdec=vaapi
+```
+
+**Windows-Entwicklung (Ist-Umgebung):**
+- mpv: `winget install mpv` oder Binary von mpv.io ins PATH
+- streamlink: `winget install streamlink` oder `pip install streamlink`
+- IPC-Socket: Named Pipe `\\.\pipe\twitch4sd-mpv` (nicht `/tmp/...sock`)
+- `--hwdec=vaapi` → auf Windows `--hwdec=d3d11va` oder `auto`
+- Pipe stdout → stdin funktioniert auch unter Windows (Node `spawn` mit stdio pipe)
+
+**Architektur-Entscheidung für `mpvController`:**
+- `process.platform === 'win32'` → Named Pipe path, sonst Unix Socket
+- Nach `spawn` kurz warten (100–200 ms) bis der IPC-Endpoint bereit ist, dann `net.createConnection`
+- JSON-IPC: pro Zeile ein Command `{"command": ["set_property", "pause", true]}\n`
+- Property-Observer für `time-pos` → Events in Main-Prozess → IPC zum Renderer (für Phase 5 Verlauf)
+
+**Spezielle Streamlink-Flags zu prüfen:**
+- `--twitch-low-latency` (reduziert Buffer, kann aber stottern verursachen)
+- `--twitch-disable-hosting`
+- TTV.LOL-Plugin: `pip install streamlink-ttvlol` — Fallback falls `--twitch-disable-ads` allein
+  keine Werbe-Umgehung mehr leistet.
+
+**IPC zwischen Renderer und Main (Phase 3):**
+- `playback:start-live` → `{channelLogin, quality}` → startet Prozess-Kette, gibt `playbackId` zurück
+- `playback:stop` → sendet `quit` an mpv, killt streamlink
+- `playback:event` (main → renderer) → `{kind: 'started' | 'stopped' | 'error', message?}`
 
 ### VOD-History-DB (⏳ Phase 5)
 ```sql
