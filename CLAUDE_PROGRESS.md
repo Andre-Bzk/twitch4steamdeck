@@ -36,13 +36,28 @@
   `logged-in` → Platzhalter mit Logout-Button).
 - `src/renderer/src/types/t4sd.d.ts` — globale Window-Typen (manuell synchron zu Preload).
 - `.env.example` — Vorlage für `MAIN_VITE_TWITCH_CLIENT_ID`.
-- **Status:** Code geschrieben, **noch nicht vom User end-to-end getestet**.
+- **Status:** ✅ End-to-End vom User verifiziert (2026-04-07). Login, Token-Persistenz nach Neustart funktionieren. Logout noch nicht getestet (kommt später).
 
 ---
 
+### ✅ Phase 2 — Twitch Helix-Client + Sidebar-Layout (2026-04-07, code-complete)
+- `src/main/twitch/types.ts`, `helixClient.ts` — Helix-Wrapper: eigener User, followed channels (paginiert), live streams (batched), Avatare
+- IPC `twitch:get-followed` in `handlers.ts`, `index.ts` (HelixClient-Instanz)
+- Preload + `t4sd.d.ts` um `window.t4sd.twitch.getFollowed` erweitert
+- **Sidebar-Layout:** `AppShell.tsx` als Post-Auth-Container mit `Sidebar.tsx` (Heart / Compass / User icons)
+  - Tabs: "Du folgst" (Default), "Durchsuchen" (Placeholder), "Mein Account" (Placeholder + Logout)
+  - Region-basierte Spatial-Navigation (`sidebar` ↔ `main`), Arrow-Left am linken Card-Grid-Rand springt in Sidebar
+- `FollowingScreen.tsx` — Karten-Grid, live-first Sortierung, [Y] Refresh
+- `FocusableCard.tsx` — **Block-Layout** (kein flex → kein overlap), Thumbnail/Avatar, LIVE-Badge, Viewer-Badge unten-links, Avatar+Name-Zeile, Titel, Spiel
+- `Icons.tsx` — inline SVG-Icons
+- `gamepad.ts` — Gamepad-Polling → synthetische KeyboardEvents (DPad + linker Stick + A/B)
+- CSS komplett überarbeitet: `.app-layout` (Grid 260px / 1fr), `.sidebar`, `.screen`, `.card-grid` mit `grid-auto-rows: max-content`, `.card` mit Block-Layout
+- **Entfernt:** alte `HomeScreen.tsx` (ersetzt durch FollowingScreen)
+- **Status:** noch nicht vom User getestet
+
 ## Wo wir gerade stehen
 
-**Mitten in:** Schritt 1 (Auth) ist code-complete, wartet auf Verifikation durch den User.
+**Mitten in:** Phase 2 ist code-complete, wartet auf Verifikation durch den User.
 
 **Konkret offen:**
 1. User muss eine Twitch-App auf https://dev.twitch.tv/console/apps registrieren

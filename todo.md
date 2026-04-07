@@ -19,23 +19,27 @@
 - [x] `LoginScreen.tsx` (QR + Code + Countdown)
 - [x] `App.tsx` Routing nach Auth-Status
 - [x] `.env.example`
-- [ ] **End-to-End-Verifikation durch User** (Login mit echter Twitch-App durchführen)
-- [ ] Token-Persistenz prüfen: App-Neustart → bleibt eingeloggt
-- [ ] Logout testen: `userData/twitch-tokens.bin` wird gelöscht
+- [x] **End-to-End-Verifikation durch User** (Login mit echter Twitch-App durchführen)
+- [x] Token-Persistenz prüfen: App-Neustart → bleibt eingeloggt
+- [ ] Logout testen: `userData/twitch-tokens.bin` wird gelöscht (später)
 
 ## Phase 2 — Twitch Helix-Client + Followed-Channels-Home-Screen
-- [ ] `src/main/twitch/types.ts` (Helix-Response-Typen)
-- [ ] `src/main/twitch/helixClient.ts` (fetch-Wrapper, Auto-Refresh bei 401, Auth-Header,
-      Client-ID-Header)
-- [ ] Helix-Endpoints implementieren:
-  - [ ] `GET /users` (eigener User → user_id cachen)
-  - [ ] `GET /channels/followed?user_id=…` (paginiert)
-  - [ ] `GET /streams?user_id=…&user_id=…` (batched, max 100 IDs pro Call)
-- [ ] IPC: `twitch:get-followed`, `twitch:get-live` registrieren
-- [ ] Preload-API erweitern: `window.t4sd.twitch.{getFollowed, getLive}`
-- [ ] `HomeScreen.tsx` — Karten-Grid mit Live-Indicator, Vorschaubild, Titel, Zuschauerzahl
-- [ ] Spatial-Navigation einbauen (Lib-Auswahl: `@noriginmedia/norigin-spatial-navigation` evaluieren)
-- [ ] Gamepad-Service: `src/renderer/src/input/gamepad.ts` (Gamepad-API → Fokus-Events)
+- [x] `src/main/twitch/types.ts` (Helix-Response-Typen)
+- [x] `src/main/twitch/helixClient.ts` (fetch-Wrapper, Auth-Header, Client-ID-Header, Paginierung)
+- [x] Helix-Endpoints implementieren:
+  - [x] `GET /users` (eigener User → user_id cachen)
+  - [x] `GET /channels/followed?user_id=…` (paginiert)
+  - [x] `GET /streams?user_id=…` (batched, max 100 IDs pro Call)
+- [x] IPC: `twitch:get-followed` registrieren (merged live-Status + Avatar)
+- [x] Preload-API erweitern: `window.t4sd.twitch.getFollowed`
+- [x] `FollowingScreen.tsx` — Karten-Grid mit Live-Indicator, Vorschaubild, Titel, Zuschauerzahl
+- [x] Spatial-Navigation: eigene Implementierung (Arrow-Keys + Region-Switch Sidebar ↔ Main)
+- [x] Gamepad-Service: `src/renderer/src/input/gamepad.ts` (Gamepad-API → Keyboard-Events)
+- [x] `FocusableCard.tsx` — Block-Layout, Avatar + Name + Titel + Spiel + Viewer-Badge
+- [x] `AppShell.tsx` + `Sidebar.tsx` — Layout mit linker Navigation (Du folgst / Durchsuchen / Mein Account)
+- [x] `Icons.tsx` — inline SVG-Icons (Heart, Compass, User)
+- [x] `BrowseScreen.tsx` + `AccountScreen.tsx` — Platzhalter-Screens mit Logout
+- [ ] **End-to-End-Verifikation durch User** (Sidebar-Navigation + Karten-Grid mit echten Daten testen)
 
 ## Phase 3 — Streamlink + mpv (Live-Wiedergabe)
 - [ ] `src/main/playback/streamlink.ts` — Subprozess-Spawning, `--twitch-disable-ads`,

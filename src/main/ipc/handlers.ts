@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { AuthEvent, AuthService } from '../auth/authService'
+import type { HelixClient } from '../twitch/helixClient'
 
 export const IPC = {
   authStatus: 'auth:get-status',
@@ -8,10 +9,12 @@ export const IPC = {
   authLogout: 'auth:logout',
   authConfigured: 'auth:is-configured',
   /** main → renderer */
-  authEvent: 'auth:event'
+  authEvent: 'auth:event',
+
+  twitchGetFollowed: 'twitch:get-followed'
 } as const
 
-export function registerIpcHandlers(auth: AuthService): void {
+export function registerIpcHandlers(auth: AuthService, helix: HelixClient): void {
   ipcMain.handle(IPC.authStatus, () => auth.getStatus())
   ipcMain.handle(IPC.authConfigured, () => auth.isConfigured())
   ipcMain.handle(IPC.authStart, () => auth.startDeviceFlow())
@@ -25,4 +28,6 @@ export function registerIpcHandlers(auth: AuthService): void {
       win.webContents.send(IPC.authEvent, event)
     }
   })
+
+  ipcMain.handle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
 }

@@ -6,7 +6,9 @@ const IPC = {
   authCancel: 'auth:cancel',
   authLogout: 'auth:logout',
   authConfigured: 'auth:is-configured',
-  authEvent: 'auth:event'
+  authEvent: 'auth:event',
+
+  twitchGetFollowed: 'twitch:get-followed'
 } as const
 
 export type AuthStatus = 'logged-out' | 'logged-in'
@@ -24,6 +26,19 @@ export type AuthEvent =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
+export interface FollowedChannelInfo {
+  broadcasterId: string
+  broadcasterLogin: string
+  broadcasterName: string
+  profileImageUrl: string
+  isLive: boolean
+  streamTitle?: string
+  gameName?: string
+  viewerCount?: number
+  thumbnailUrl?: string
+  startedAt?: string
+}
+
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
   auth: {
@@ -37,6 +52,10 @@ const api = {
       ipcRenderer.on(IPC.authEvent, listener)
       return () => ipcRenderer.removeListener(IPC.authEvent, listener)
     }
+  },
+  twitch: {
+    getFollowed: (): Promise<FollowedChannelInfo[]> =>
+      ipcRenderer.invoke(IPC.twitchGetFollowed)
   }
 }
 

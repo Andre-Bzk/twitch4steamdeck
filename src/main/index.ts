@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { AuthService } from './auth/authService'
+import { HelixClient } from './twitch/helixClient'
 import { registerIpcHandlers } from './ipc/handlers'
 
 const isDev = !app.isPackaged
@@ -42,7 +43,8 @@ app.whenReady().then(async () => {
   const clientId = import.meta.env.MAIN_VITE_TWITCH_CLIENT_ID ?? ''
   const auth = new AuthService(clientId)
   await auth.init()
-  registerIpcHandlers(auth)
+  const helix = new HelixClient(clientId, () => auth.getValidAccessToken())
+  registerIpcHandlers(auth, helix)
 
   if (!clientId) {
     console.warn(

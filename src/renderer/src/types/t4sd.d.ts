@@ -15,6 +15,19 @@ export type AuthEvent =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
+export interface FollowedChannelInfo {
+  broadcasterId: string
+  broadcasterLogin: string
+  broadcasterName: string
+  profileImageUrl: string
+  isLive: boolean
+  streamTitle?: string
+  gameName?: string
+  viewerCount?: number
+  thumbnailUrl?: string
+  startedAt?: string
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -24,6 +37,9 @@ export interface T4sdApi {
     cancel: () => Promise<void>
     logout: () => Promise<void>
     onEvent: (cb: (event: AuthEvent) => void) => () => void
+  }
+  twitch: {
+    getFollowed: () => Promise<FollowedChannelInfo[]>
   }
 }
 

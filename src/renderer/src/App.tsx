@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { gamepadService } from './input/gamepad'
+import AppShell from './screens/AppShell'
 import LoginScreen from './screens/LoginScreen'
 import type { AuthStatus } from './types/t4sd'
 
@@ -18,33 +20,26 @@ export default function App(): JSX.Element {
     return off
   }, [refresh])
 
-  return (
-    <main className="shell">
-      <header className="shell__header">
-        <h1>Twitch4SteamDeck</h1>
-        <span className="shell__version">v{window.t4sd.appVersion}</span>
-      </header>
-      <section className="shell__body">
-        {status === 'loading' && <p>Lade…</p>}
-        {status === 'logged-out' && <LoginScreen onAuthorized={refresh} />}
-        {status === 'logged-in' && <LoggedInPlaceholder onLogout={refresh} />}
-      </section>
-    </main>
-  )
-}
+  useEffect(() => {
+    gamepadService.start()
+    return () => gamepadService.stop()
+  }, [])
 
-function LoggedInPlaceholder({ onLogout }: { onLogout: () => void }): JSX.Element {
-  async function handleLogout(): Promise<void> {
-    await window.t4sd.auth.logout()
-    onLogout()
+  if (status === 'loading') {
+    return (
+      <div className="fullscreen-center">
+        <p>Lade…</p>
+      </div>
+    )
   }
-  return (
-    <div className="login">
-      <h2>Eingeloggt</h2>
-      <p>Followed-Liste, VODs und Player folgen in den nächsten Schritten.</p>
-      <button className="btn" onClick={handleLogout}>
-        Abmelden
-      </button>
-    </div>
-  )
+
+  if (status === 'logged-out') {
+    return (
+      <main className="shell">
+        <LoginScreen onAuthorized={refresh} />
+      </main>
+    )
+  }
+
+  return <AppShell onLogout={refresh} />
 }
