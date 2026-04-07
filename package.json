@@ -1,0 +1,35 @@
+{
+  "name": "twitch4steamdeck",
+  "version": "0.0.1",
+  "description": "Werbefreier Twitch-Client für das Steam Deck (Live & VOD, Big-Screen-UI)",
+  "main": "out/main/index.js",
+  "author": "twitch4steamdeck",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "package": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.5",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.1"
+  }
+}

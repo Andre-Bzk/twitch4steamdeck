@@ -1,0 +1,18 @@
+appId: tv.twitch4steamdeck.App
+productName: Twitch4SteamDeck
+copyright: Copyright © 2026 twitch4steamdeck
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.{js,ts,mjs,cjs}"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+  - "!{.eslintrc,.prettierrc,.gitignore}"
+linux:
+  target:
+    - AppImage
+  category: AudioVideo
+  synopsis: Werbefreier Twitch-Client für das Steam Deck
+  description: Big-Screen-Twitch-Client mit werbefreier Live- und VOD-Wiedergabe, Gamepad-Bedienung und lokalem VOD-Verlauf.
