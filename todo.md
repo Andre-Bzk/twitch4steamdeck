@@ -79,12 +79,16 @@
 - [x] mpv `--start=<seconds>` beim Spawn (Parameter vorbereitet für Phase 5)
 - [x] **User:** VOD-Wiedergabe + Stop-Verhalten verifiziert (2026-04-08)
 
-## Phase 5 — Lokaler VOD-Verlauf
-- [ ] SQLite-Setup: `src/main/store/db.ts` (better-sqlite3, Migrations)
-- [ ] `historyRepo.ts` mit `vod_history`-Tabelle (siehe plan.md)
-- [ ] mpv `time-pos`-Observer schreibt alle ~5s in DB
-- [ ] „Continue Watching"-Reihe auf HomeScreen
-- [ ] Auto-Complete bei >95% Wiedergabefortschritt
+## Phase 5 — Lokaler VOD-Verlauf (Resume)
+- [x] SQLite-Setup: `src/main/store/db.ts` (better-sqlite3, Migration)
+- [x] `historyRepo.ts` mit `vod_history`-Tabelle
+- [x] mpv `time-pos`-Observer schreibt alle ~5s in DB
+- [x] Auto-Resume: beim VOD-Start Position aus DB lesen → `--start=<s>`
+- [x] Auto-Complete bei >95% Wiedergabefortschritt
+- [x] Resume-Indikator auf VOD-Karte (Fortschrittsbalken + „0:16 von 6:22" + „Vor X Min.")
+- [x] Completed-Indikator (dunkles Overlay + Checkmark)
+- [x] **User:** Verifiziert (2026-04-08)
+- ~~„Continue Watching"-Reihe~~ — entfällt (nicht benötigt)
 
 ## Phase 6 — Flatpak-Packaging
 - [ ] `flatpak/tv.twitch4steamdeck.App.yml` Manifest (Runtime, Module, Permissions)

@@ -3,6 +3,7 @@ import type { AuthEvent, AuthService } from '../auth/authService'
 import type { HelixClient } from '../twitch/helixClient'
 import type { PlaybackService } from '../playback/playbackService'
 import type { PlaybackEvent } from '../playback/types'
+import { getProgressMap } from '../store/historyRepo'
 
 export const IPC = {
   authStatus: 'auth:get-status',
@@ -15,6 +16,7 @@ export const IPC = {
 
   twitchGetFollowed: 'twitch:get-followed',
   twitchGetVideos: 'twitch:get-videos',
+  historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
@@ -47,6 +49,10 @@ export function registerIpcHandlers(
     IPC.twitchGetVideos,
     (_e, broadcasterId: string) => helix.getVideos(broadcasterId)
   )
+  ipcMain.handle(
+    IPC.historyGetProgress,
+    (_e, vodIds: string[]) => getProgressMap(vodIds)
+  )
 
   ipcMain.handle(
     IPC.playbackStartLive,
@@ -54,7 +60,8 @@ export function registerIpcHandlers(
   )
   ipcMain.handle(
     IPC.playbackStartVod,
-    (_e, vodId: string, startSeconds?: number) => playback.startVod(vodId, startSeconds)
+    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number) =>
+      playback.startVod(vodId, channelLogin, title, durationSeconds)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
 

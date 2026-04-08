@@ -11,6 +11,7 @@ export function getMpvIpcPath(): string {
 
 export class MpvController {
   private socket: net.Socket | null = null
+  private buf = ''
 
   constructor(private ipcPath: string) {}
 
@@ -33,22 +34,51 @@ export class MpvController {
       const sock = net.createConnection({ path: this.ipcPath })
       sock.once('connect', () => {
         this.socket = sock
-        sock.on('error', () => {
-          /* ignore socket errors after connect */
-        })
+        sock.on('error', () => { /* ignore socket errors after connect */ })
         resolve()
       })
       sock.once('error', reject)
     })
   }
 
+  /** Beobachtet time-pos; ruft cb mit Sekunden auf. Throttling liegt beim Aufrufer. */
+  observeTimePos(cb: (seconds: number) => void): void {
+    if (!this.socket?.writable) return
+
+    // Observer registrieren
+    this._send({ command: ['observe_property', 1, 'time-pos'] })
+
+    this.socket.on('data', (chunk: Buffer) => {
+      this.buf += chunk.toString()
+      const lines = this.buf.split('\n')
+      this.buf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const msg = JSON.parse(line) as {
+            event?: string
+            name?: string
+            data?: unknown
+          }
+          if (
+            msg.event === 'property-change' &&
+            msg.name === 'time-pos' &&
+            typeof msg.data === 'number'
+          ) {
+            cb(msg.data)
+          }
+        } catch {
+          /* ignore malformed lines */
+        }
+      }
+    })
+  }
+
   quit(): void {
     if (this.socket?.writable) {
       try {
-        this.socket.write(JSON.stringify({ command: ['quit'] }) + '\n')
-      } catch {
-        /* ignore */
-      }
+        this._send({ command: ['quit'] })
+      } catch { /* ignore */ }
     }
     this.socket?.destroy()
     this.socket = null
@@ -57,5 +87,10 @@ export class MpvController {
   disconnect(): void {
     this.socket?.destroy()
     this.socket = null
+    this.buf = ''
+  }
+
+  private _send(msg: object): void {
+    this.socket?.write(JSON.stringify(msg) + '\n')
   }
 }

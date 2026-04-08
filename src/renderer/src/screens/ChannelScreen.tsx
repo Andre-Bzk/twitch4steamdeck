@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FollowedChannelInfo, PlaybackEvent, VodInfo } from '../types/t4sd'
+import type { FollowedChannelInfo, PlaybackEvent, VodInfo, VodProgress } from '../types/t4sd'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -21,9 +21,7 @@ function formatViewers(n: number): string {
 function formatDuration(s: number): string {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-  return `${m}:${String(sec).padStart(2, '0')}`
+  return `${h}:${String(m).padStart(2, '0')}`
 }
 
 function formatDate(iso: string): string {
@@ -32,6 +30,19 @@ function formatDate(iso: string): string {
     month: '2-digit',
     year: 'numeric'
   })
+}
+
+function formatWatchedAt(ms: number): string {
+  const diff = Date.now() - ms
+  const mins = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(diff / 86_400_000)
+  if (mins < 2) return 'Gerade eben'
+  if (mins < 60) return `Vor ${mins} Min.`
+  if (hours < 24) return `Vor ${hours} Std.`
+  if (days === 1) return 'Gestern'
+  if (days < 7) return `Vor ${days} Tagen`
+  return new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function resolveThumbnail(url: string | undefined, w = 1280, h = 720): string | undefined {
@@ -43,6 +54,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [errorMsg, setErrorMsg] = useState('')
   const [vods, setVods] = useState<VodInfo[]>([])
   const [vodsLoading, setVodsLoading] = useState(true)
+  const [progressMap, setProgressMap] = useState<Record<string, VodProgress>>({})
   const [focusRegion, setFocusRegion] = useState<FocusRegion>('hero')
   const [shelfIndex, setShelfIndex] = useState(0)
   const watchBtnRef = useRef<HTMLButtonElement>(null)
@@ -50,7 +62,11 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   useEffect(() => {
     window.t4sd.twitch
       .getVideos(channel.broadcasterId)
-      .then(setVods)
+      .then((loaded) => {
+        setVods(loaded)
+        const ids = loaded.map((v) => v.id)
+        return window.t4sd.history.getProgress(ids).then(setProgressMap)
+      })
       .catch(() => {})
       .finally(() => setVodsLoading(false))
   }, [channel.broadcasterId])
@@ -106,13 +122,20 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         setPlayState('playing')
       } else if (ev.kind === 'stopped') {
         setPlayState('idle')
+        // Progress nach Stop neu laden
+        if (vods.length > 0) {
+          void window.t4sd.history
+            .getProgress(vods.map((v) => v.id))
+            .then(setProgressMap)
+            .catch(() => {})
+        }
       } else if (ev.kind === 'error') {
         setPlayState('error')
         setErrorMsg(ev.message ?? 'Unbekannter Fehler')
       }
     })
     return unsub
-  }, [])
+  }, [vods])
 
   useEffect(() => {
     watchBtnRef.current?.focus()
@@ -133,7 +156,12 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     setPlayState('starting')
     setErrorMsg('')
     try {
-      await window.t4sd.playback.startVod(vod.id)
+      await window.t4sd.playback.startVod(
+        vod.id,
+        channel.broadcasterLogin,
+        vod.title,
+        vod.durationSeconds
+      )
     } catch (e) {
       setPlayState('error')
       setErrorMsg(String(e))
@@ -252,26 +280,58 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
               className="channel-screen__shelf-track"
               style={{ transform: `translateX(-${trackOffset}px)` }}
             >
-              {vods.map((vod, i) => (
-                <div
-                  key={vod.id}
-                  className={`channel-screen__vod-card${focusRegion === 'shelf' && shelfIndex === i ? ' channel-screen__vod-card--focused' : ''}`}
-                  onClick={() => void handleWatchVod(vod)}
-                >
-                  <div className="channel-screen__vod-thumb">
-                    {vod.thumbnailUrl && !vod.thumbnailUrl.includes('404_processing') ? (
-                      <img src={vod.thumbnailUrl} alt="" draggable={false} />
-                    ) : (
-                      <div className="channel-screen__vod-thumb-placeholder" />
-                    )}
-                    <span className="channel-screen__vod-duration">
-                      {formatDuration(vod.durationSeconds)}
-                    </span>
+              {vods.map((vod, i) => {
+                const prog = progressMap[vod.id]
+                const pct =
+                  prog && !prog.completed && vod.durationSeconds > 0
+                    ? Math.min(100, (prog.resumePositionSeconds / vod.durationSeconds) * 100)
+                    : 0
+                return (
+                  <div
+                    key={vod.id}
+                    className={`channel-screen__vod-card${focusRegion === 'shelf' && shelfIndex === i ? ' channel-screen__vod-card--focused' : ''}`}
+                    onClick={() => void handleWatchVod(vod)}
+                  >
+                    <div className="channel-screen__vod-thumb">
+                      {vod.thumbnailUrl && !vod.thumbnailUrl.includes('404_processing') ? (
+                        <img src={vod.thumbnailUrl} alt="" draggable={false} />
+                      ) : (
+                        <div className="channel-screen__vod-thumb-placeholder" />
+                      )}
+                      <span className="channel-screen__vod-duration">
+                        {prog && !prog.completed && prog.resumePositionSeconds > 0
+                          ? `${formatDuration(prog.resumePositionSeconds)} von ${formatDuration(vod.durationSeconds)}`
+                          : formatDuration(vod.durationSeconds)}
+                      </span>
+                      {pct > 0 && (
+                        <div className="channel-screen__vod-progress">
+                          <div
+                            className="channel-screen__vod-progress-bar"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
+                      {prog?.completed && (
+                        <div className="channel-screen__vod-completed">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="7 13 10.5 16.5 17 8" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <p className="channel-screen__vod-title">{vod.title}</p>
+                    <p className="channel-screen__vod-meta">
+                      {formatDate(vod.createdAt)}
+                      {prog && !prog.completed && (
+                        <span className="channel-screen__vod-watched">
+                          {' · '}{formatWatchedAt(prog.watchedAt)}
+                        </span>
+                      )}
+                    </p>
                   </div>
-                  <p className="channel-screen__vod-title">{vod.title}</p>
-                  <p className="channel-screen__vod-meta">{formatDate(vod.createdAt)}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

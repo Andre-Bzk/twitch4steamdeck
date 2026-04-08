@@ -43,6 +43,12 @@ export interface VodInfo {
   thumbnailUrl: string
 }
 
+export interface VodProgress {
+  resumePositionSeconds: number
+  watchedAt: number
+  completed: boolean
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -57,9 +63,12 @@ export interface T4sdApi {
     getFollowed: () => Promise<FollowedChannelInfo[]>
     getVideos: (broadcasterId: string) => Promise<VodInfo[]>
   }
+  history: {
+    getProgress: (vodIds: string[]) => Promise<Record<string, VodProgress>>
+  }
   playback: {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
-    startVod: (vodId: string, startSeconds?: number) => Promise<void>
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number) => Promise<void>
     stop: () => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }

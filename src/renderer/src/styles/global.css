@@ -691,6 +691,21 @@ body,
   border-radius: 4px;
 }
 
+.channel-screen__vod-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.channel-screen__vod-progress-bar {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 0 2px 2px 0;
+}
+
 .channel-screen__vod-title {
   margin: 0;
   font-size: 15px;
@@ -706,6 +721,26 @@ body,
   margin: 0;
   font-size: 13px;
   color: var(--color-fg-dim);
+}
+
+.channel-screen__vod-watched {
+  color: var(--color-accent);
+}
+
+.channel-screen__vod-completed {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.channel-screen__vod-completed svg {
+  width: 48px;
+  height: 48px;
+  color: #fff;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
 }
 
 /* ── Account Screen ───────────────────────────────── */

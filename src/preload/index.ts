@@ -10,6 +10,7 @@ const IPC = {
 
   twitchGetFollowed: 'twitch:get-followed',
   twitchGetVideos: 'twitch:get-videos',
+  historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
@@ -60,6 +61,12 @@ export interface VodInfo {
   thumbnailUrl: string
 }
 
+export interface VodProgress {
+  resumePositionSeconds: number
+  watchedAt: number
+  completed: boolean
+}
+
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
   auth: {
@@ -80,11 +87,15 @@ const api = {
     getVideos: (broadcasterId: string): Promise<VodInfo[]> =>
       ipcRenderer.invoke(IPC.twitchGetVideos, broadcasterId)
   },
+  history: {
+    getProgress: (vodIds: string[]): Promise<Record<string, VodProgress>> =>
+      ipcRenderer.invoke(IPC.historyGetProgress, vodIds)
+  },
   playback: {
     startLive: (channelLogin: string, quality?: string): Promise<void> =>
       ipcRenderer.invoke(IPC.playbackStartLive, channelLogin, quality),
-    startVod: (vodId: string, startSeconds?: number): Promise<void> =>
-      ipcRenderer.invoke(IPC.playbackStartVod, vodId, startSeconds),
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)

@@ -33,33 +33,52 @@ function resolveMpvBin(): string {
 const STREAMLINK_BIN = resolveStreamlinkBin()
 const MPV_BIN = resolveMpvBin()
 
-export interface StreamlinkOptions {
-  url: string
-  quality: string
-  mpvIpcPath: string
+/** Startet streamlink so dass es mpv als Player verwendet (für Live-Streams). */
+export function spawnStreamlink(url: string, quality: string): ChildProcess {
+  return spawn(STREAMLINK_BIN, ['--player', MPV_BIN, '--player-args', '--fullscreen', url, quality], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+}
+
+/**
+ * Fragt streamlink nach der direkten HLS-URL für einen VOD.
+ * mpv kann diese URL dann nativ laden und darin seeked.
+ */
+export function getStreamUrl(url: string, quality: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(STREAMLINK_BIN, ['--stream-url', url, quality], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    let out = ''
+    proc.stdout?.on('data', (d: Buffer) => { out += d.toString() })
+    proc.on('error', reject)
+    proc.on('exit', (code) => {
+      const hlsUrl = out.trim()
+      if (code === 0 && hlsUrl) {
+        resolve(hlsUrl)
+      } else {
+        reject(new Error(`streamlink --stream-url exit ${code}`))
+      }
+    })
+  })
+}
+
+export interface MpvOptions {
+  ipcPath: string
   startSeconds?: number
 }
 
-export function spawnStreamlink({
-  url,
-  quality,
-  mpvIpcPath,
-  startSeconds
-}: StreamlinkOptions): ChildProcess {
+/** Startet mpv direkt mit einer URL (HLS oder lokal). IPC-Socket wird gesetzt. */
+export function spawnMpv(url: string, { ipcPath, startSeconds }: MpvOptions): ChildProcess {
   const hwdec = process.platform === 'win32' ? 'auto' : 'vaapi'
-  let playerArgs = `--input-ipc-server=${mpvIpcPath} --fullscreen --hwdec=${hwdec}`
-  if (startSeconds && startSeconds > 0) {
-    playerArgs += ` --start=${startSeconds}`
-  }
-
   const args = [
-    '--player',
-    MPV_BIN,
-    '--player-args',
-    playerArgs,
     url,
-    quality
+    `--input-ipc-server=${ipcPath}`,
+    '--fullscreen',
+    `--hwdec=${hwdec}`
   ]
-
-  return spawn(STREAMLINK_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+  if (startSeconds && startSeconds > 0) {
+    args.push(`--start=${startSeconds}`)
+  }
+  return spawn(MPV_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 }

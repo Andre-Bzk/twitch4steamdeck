@@ -151,60 +151,66 @@ Header: `Client-Id: <id>`, `Authorization: Bearer <access_token>`.
 `getFollowedWithLiveStatus()` merged Followed + Live + Avatare zu `FollowedChannelInfo[]` und
 sortiert live-zuerst, dann alphabetisch.
 
-### Streamlink + mpv (⏳ Phase 3)
+### Streamlink + mpv (✅ Phase 3 + 4)
 
-**Kommandos (Linux / Flatpak-Target):**
+**Zwei unterschiedliche Spawn-Strategien (implementiert):**
+
+**Live-Streams** (`spawnStreamlink`):
 ```
-streamlink \
-  --twitch-disable-ads \
-  --twitch-api-header=Authorization=OAuth <token> \
-  --stdout twitch.tv/<channel> best
-  | mpv - \
-    --input-ipc-server=/tmp/twitch4sd-mpv.sock \
-    --fullscreen --hwdec=vaapi
+streamlink --player <mpv-bin> --player-args "--fullscreen" twitch.tv/<channel> best
 ```
+- streamlink spawnt mpv als Kind-Prozess, kein IPC
+- `--twitch-disable-ads` wurde von streamlink deaktiviert (deprecated) — kein Ad-Bypass
+- `--twitch-api-header=Authorization=OAuth` wird **nicht** übergeben: Twitch lehnt
+  Device-Code-Flow-Token für streamlinks interne GQL-API ab
 
-**Windows-Entwicklung (Ist-Umgebung):**
-- mpv: `winget install mpv` oder Binary von mpv.io ins PATH
-- streamlink: `winget install streamlink` oder `pip install streamlink`
-- IPC-Socket: Named Pipe `\\.\pipe\twitch4sd-mpv` (nicht `/tmp/...sock`)
-- `--hwdec=vaapi` → auf Windows `--hwdec=d3d11va` oder `auto`
-- Pipe stdout → stdin funktioniert auch unter Windows (Node `spawn` mit stdio pipe)
+**VODs** (`getStreamUrl` + `spawnMpv`):
+```
+# Schritt 1: HLS-URL abrufen
+streamlink --stream-url https://www.twitch.tv/videos/<id> best
+# → gibt z.B. https://…/playlist.m3u8 zurück
 
-**Architektur-Entscheidung für `mpvController`:**
-- `process.platform === 'win32'` → Named Pipe path, sonst Unix Socket
-- Nach `spawn` kurz warten (100–200 ms) bis der IPC-Endpoint bereit ist, dann `net.createConnection`
-- JSON-IPC: pro Zeile ein Command `{"command": ["set_property", "pause", true]}\n`
-- Property-Observer für `time-pos` → Events in Main-Prozess → IPC zum Renderer (für Phase 5 Verlauf)
+# Schritt 2: mpv direkt mit HLS-URL starten
+mpv <hls-url> --input-ipc-server=<ipcPath> --fullscreen --hwdec=<auto|vaapi> --start=<resumePos>
+```
+- mpv wird direkt gespawnt (nicht via streamlink) → HLS-URL ist seekable → Seeking/Fortschrittsbalken funktioniert
+- IPC funktioniert zuverlässig (direkter mpv-Prozess, kein Pfad-Escaping durch streamlink)
+- `--hwdec=auto` auf Windows, `--hwdec=vaapi` auf Linux/Steam Deck
 
-**Spezielle Streamlink-Flags zu prüfen:**
-- `--twitch-low-latency` (reduziert Buffer, kann aber stottern verursachen)
-- `--twitch-disable-hosting`
-- TTV.LOL-Plugin: `pip install streamlink-ttvlol` — Fallback falls `--twitch-disable-ads` allein
-  keine Werbe-Umgehung mehr leistet.
+**IPC-Pfade:**
+- Windows: Named Pipe `\\.\pipe\twitch4sd-mpv`
+- Linux/Flatpak: Unix Socket `/tmp/twitch4sd-mpv.sock`
 
-**IPC zwischen Renderer und Main (Phase 3):**
-- `playback:start-live` → `{channelLogin, quality}` → startet Prozess-Kette, gibt `playbackId` zurück
-- `playback:stop` → sendet `quit` an mpv, killt streamlink
-- `playback:event` (main → renderer) → `{kind: 'started' | 'stopped' | 'error', message?}`
+**mpvController** (`src/main/playback/mpvController.ts`):
+- `connect(retries, delayMs)` — verbindet nach Spawn
+- `observeTimePos(cb)` — registriert `observe_property 1 time-pos`, parst JSON-Lines
+- `quit()` — sendet `{"command":["quit"]}` via IPC
+- Wird bei Live-Streams instanziiert aber nie verbunden (harmlos)
 
-### VOD-History-DB (⏳ Phase 5)
+**IPC zwischen Renderer und Main:**
+- `playback:start-live` → `(channelLogin, quality?)` → `PlaybackService.startLive()`
+- `playback:start-vod` → `(vodId, channelLogin, title, durationSeconds)` → `PlaybackService.startVod()`
+- `playback:stop` → `PlaybackService.stop()`
+- `playback:event` (main → renderer) → `{kind: 'started'|'stopped'|'error', message?}`
+
+### VOD-History-DB (✅ Phase 5)
 ```sql
 CREATE TABLE vod_history (
-  vod_id TEXT PRIMARY KEY,
-  channel_login TEXT NOT NULL,
-  channel_display TEXT,
-  title TEXT,
-  thumbnail_url TEXT,
-  duration_seconds INTEGER,
-  resume_position_seconds INTEGER NOT NULL DEFAULT 0,
-  watched_at INTEGER NOT NULL,
-  completed INTEGER NOT NULL DEFAULT 0
+  vod_id                   TEXT PRIMARY KEY,
+  channel_login            TEXT NOT NULL,
+  title                    TEXT,
+  duration_seconds         INTEGER,
+  resume_position_seconds  INTEGER NOT NULL DEFAULT 0,
+  watched_at               INTEGER NOT NULL,
+  completed                INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX idx_history_watched ON vod_history(watched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_history_watched ON vod_history(watched_at DESC);
 ```
-„Continue Watching": `SELECT … WHERE completed=0 ORDER BY watched_at DESC LIMIT 20`.
-Complete-Threshold: `resume_position / duration > 0.95`.
+- DB-Pfad: `app.getPath('userData')/history.db`, WAL-Modus
+- Complete-Threshold: `resume_position / duration > 0.95`
+- `„Continue Watching"-Reihe` bewusst weggelassen (nicht benötigt)
+- IPC: `history:get-progress` → `(vodIds: string[]) → Record<vodId, VodProgress>`
+- VOD-Karte zeigt: Fortschrittsbalken, `0:16 von 6:22`, `Vor X Min.`, Completed-Overlay
 
 ### Big-Screen-UI / Gamepad
 - Spatial-Navigation-Lib oder eigene Mini-Implementierung.
