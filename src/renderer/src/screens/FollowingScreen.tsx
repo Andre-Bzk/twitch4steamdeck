@@ -5,11 +5,16 @@ import type { FollowedChannelInfo } from '../types/t4sd'
 interface Props {
   hasFocus: boolean
   onRequestSidebar: () => void
+  onSelectChannel: (ch: FollowedChannelInfo) => void
 }
 
 type LoadState = 'loading' | 'ok' | 'error'
 
-export default function FollowingScreen({ hasFocus, onRequestSidebar }: Props): JSX.Element {
+export default function FollowingScreen({
+  hasFocus,
+  onRequestSidebar,
+  onSelectChannel
+}: Props): JSX.Element {
   const [channels, setChannels] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -136,10 +141,7 @@ export default function FollowingScreen({ hasFocus, onRequestSidebar }: Props): 
               channel={ch}
               focused={hasFocus && i === focusedIndex}
               onFocus={() => setFocusedIndex(i)}
-              onSelect={() => {
-                // Phase 3: Channel-Detail-Screen öffnen
-                console.log('[FollowingScreen] Kanal ausgewählt:', ch.broadcasterLogin)
-              }}
+              onSelect={() => onSelectChannel(ch)}
             />
           ))}
         </div>

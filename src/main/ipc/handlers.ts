@@ -1,6 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { AuthEvent, AuthService } from '../auth/authService'
 import type { HelixClient } from '../twitch/helixClient'
+import type { PlaybackService } from '../playback/playbackService'
+import type { PlaybackEvent } from '../playback/types'
 
 export const IPC = {
   authStatus: 'auth:get-status',
@@ -11,10 +13,19 @@ export const IPC = {
   /** main → renderer */
   authEvent: 'auth:event',
 
-  twitchGetFollowed: 'twitch:get-followed'
+  twitchGetFollowed: 'twitch:get-followed',
+
+  playbackStartLive: 'playback:start-live',
+  playbackStop: 'playback:stop',
+  /** main → renderer */
+  playbackEvent: 'playback:event'
 } as const
 
-export function registerIpcHandlers(auth: AuthService, helix: HelixClient): void {
+export function registerIpcHandlers(
+  auth: AuthService,
+  helix: HelixClient,
+  playback: PlaybackService
+): void {
   ipcMain.handle(IPC.authStatus, () => auth.getStatus())
   ipcMain.handle(IPC.authConfigured, () => auth.isConfigured())
   ipcMain.handle(IPC.authStart, () => auth.startDeviceFlow())
@@ -30,4 +41,16 @@ export function registerIpcHandlers(auth: AuthService, helix: HelixClient): void
   })
 
   ipcMain.handle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
+
+  ipcMain.handle(
+    IPC.playbackStartLive,
+    (_e, channelLogin: string, quality?: string) => playback.startLive(channelLogin, quality)
+  )
+  ipcMain.handle(IPC.playbackStop, () => playback.stop())
+
+  playback.on('playback-event', (event: PlaybackEvent) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.playbackEvent, event)
+    }
+  })
 }

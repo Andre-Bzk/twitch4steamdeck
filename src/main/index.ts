@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { AuthService } from './auth/authService'
 import { HelixClient } from './twitch/helixClient'
+import { PlaybackService } from './playback/playbackService'
 import { registerIpcHandlers } from './ipc/handlers'
 
 const isDev = !app.isPackaged
@@ -44,7 +45,13 @@ app.whenReady().then(async () => {
   const auth = new AuthService(clientId)
   await auth.init()
   const helix = new HelixClient(clientId, () => auth.getValidAccessToken())
-  registerIpcHandlers(auth, helix)
+  const playback = new PlaybackService()
+
+  registerIpcHandlers(auth, helix, playback)
+
+  app.on('before-quit', () => {
+    playback.stopAll()
+  })
 
   if (!clientId) {
     console.warn(

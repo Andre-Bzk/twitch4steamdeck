@@ -44,48 +44,29 @@
 ## Phase 3 — Streamlink + mpv (Live-Wiedergabe)
 
 ### Vorab (Dev-Setup, Windows)
-- [ ] **User:** `mpv` installieren und im PATH verfügbar machen (`winget install mpv` oder
-      Binary von mpv.io) — `mpv --version` muss in Shell funktionieren
-- [ ] **User:** `streamlink` installieren (`winget install streamlink` oder
-      `pip install streamlink`) — `streamlink --version` muss funktionieren
-- [ ] **User:** Kurz manuell testen:
-      `streamlink --twitch-disable-ads twitch.tv/<live-channel> best --player mpv`
-      → soll ein mpv-Fenster mit Live-Stream öffnen. Wenn das klappt, ist der Pipeline-Baseline
-      verifiziert und wir können im Code darauf aufbauen.
+- [x] **User:** `mpv` installieren — `winget install shinchiro.mpv`, via `setx` zum PATH
+- [x] **User:** `streamlink` installieren — `winget install streamlink` (8.2.1)
+- [x] **User:** Baseline-Test erfolgreich:
+      `streamlink --twitch-disable-ads twitch.tv/streamerhouse best --player mpv`
 
 ### Backend (Main-Prozess)
-- [ ] `src/main/playback/types.ts` — `PlaybackState`, `PlaybackEvent`, `Quality`
-- [ ] `src/main/playback/streamlink.ts` — `spawnStreamlink({channelLogin, quality, oauthToken})`,
-      gibt `ChildProcess` mit stdout-Stream zurück, `--twitch-disable-ads`,
-      `--twitch-api-header=Authorization=OAuth <token>`, stderr in Logger
-- [ ] `src/main/playback/mpvController.ts`:
-  - [ ] Plattform-Weiche: `win32` → Named Pipe `\\.\pipe\twitch4sd-mpv-<pid>`,
-        sonst Unix Socket unter `os.tmpdir()`
-  - [ ] `start(stdin)` — spawnt mpv mit `--input-ipc-server=<path> --fullscreen --hwdec=auto -`
-  - [ ] IPC-Client verbindet mit Retry (100–200 ms Delay nach spawn)
-  - [ ] Commands: `pause(bool)`, `seek(sec)`, `quit()`, `observeProperty(name)`
-  - [ ] `EventEmitter`-Events: `'started'`, `'time-pos'`, `'ended'`, `'error'`
-- [ ] `src/main/playback/playbackService.ts` — bindet streamlink + mpv zusammen,
-      verwaltet `currentPlayback: { streamlink, mpv, channelLogin }`, räumt beim Stop auf
-- [ ] IPC-Kanäle (in `handlers.ts`):
-  - [ ] `playback:start-live` → `{channelLogin, quality}` → `Promise<{playbackId}>`
-  - [ ] `playback:stop`
-  - [ ] `playback:event` (main → renderer, `{kind, payload?}`)
+- [x] `src/main/playback/types.ts`
+- [x] `src/main/playback/streamlink.ts` — `resolveStreamlinkBin()` (Win32-Pfad-Auflösung),
+      `spawnStreamlink()` mit `--player mpv --player-args "..."` (Variante 2)
+- [x] `src/main/playback/mpvController.ts` — Named Pipe (Win32) / Unix Socket (Linux),
+      connect mit Retry, `quit()`, `disconnect()`
+- [x] `src/main/playback/playbackService.ts`
+- [x] IPC-Kanäle: `playback:start-live`, `playback:stop`, `playback:event`
 
 ### Renderer (UI)
-- [ ] Preload + `t4sd.d.ts` erweitern: `window.t4sd.playback.{startLive, stop, onEvent}`
-- [ ] `src/renderer/src/screens/ChannelScreen.tsx` — Detail-Screen:
-  - [ ] Hero mit Thumbnail/Avatar + Kanalname + Titel + Spiel + Viewer
-  - [ ] Button „Live ansehen" (default `best`)
-  - [ ] Quality-Picker als Dropdown/Liste (`best`, `720p`, `480p`, `audio_only`) — MVP optional,
-        kann mit Default `best` beginnen und später nachgezogen werden
-  - [ ] „Zurück"-Button (B / Escape)
-- [ ] Routing in `AppShell.tsx` erweitern: `selectedChannel: FollowedChannelInfo | null` State,
-      wenn gesetzt → `ChannelScreen` statt `FollowingScreen` anzeigen
-- [ ] `FocusableCard.onSelect` → setzt `selectedChannel`
-- [ ] Spatial-Nav: B-Taste / Escape im ChannelScreen → zurück zu FollowingScreen
+- [x] Preload + `t4sd.d.ts` erweitern: `window.t4sd.playback.{startLive, stop, onEvent}`
+- [x] `src/renderer/src/screens/ChannelScreen.tsx` (Hero + Live-Button + Zustandsanzeige)
+- [x] Routing in `AppShell.tsx`: `selectedChannel`-State → `ChannelScreen`
+- [x] `FocusableCard.onSelect` → setzt `selectedChannel` via `onSelectChannel`-Prop
+- [x] Spatial-Nav: Escape/B im ChannelScreen → Stop oder Zurück
 
 ### Verifikation
+- [ ] **mpv PATH-Problem lösen** (VS Code neu starten, dann testen — siehe CLAUDE_PROGRESS.md)
 - [ ] 5 min Live-Stream ohne Werbe-Unterbrechung auf Windows (Dev-Setup)
 - [ ] Beim Stop: mpv-Fenster schließt sich sauber, streamlink-Prozess terminiert,
       keine Zombie-Prozesse im Task-Manager

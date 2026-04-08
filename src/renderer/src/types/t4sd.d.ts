@@ -28,6 +28,12 @@ export interface FollowedChannelInfo {
   startedAt?: string
 }
 
+export interface PlaybackEvent {
+  kind: 'started' | 'stopped' | 'error'
+  channelLogin?: string
+  message?: string
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -40,6 +46,11 @@ export interface T4sdApi {
   }
   twitch: {
     getFollowed: () => Promise<FollowedChannelInfo[]>
+  }
+  playback: {
+    startLive: (channelLogin: string, quality?: string) => Promise<void>
+    stop: () => Promise<void>
+    onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
 }
 

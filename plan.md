@@ -79,14 +79,16 @@ twitch4steamdeck/
 │   │   │   ├── helixClient.ts            ✅
 │   │   │   └── types.ts                  ✅
 │   │   ├── playback/
-│   │   │   ├── streamlink.ts             ⏳ Phase 3
-│   │   │   └── mpvController.ts          ⏳ Phase 3
+│   │   │   ├── types.ts                  ✅ Phase 3
+│   │   │   ├── streamlink.ts             ✅ Phase 3
+│   │   │   ├── mpvController.ts          ✅ Phase 3
+│   │   │   └── playbackService.ts        ✅ Phase 3
 │   │   ├── store/
 │   │   │   ├── db.ts                     ⏳ Phase 5
 │   │   │   ├── historyRepo.ts            ⏳ Phase 5
 │   │   │   └── settingsRepo.ts           ⏳ Phase 5
 │   │   └── ipc/
-│   │       └── handlers.ts               ✅ (Auth + twitch:get-followed)
+│   │       └── handlers.ts               ✅ (Auth + twitch:get-followed + playback:*)
 │   ├── preload/
 │   │   └── index.ts                      ✅ (auth + twitch APIs)
 │   └── renderer/
@@ -100,8 +102,8 @@ twitch4steamdeck/
 │           │   ├── FollowingScreen.tsx   ✅ (ersetzt die ursprünglich geplante HomeScreen.tsx)
 │           │   ├── BrowseScreen.tsx      ✅ (Platzhalter)
 │           │   ├── AccountScreen.tsx     ✅ (Platzhalter + Logout)
-│           │   ├── ChannelScreen.tsx     ⏳ Phase 3/4 (Detail-Screen mit „Live ansehen")
-│           │   └── PlayerLaunchScreen.tsx ⏳ Phase 3
+│           │   ├── ChannelScreen.tsx     ✅ Phase 3
+│           │   └── PlayerLaunchScreen.tsx — entfällt (in ChannelScreen integriert)
 │           ├── components/
 │           │   ├── Sidebar.tsx           ✅
 │           │   ├── Icons.tsx             ✅ (inline SVG: Heart/Compass/User)

@@ -8,7 +8,11 @@ const IPC = {
   authConfigured: 'auth:is-configured',
   authEvent: 'auth:event',
 
-  twitchGetFollowed: 'twitch:get-followed'
+  twitchGetFollowed: 'twitch:get-followed',
+
+  playbackStartLive: 'playback:start-live',
+  playbackStop: 'playback:stop',
+  playbackEvent: 'playback:event'
 } as const
 
 export type AuthStatus = 'logged-out' | 'logged-in'
@@ -39,6 +43,12 @@ export interface FollowedChannelInfo {
   startedAt?: string
 }
 
+export interface PlaybackEvent {
+  kind: 'started' | 'stopped' | 'error'
+  channelLogin?: string
+  message?: string
+}
+
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
   auth: {
@@ -56,6 +66,16 @@ const api = {
   twitch: {
     getFollowed: (): Promise<FollowedChannelInfo[]> =>
       ipcRenderer.invoke(IPC.twitchGetFollowed)
+  },
+  playback: {
+    startLive: (channelLogin: string, quality?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.playbackStartLive, channelLogin, quality),
+    stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
+    onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
+      ipcRenderer.on(IPC.playbackEvent, listener)
+      return () => ipcRenderer.removeListener(IPC.playbackEvent, listener)
+    }
   }
 }
 

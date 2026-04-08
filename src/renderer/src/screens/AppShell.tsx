@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import Sidebar, { SIDEBAR_ITEMS, type TabKey } from '../components/Sidebar'
 import AccountScreen from './AccountScreen'
 import BrowseScreen from './BrowseScreen'
+import ChannelScreen from './ChannelScreen'
 import FollowingScreen from './FollowingScreen'
+import type { FollowedChannelInfo } from '../types/t4sd'
 
 type Region = 'sidebar' | 'main'
 
@@ -14,12 +16,21 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [tab, setTab] = useState<TabKey>('following')
   const [region, setRegion] = useState<Region>('main')
   const [sidebarIndex, setSidebarIndex] = useState(0)
+  const [selectedChannel, setSelectedChannel] = useState<FollowedChannelInfo | null>(null)
 
   const requestSidebar = useCallback(() => {
     const idx = SIDEBAR_ITEMS.findIndex((t) => t.key === tab)
     setSidebarIndex(idx >= 0 ? idx : 0)
     setRegion('sidebar')
   }, [tab])
+
+  const handleSelectChannel = useCallback((ch: FollowedChannelInfo) => {
+    setSelectedChannel(ch)
+  }, [])
+
+  const handleBack = useCallback(() => {
+    setSelectedChannel(null)
+  }, [])
 
   // Key-Handler für die Sidebar (wenn sie den Fokus hat)
   useEffect(() => {
@@ -41,6 +52,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         case 'Enter':
           e.preventDefault()
           setTab(SIDEBAR_ITEMS[sidebarIndex].key)
+          setSelectedChannel(null)
           setRegion('main')
           break
       }
@@ -58,22 +70,33 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         focusedIndex={region === 'sidebar' ? sidebarIndex : -1}
         onItemClick={(k) => {
           setTab(k)
+          setSelectedChannel(null)
           setRegion('main')
         }}
       />
       <div className="main-content">
-        {tab === 'following' && (
-          <FollowingScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
-        )}
-        {tab === 'browse' && (
-          <BrowseScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
-        )}
-        {tab === 'account' && (
-          <AccountScreen
-            hasFocus={mainFocus}
-            onRequestSidebar={requestSidebar}
-            onLogout={onLogout}
-          />
+        {selectedChannel ? (
+          <ChannelScreen channel={selectedChannel} onBack={handleBack} />
+        ) : (
+          <>
+            {tab === 'following' && (
+              <FollowingScreen
+                hasFocus={mainFocus}
+                onRequestSidebar={requestSidebar}
+                onSelectChannel={handleSelectChannel}
+              />
+            )}
+            {tab === 'browse' && (
+              <BrowseScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
+            )}
+            {tab === 'account' && (
+              <AccountScreen
+                hasFocus={mainFocus}
+                onRequestSidebar={requestSidebar}
+                onLogout={onLogout}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
