@@ -14,8 +14,10 @@ export const IPC = {
   authEvent: 'auth:event',
 
   twitchGetFollowed: 'twitch:get-followed',
+  twitchGetVideos: 'twitch:get-videos',
 
   playbackStartLive: 'playback:start-live',
+  playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
   /** main → renderer */
   playbackEvent: 'playback:event'
@@ -41,10 +43,18 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
+  ipcMain.handle(
+    IPC.twitchGetVideos,
+    (_e, broadcasterId: string) => helix.getVideos(broadcasterId)
+  )
 
   ipcMain.handle(
     IPC.playbackStartLive,
     (_e, channelLogin: string, quality?: string) => playback.startLive(channelLogin, quality)
+  )
+  ipcMain.handle(
+    IPC.playbackStartVod,
+    (_e, vodId: string, startSeconds?: number) => playback.startVod(vodId, startSeconds)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
 

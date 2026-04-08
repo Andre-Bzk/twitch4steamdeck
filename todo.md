@@ -66,17 +66,18 @@
 - [x] Spatial-Nav: Escape/B im ChannelScreen → Stop oder Zurück
 
 ### Verifikation
-- [ ] **mpv PATH-Problem lösen** (VS Code neu starten, dann testen — siehe CLAUDE_PROGRESS.md)
-- [ ] 5 min Live-Stream ohne Werbe-Unterbrechung auf Windows (Dev-Setup)
-- [ ] Beim Stop: mpv-Fenster schließt sich sauber, streamlink-Prozess terminiert,
-      keine Zombie-Prozesse im Task-Manager
-- [ ] Logout/Login und erneutes Starten funktioniert ohne App-Neustart
+- [x] Stream startet: mpv-Fenster öffnet sich, Stream spielt ab (2026-04-08)
+      _(Fix: --twitch-api-header entfernt, resolveMpvBin() ergänzt)_
+- [x] **User:** Stop-Verhalten: mpv-Fenster schließt sich, keine Zombie-Prozesse (2026-04-08)
+- [x] **User:** Logout → Login → Stream starten funktioniert ohne App-Neustart (2026-04-08)
+      ⚠️ `--twitch-disable-ads` ist von streamlink deaktiviert — Werbung wird ggf. abgespielt (Post-MVP)
 
 ## Phase 4 — VOD-Browsing + -Wiedergabe
-- [ ] Helix `GET /videos?user_id=…&type=archive` (paginiert)
-- [ ] VOD-Listen-Screen pro Channel
-- [ ] `playback:start-vod` (mit optionaler Resume-Position)
-- [ ] mpv-Resume: `--start=<seconds>` beim Spawn
+- [x] Helix `GET /videos?user_id=…&type=archive` → `getVideos()` in helixClient
+- [x] VOD-Shelf im ChannelScreen (horizontal, obere Hälfte fix)
+- [x] `playback:start-vod` IPC-Kanal + `PlaybackService.startVod()`
+- [x] mpv `--start=<seconds>` beim Spawn (Parameter vorbereitet für Phase 5)
+- [x] **User:** VOD-Wiedergabe + Stop-Verhalten verifiziert (2026-04-08)
 
 ## Phase 5 — Lokaler VOD-Verlauf
 - [ ] SQLite-Setup: `src/main/store/db.ts` (better-sqlite3, Migrations)

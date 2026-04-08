@@ -34,25 +34,30 @@ const STREAMLINK_BIN = resolveStreamlinkBin()
 const MPV_BIN = resolveMpvBin()
 
 export interface StreamlinkOptions {
-  channelLogin: string
+  url: string
   quality: string
   mpvIpcPath: string
+  startSeconds?: number
 }
 
 export function spawnStreamlink({
-  channelLogin,
+  url,
   quality,
-  mpvIpcPath
+  mpvIpcPath,
+  startSeconds
 }: StreamlinkOptions): ChildProcess {
   const hwdec = process.platform === 'win32' ? 'auto' : 'vaapi'
-  const playerArgs = `--input-ipc-server=${mpvIpcPath} --fullscreen --hwdec=${hwdec}`
+  let playerArgs = `--input-ipc-server=${mpvIpcPath} --fullscreen --hwdec=${hwdec}`
+  if (startSeconds && startSeconds > 0) {
+    playerArgs += ` --start=${startSeconds}`
+  }
 
   const args = [
     '--player',
     MPV_BIN,
     '--player-args',
     playerArgs,
-    `twitch.tv/${channelLogin}`,
+    url,
     quality
   ]
 

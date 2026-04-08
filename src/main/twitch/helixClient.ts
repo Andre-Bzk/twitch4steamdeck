@@ -3,8 +3,21 @@ import type {
   HelixFollowedChannel,
   HelixPaginatedResponse,
   HelixStream,
-  HelixUser
+  HelixUser,
+  HelixVideo,
+  VodInfo
 } from './types'
+
+function parseDuration(d: string): number {
+  let s = 0
+  const h = d.match(/(\d+)h/)
+  const m = d.match(/(\d+)m/)
+  const sec = d.match(/(\d+)s/)
+  if (h) s += parseInt(h[1]) * 3600
+  if (m) s += parseInt(m[1]) * 60
+  if (sec) s += parseInt(sec[1])
+  return s
+}
 
 const BASE = 'https://api.twitch.tv/helix'
 
@@ -94,6 +107,24 @@ export class HelixClient {
       for (const user of data.data) map.set(user.id, user.profile_image_url)
     }
     return map
+  }
+
+  async getVideos(broadcasterId: string, limit = 20): Promise<VodInfo[]> {
+    const data = await this.get<HelixPaginatedResponse<HelixVideo>>('/videos', {
+      user_id: broadcasterId,
+      type: 'archive',
+      first: String(limit)
+    })
+    return data.data.map((v) => ({
+      id: v.id,
+      title: v.title,
+      createdAt: v.created_at,
+      durationSeconds: parseDuration(v.duration),
+      viewCount: v.view_count,
+      thumbnailUrl: v.thumbnail_url
+        .replace('%{width}', '440')
+        .replace('%{height}', '248')
+    }))
   }
 
   async getFollowedWithLiveStatus(): Promise<FollowedChannelInfo[]> {

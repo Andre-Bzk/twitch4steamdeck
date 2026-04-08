@@ -23,7 +23,7 @@ export class PlaybackService extends EventEmitter {
     }
 
     const sl = spawnStreamlink({
-      channelLogin,
+      url: `twitch.tv/${channelLogin}`,
       quality,
       mpvIpcPath: this.ipcPath
     })
@@ -62,6 +62,50 @@ export class PlaybackService extends EventEmitter {
     } satisfies PlaybackEvent)
 
     // IPC-Verbindung zu mpv im Hintergrund (nicht blockierend, nicht kritisch)
+    mpv.connect().catch(() => {})
+  }
+
+  async startVod(vodId: string, startSeconds = 0): Promise<void> {
+    if (this.current) {
+      await this.stop()
+    }
+
+    const sl = spawnStreamlink({
+      url: `https://www.twitch.tv/videos/${vodId}`,
+      quality: 'best',
+      mpvIpcPath: this.ipcPath,
+      startSeconds
+    })
+
+    sl.stdout?.on('data', (d: Buffer) => {
+      console.log('[streamlink stdout]', d.toString().trim())
+    })
+
+    sl.stderr?.on('data', (d: Buffer) => {
+      console.log('[streamlink stderr]', d.toString().trim())
+    })
+
+    sl.on('error', (e: Error) => {
+      console.error('[streamlink] spawn error:', e)
+      if (this.current?.streamlink === sl) this.current = null
+      this.emit('playback-event', {
+        kind: 'error',
+        message: `streamlink Fehler: ${e.message}`
+      } satisfies PlaybackEvent)
+    })
+
+    sl.on('exit', (code) => {
+      if (this.current?.streamlink === sl) this.current = null
+      if (code !== 0 && code !== null) {
+        console.warn('[streamlink] exit code', code)
+      }
+      this.emit('playback-event', { kind: 'stopped' } satisfies PlaybackEvent)
+    })
+
+    const mpv = new MpvController(this.ipcPath)
+    this.current = { channelLogin: vodId, streamlink: sl, mpv }
+
+    this.emit('playback-event', { kind: 'started' } satisfies PlaybackEvent)
     mpv.connect().catch(() => {})
   }
 

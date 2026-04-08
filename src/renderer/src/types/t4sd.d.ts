@@ -34,6 +34,15 @@ export interface PlaybackEvent {
   message?: string
 }
 
+export interface VodInfo {
+  id: string
+  title: string
+  createdAt: string
+  durationSeconds: number
+  viewCount: number
+  thumbnailUrl: string
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -46,9 +55,11 @@ export interface T4sdApi {
   }
   twitch: {
     getFollowed: () => Promise<FollowedChannelInfo[]>
+    getVideos: (broadcasterId: string) => Promise<VodInfo[]>
   }
   playback: {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
+    startVod: (vodId: string, startSeconds?: number) => Promise<void>
     stop: () => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
