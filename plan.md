@@ -30,7 +30,9 @@ mit Resume. Verteilung als Flatpak.
 3. Live-Stream-Wiedergabe werbefrei (Streamlink → mpv)
 4. VOD-Browsing pro Kanal
 5. VOD-Wiedergabe werbefrei
-6. Lokaler VOD-Verlauf + Resume + „Continue Watching"-Reihe
+6. Lokaler VOD-Verlauf + Resume
+7. Browse: Top Live-Streams + Kategorien (mit Zuschauerzahlen, Infinite Scroll)
+8. Einstellungen: Sprach-Badge / Flagge auf Thumbnails
 
 **Bewusst nicht im MVP:** Chat/Emotes, Suche (Text-Input), PiP, Themes.
 
@@ -57,6 +59,19 @@ mit Resume. Verteilung als Flatpak.
 
 Wiedergabe läuft **außerhalb** Electron in einem mpv-Vollbildfenster.
 Electron startet/stoppt mpv, sendet Befehle, lauscht auf `time-pos` für Verlaufsspeicherung.
+
+## Architektur-Abweichungen (aktuell)
+
+Zusätzlich zu den ursprünglichen Abweichungen:
+- **Browse-Screen** (`BrowseScreen.tsx`) ist kein Platzhalter mehr, sondern
+  ein vollständiger Screen mit Shelf (Top Live) + Kategorien-Grid.
+- **CategoryScreen** (`CategoryScreen.tsx`) neu: Drilldown aus Browse in
+  Streams einer Kategorie. Key-Mapping: Enter=Live, X=ChannelScreen, B=zurück.
+- **SettingsContext** (`context/SettingsContext.tsx`): globaler React-Context
+  mit localStorage-Persistenz für UI-Präferenzen. Kein IPC nötig.
+- **LanguageBadge** (`components/LanguageBadge.tsx`): rendert Sprachkürzel/Flagge
+  auf Thumbnails. Flaggen = Unicode-Emoji, auf Steam Deck (Noto Emoji) korrekt.
+- **Gamepad Button 2 (X) + 3 (Y)** jetzt gemappt: `'x'` / `'y'`.
 
 ## Verzeichnisstruktur (Ist-Stand + Soll)
 
@@ -96,20 +111,25 @@ twitch4steamdeck/
 │       └── src/
 │           ├── main.tsx                  ✅
 │           ├── App.tsx                   ✅ (Routing: LoginScreen / AppShell)
+│           ├── context/
+│           │   └── SettingsContext.tsx   ✅ Phase 5.6
 │           ├── screens/
 │           │   ├── LoginScreen.tsx       ✅
 │           │   ├── AppShell.tsx          ✅ (Sidebar + Main-Content, Region-Nav)
-│           │   ├── FollowingScreen.tsx   ✅ (ersetzt die ursprünglich geplante HomeScreen.tsx)
-│           │   ├── BrowseScreen.tsx      ✅ (Platzhalter)
+│           │   ├── FollowingScreen.tsx   ✅
+│           │   ├── BrowseScreen.tsx      ✅ Phase 5.5 (Shelf + Kategorien-Grid)
+│           │   ├── CategoryScreen.tsx    ✅ Phase 5.5 (Streams pro Kategorie)
 │           │   ├── AccountScreen.tsx     ✅ (Platzhalter + Logout)
+│           │   ├── SettingsScreen.tsx    ✅ Phase 5.6
 │           │   ├── ChannelScreen.tsx     ✅ Phase 3
 │           │   └── PlayerLaunchScreen.tsx — entfällt (in ChannelScreen integriert)
 │           ├── components/
-│           │   ├── Sidebar.tsx           ✅
-│           │   ├── Icons.tsx             ✅ (inline SVG: Heart/Compass/User)
-│           │   └── FocusableCard.tsx     ✅ (Block-Layout)
+│           │   ├── Sidebar.tsx           ✅ (4 Tabs inkl. Einstellungen)
+│           │   ├── Icons.tsx             ✅ (Heart/Compass/User/Settings)
+│           │   ├── FocusableCard.tsx     ✅ (mit LanguageBadge)
+│           │   └── LanguageBadge.tsx     ✅ Phase 5.6
 │           ├── input/
-│           │   └── gamepad.ts            ✅
+│           │   └── gamepad.ts            ✅ (A/B/X/Y + DPad gemappt)
 │           ├── types/
 │           │   └── t4sd.d.ts             ✅
 │           └── styles/
@@ -146,8 +166,12 @@ Implementierte Endpoints (in `src/main/twitch/helixClient.ts`):
 - `GET /channels/followed?user_id=…` (paginiert via `after`, safety-cap 500)
 - `GET /streams?user_id=…` (batched, max 100 IDs/Call)
 - `GET /videos?user_id=…&type=archive` — `getVideos()` ✅
-- `GET /games/top` — `getTopGames()` ✅ Phase 5.5
-- `GET /streams` (global + game_id) — `getTopStreams()` ✅ Phase 5.5
+- `GET /games/top?first=40&after=<cursor>` — `getTopGames(limit, cursor?)` ✅ Phase 5.5
+  - Gibt `{ games: GameInfo[], cursor?: string }` zurück (Pagination)
+  - Macht 40 parallele `/streams?game_id=<id>&first=100` Calls für Zuschauerzahlen
+- `GET /streams` (global `limit:100` + optional `game_id`) — `getTopStreams(opts?)` ✅ Phase 5.5
+  - Reichert mit Avataren an (`getProfileImages`, batched)
+  - Gibt `FollowedChannelInfo[]` zurück (inkl. `gameId`, `language`)
 
 Header: `Client-Id: <id>`, `Authorization: Bearer <access_token>`.
 `getFollowedWithLiveStatus()` merged Followed + Live + Avatare zu `FollowedChannelInfo[]` und
@@ -220,6 +244,17 @@ CREATE INDEX IF NOT EXISTS idx_history_watched ON vod_history(watched_at DESC);
 - Schrift: min. 22px Body, 36px+ Headlines.
 - Mapping: D-Pad/Stick = Navigation, A = Aktivieren, B = Zurück, Y = Refresh, Start = Menü, L1/R1 = Tab.
 
+### Settings (✅ Phase 5.6)
+
+- Persistenz: `localStorage`, Key `t4sd:settings`, synchron lesbar (kein Flicker)
+- Shape: `{ streamBadgeMode: 'off' | 'language' | 'flag' | 'both' }`
+- Default: `'language'`
+- React Context: `SettingsProvider` um `<App>`, `useSettings()` Hook
+- Flaggen: Unicode Regional Indicator Emojis — auf Steam Deck (Noto Color Emoji) korrekt,
+  auf Windows Dev-Host ggf. Rechtecke
+- `LanguageBadge` rendert in Thumbnails: unten-rechts (gegenüber Viewer-Count unten-links)
+- 38 Sprachen gemappt (pragmatische Twitch-Dominanz: `pt→🇧🇷`, `en→🇺🇸`, `zh→🇹🇼`)
+
 ### Flatpak (⏳ Phase 6)
 - Runtime: `org.freedesktop.Platform//23.08`, `org.electronjs.Electron2.BaseApp`
 - Module: app-bundle, `mpv`, `streamlink` (pip), evtl. `streamlink-ttvlol`
@@ -239,5 +274,6 @@ End-to-End auf Steam Deck oder Linux-Box:
 ## Offene Punkte (Post-MVP)
 - Eigene `client_id` im Build vor Release.
 - Chat / Emotes (BTTV/FFZ/7TV).
-- Suche, Kategorien, Top-Streams.
+- Suche (Text-Input am Gamepad — eigenes UX-Problem).
 - README + ToS-Disclaimer (Twitch-Werbeumgehung kann gegen ToS verstoßen).
+- Weitere Einstellungen (Qualität, Theme, ...) — Infrastruktur mit SettingsContext bereit.

@@ -47,6 +47,7 @@ export interface FollowedChannelInfo {
   viewerCount?: number
   thumbnailUrl?: string
   startedAt?: string
+  language?: string
 }
 
 export interface PlaybackEvent {

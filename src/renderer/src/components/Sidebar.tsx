@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { CompassIcon, HeartIcon, UserIcon } from './Icons'
+import { CompassIcon, HeartIcon, SettingsIcon, UserIcon } from './Icons'
 
-export type TabKey = 'following' | 'browse' | 'account'
+export type TabKey = 'following' | 'browse' | 'account' | 'settings'
 
 interface SidebarItemDef {
   key: TabKey
@@ -12,7 +12,8 @@ interface SidebarItemDef {
 export const SIDEBAR_ITEMS: SidebarItemDef[] = [
   { key: 'following', label: 'Du folgst', Icon: HeartIcon },
   { key: 'browse', label: 'Durchsuchen', Icon: CompassIcon },
-  { key: 'account', label: 'Mein Account', Icon: UserIcon }
+  { key: 'account', label: 'Mein Account', Icon: UserIcon },
+  { key: 'settings', label: 'Einstellungen', Icon: SettingsIcon }
 ]
 
 interface Props {

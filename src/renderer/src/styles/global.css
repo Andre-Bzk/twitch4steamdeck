@@ -989,6 +989,115 @@ body,
   color: var(--color-fg-dim);
 }
 
+/* ── Language Badge (unten-rechts im Thumbnail) ───── */
+.card__language {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.browse-stream-card__language {
+  position: absolute;
+  bottom: 6px;
+  right: 7px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+/* ── Settings Screen ──────────────────────────────── */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 680px;
+}
+
+.settings-section__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.settings-section__hint {
+  margin: 0;
+  font-size: 16px;
+  color: var(--color-fg-dim);
+  line-height: 1.5;
+}
+
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--color-bg-elev);
+  border: 2px solid transparent;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.settings-option:hover {
+  background: var(--color-bg-elev2);
+}
+
+.settings-option--active {
+  background: rgba(145, 71, 255, 0.12);
+}
+
+.settings-option--active .settings-option__radio {
+  color: var(--color-accent);
+}
+
+.settings-option--focused {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 2px rgba(191, 148, 255, 0.25);
+}
+
+.settings-option__radio {
+  font-size: 20px;
+  color: var(--color-fg-dim);
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.settings-option__label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.settings-option__preview {
+  font-size: 17px;
+  color: var(--color-fg-dim);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 /* ── Account Screen ───────────────────────────────── */
 .account {
   flex: 1;

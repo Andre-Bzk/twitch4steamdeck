@@ -5,6 +5,7 @@ import BrowseScreen from './BrowseScreen'
 import CategoryScreen from './CategoryScreen'
 import ChannelScreen from './ChannelScreen'
 import FollowingScreen from './FollowingScreen'
+import SettingsScreen from './SettingsScreen'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 
 type Region = 'sidebar' | 'main'
@@ -114,6 +115,9 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 onRequestSidebar={requestSidebar}
                 onLogout={onLogout}
               />
+            )}
+            {tab === 'settings' && (
+              <SettingsScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
             )}
           </>
         )}

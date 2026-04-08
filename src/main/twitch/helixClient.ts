@@ -195,7 +195,8 @@ export class HelixClient {
       gameName: s.game_name,
       viewerCount: s.viewer_count,
       thumbnailUrl: s.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
-      startedAt: s.started_at
+      startedAt: s.started_at,
+      language: s.language
     }))
   }
 
@@ -219,6 +220,7 @@ export class HelixClient {
         profileImageUrl: avatarMap.get(f.broadcaster_id) ?? '',
         isLive: !!stream,
         streamTitle: stream?.title,
+        gameId: stream?.game_id,
         gameName: stream?.game_name,
         viewerCount: stream?.viewer_count,
         thumbnailUrl: stream
@@ -226,7 +228,8 @@ export class HelixClient {
               .replace('{width}', '440')
               .replace('{height}', '248')
           : undefined,
-        startedAt: stream?.started_at
+        startedAt: stream?.started_at,
+        language: stream?.language
       }
     })
 

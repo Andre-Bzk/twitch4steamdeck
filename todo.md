@@ -101,7 +101,23 @@
 - [x] `CategoryScreen.tsx`: Streams-Grid pro Game
 - [x] `AppShell.tsx`: `selectedCategory`-Routing
 - [x] `global.css`: Browse/Game-Card-Styles
-- [ ] **User:** End-to-End-Verifikation (Browse laden, Live starten, Kategorie-Drilldown)
+- [x] **User:** End-to-End-Verifikation (Browse laden, Live starten, Kategorie-Drilldown)
+
+## Phase 5.6 — Einstellungen + Sprach-Badge/Flagge
+
+- [x] `language` in `HelixStream` + `FollowedChannelInfo` (types.ts, preload, t4sd.d.ts)
+- [x] `helixClient.ts`: `language` in `getTopStreams` + `getFollowedWithLiveStatus`
+- [x] `SettingsContext.tsx`: Provider + `useSettings()` + localStorage-Persistenz
+- [x] `Icons.tsx`: `SettingsIcon` (Zahnrad)
+- [x] `Sidebar.tsx`: 4. Tab „Einstellungen"
+- [x] `LanguageBadge.tsx`: Badge/Flag/Both Rendering + 38-Sprachen-Map
+- [x] `SettingsScreen.tsx`: Radio-Liste mit 4 Optionen
+- [x] `AppShell.tsx`: Settings-Tab routen
+- [x] `main.tsx`: `<SettingsProvider>` um App
+- [x] `FocusableCard.tsx`: LanguageBadge unten-rechts
+- [x] `BrowseScreen.tsx`: LanguageBadge in Shelf-Cards
+- [x] `global.css`: Badge + Settings-Screen Styles
+- [x] **User:** End-to-End-Verifikation (Einstellungen + Badge funktionieren, Persistenz bestätigt; Flaggen erst auf Steam Deck testbar)
 
 ## Phase 6 — Flatpak-Packaging
 - [ ] `flatpak/tv.twitch4steamdeck.App.yml` Manifest (Runtime, Module, Permissions)

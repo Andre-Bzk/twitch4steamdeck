@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import LanguageBadge from '../components/LanguageBadge'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 
 interface Props {
@@ -244,6 +245,7 @@ export default function BrowseScreen({
                       {ch.viewerCount !== undefined && (
                         <span className="card__viewers">{formatViewers(ch.viewerCount)}</span>
                       )}
+                      <LanguageBadge language={ch.language} className="browse-stream-card__language" />
                     </div>
                     <span className="browse-stream-card__name">{ch.broadcasterName}</span>
                     {ch.gameName && (

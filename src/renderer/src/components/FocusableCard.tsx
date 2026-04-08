@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { FollowedChannelInfo } from '../types/t4sd'
+import LanguageBadge from './LanguageBadge'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -40,6 +41,7 @@ export default function FocusableCard({ channel, focused, onFocus, onSelect }: P
             {channel.viewerCount !== undefined && (
               <span className="card__viewers">{formatViewers(channel.viewerCount)}</span>
             )}
+            <LanguageBadge language={channel.language} />
           </>
         ) : (
           <div className="card__thumb-offline">

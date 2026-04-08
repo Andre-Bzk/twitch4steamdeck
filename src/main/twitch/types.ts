@@ -22,6 +22,7 @@ export interface HelixStream {
   viewer_count: number
   thumbnail_url: string
   started_at: string
+  language: string
 }
 
 export interface HelixPaginatedResponse<T> {
@@ -81,4 +82,5 @@ export interface FollowedChannelInfo {
   /** 440×248 thumbnail URL (only set when live) */
   thumbnailUrl?: string
   startedAt?: string
+  language?: string
 }
