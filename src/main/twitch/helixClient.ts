@@ -1,6 +1,8 @@
 import type {
   FollowedChannelInfo,
+  GameInfo,
   HelixFollowedChannel,
+  HelixGame,
   HelixPaginatedResponse,
   HelixStream,
   HelixUser,
@@ -124,6 +126,76 @@ export class HelixClient {
       thumbnailUrl: v.thumbnail_url
         .replace('%{width}', '440')
         .replace('%{height}', '248')
+    }))
+  }
+
+  async getTopGames(
+    limit = 40,
+    cursor?: string
+  ): Promise<{ games: GameInfo[]; cursor?: string }> {
+    const params: Record<string, string> = { first: String(limit) }
+    if (cursor) params.after = cursor
+
+    const data = await this.get<HelixPaginatedResponse<HelixGame>>('/games/top', params)
+    const games = data.data.map((g) => ({
+      id: g.id,
+      name: g.name,
+      boxArtUrl: g.box_art_url.replace('{width}', '285').replace('{height}', '380')
+    }))
+
+    // Zuschauerzahlen: pro Kategorie die Top-100-Streams abrufen (parallel)
+    const headers = await this.authHeaders()
+    const viewerCounts = await Promise.all(
+      games.map(async (g) => {
+        try {
+          const url = new URL(`${BASE}/streams`)
+          url.searchParams.set('game_id', g.id)
+          url.searchParams.set('first', '100')
+          const res = await fetch(url.toString(), { headers })
+          if (!res.ok) return undefined
+          const d = (await res.json()) as { data: HelixStream[] }
+          return d.data.reduce((sum, s) => sum + s.viewer_count, 0)
+        } catch {
+          return undefined
+        }
+      })
+    )
+
+    return {
+      games: games.map((g, i) => ({ ...g, viewerCount: viewerCounts[i] })),
+      cursor: data.pagination?.cursor
+    }
+  }
+
+  async getTopStreams(opts?: { gameId?: string; limit?: number }): Promise<FollowedChannelInfo[]> {
+    const params: Record<string, string> = { first: String(opts?.limit ?? 20) }
+    if (opts?.gameId) params.game_id = opts.gameId
+
+    const url = new URL(`${BASE}/streams`)
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    const res = await fetch(url.toString(), { headers: await this.authHeaders() })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Helix /streams → ${res.status}: ${body}`)
+    }
+    const data = (await res.json()) as { data: HelixStream[] }
+    const streams = data.data
+
+    const userIds = streams.map((s) => s.user_id)
+    const avatarMap = await this.getProfileImages(userIds)
+
+    return streams.map((s) => ({
+      broadcasterId: s.user_id,
+      broadcasterLogin: s.user_login,
+      broadcasterName: s.user_name,
+      profileImageUrl: avatarMap.get(s.user_id) ?? '',
+      isLive: true,
+      streamTitle: s.title,
+      gameId: s.game_id,
+      gameName: s.game_name,
+      viewerCount: s.viewer_count,
+      thumbnailUrl: s.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
+      startedAt: s.started_at
     }))
   }
 

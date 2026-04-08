@@ -32,7 +32,7 @@ mit Resume. Verteilung als Flatpak.
 5. VOD-Wiedergabe werbefrei
 6. Lokaler VOD-Verlauf + Resume + „Continue Watching"-Reihe
 
-**Bewusst nicht im MVP:** Chat/Emotes, Suche, Kategorien, PiP, Themes.
+**Bewusst nicht im MVP:** Chat/Emotes, Suche (Text-Input), PiP, Themes.
 
 ## Architektur
 
@@ -145,7 +145,9 @@ Implementierte Endpoints (in `src/main/twitch/helixClient.ts`):
 - `GET /users?id=…` (batched, für Avatare der Followed-Kanäle)
 - `GET /channels/followed?user_id=…` (paginiert via `after`, safety-cap 500)
 - `GET /streams?user_id=…` (batched, max 100 IDs/Call)
-- ⏳ `GET /videos?user_id=…&type=archive` (noch offen für Phase 4)
+- `GET /videos?user_id=…&type=archive` — `getVideos()` ✅
+- `GET /games/top` — `getTopGames()` ✅ Phase 5.5
+- `GET /streams` (global + game_id) — `getTopStreams()` ✅ Phase 5.5
 
 Header: `Client-Id: <id>`, `Authorization: Bearer <access_token>`.
 `getFollowedWithLiveStatus()` merged Followed + Live + Avatare zu `FollowedChannelInfo[]` und

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import Sidebar, { SIDEBAR_ITEMS, type TabKey } from '../components/Sidebar'
 import AccountScreen from './AccountScreen'
 import BrowseScreen from './BrowseScreen'
+import CategoryScreen from './CategoryScreen'
 import ChannelScreen from './ChannelScreen'
 import FollowingScreen from './FollowingScreen'
-import type { FollowedChannelInfo } from '../types/t4sd'
+import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 
 type Region = 'sidebar' | 'main'
 
@@ -17,6 +18,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [region, setRegion] = useState<Region>('main')
   const [sidebarIndex, setSidebarIndex] = useState(0)
   const [selectedChannel, setSelectedChannel] = useState<FollowedChannelInfo | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<GameInfo | null>(null)
 
   const requestSidebar = useCallback(() => {
     const idx = SIDEBAR_ITEMS.findIndex((t) => t.key === tab)
@@ -30,6 +32,10 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
 
   const handleBack = useCallback(() => {
     setSelectedChannel(null)
+  }, [])
+
+  const handleSelectCategory = useCallback((game: GameInfo) => {
+    setSelectedCategory(game)
   }, [])
 
   // Key-Handler für die Sidebar (wenn sie den Fokus hat)
@@ -53,6 +59,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
           e.preventDefault()
           setTab(SIDEBAR_ITEMS[sidebarIndex].key)
           setSelectedChannel(null)
+          setSelectedCategory(null)
           setRegion('main')
           break
       }
@@ -71,12 +78,19 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         onItemClick={(k) => {
           setTab(k)
           setSelectedChannel(null)
+          setSelectedCategory(null)
           setRegion('main')
         }}
       />
       <div className="main-content">
         {selectedChannel ? (
           <ChannelScreen channel={selectedChannel} onBack={handleBack} />
+        ) : selectedCategory && tab === 'browse' ? (
+          <CategoryScreen
+            game={selectedCategory}
+            onSelectChannel={handleSelectChannel}
+            onBack={() => setSelectedCategory(null)}
+          />
         ) : (
           <>
             {tab === 'following' && (
@@ -87,7 +101,12 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
               />
             )}
             {tab === 'browse' && (
-              <BrowseScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
+              <BrowseScreen
+                hasFocus={mainFocus}
+                onRequestSidebar={requestSidebar}
+                onSelectChannel={handleSelectChannel}
+                onSelectCategory={handleSelectCategory}
+              />
             )}
             {tab === 'account' && (
               <AccountScreen

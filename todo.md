@@ -90,6 +90,19 @@
 - [x] **User:** Verifiziert (2026-04-08)
 - ~~„Continue Watching"-Reihe~~ — entfällt (nicht benötigt)
 
+## Phase 5.5 — Browse-Menü: Kategorien + Top Live-Streams
+
+- [x] `HelixGame`, `GameInfo` Typen in `types.ts`
+- [x] `helixClient.ts`: `getTopGames()` + `getTopStreams(gameId?)`
+- [x] IPC: `twitch:get-top-games`, `twitch:get-top-streams`
+- [x] Preload + `t4sd.d.ts`: Typen + API-Methoden
+- [x] `gamepad.ts`: Button 2 (X) → `'x'`, Button 3 (Y) → `'y'`
+- [x] `BrowseScreen.tsx`: Shelf (Top Live) + Grid (Kategorien), Key-Mapping
+- [x] `CategoryScreen.tsx`: Streams-Grid pro Game
+- [x] `AppShell.tsx`: `selectedCategory`-Routing
+- [x] `global.css`: Browse/Game-Card-Styles
+- [ ] **User:** End-to-End-Verifikation (Browse laden, Live starten, Kategorie-Drilldown)
+
 ## Phase 6 — Flatpak-Packaging
 - [ ] `flatpak/tv.twitch4steamdeck.App.yml` Manifest (Runtime, Module, Permissions)
 - [ ] mpv + streamlink als Flatpak-Module bündeln

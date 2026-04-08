@@ -22,6 +22,8 @@ interface ButtonState {
 const BUTTON_MAP: Record<number, string> = {
   0: 'Enter',   // A
   1: 'Escape',  // B
+  2: 'x',       // X
+  3: 'y',       // Y
   12: 'ArrowUp',
   13: 'ArrowDown',
   14: 'ArrowLeft',

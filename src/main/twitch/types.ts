@@ -16,6 +16,7 @@ export interface HelixStream {
   user_id: string
   user_login: string
   user_name: string
+  game_id: string
   game_name: string
   title: string
   viewer_count: number
@@ -39,6 +40,22 @@ export interface HelixVideo {
   type: 'archive' | 'highlight' | 'upload'
 }
 
+export interface HelixGame {
+  id: string
+  name: string
+  box_art_url: string
+}
+
+/** Simplified game info für den Renderer. */
+export interface GameInfo {
+  id: string
+  name: string
+  /** Boxart-URL bereits auf 285×380 aufgelöst */
+  boxArtUrl: string
+  /** Summe der Zuschauer aus den Top-100-Streams der Kategorie */
+  viewerCount?: number
+}
+
 /** Simplified VOD info für den Renderer. */
 export interface VodInfo {
   id: string
@@ -58,6 +75,7 @@ export interface FollowedChannelInfo {
   profileImageUrl: string
   isLive: boolean
   streamTitle?: string
+  gameId?: string
   gameName?: string
   viewerCount?: number
   /** 440×248 thumbnail URL (only set when live) */

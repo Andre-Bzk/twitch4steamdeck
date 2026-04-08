@@ -3,7 +3,7 @@
 > Stand: **2026-04-08 (Session 3)**. Diese Datei dient als Übergabe zwischen Sessions.
 > **Lies zuerst:** diese Datei + `todo.md` + `plan.md`.
 
-**Aktueller Stand:** Phase 0–5 abgeschlossen & verifiziert. Als nächstes: Phase 6 (Flatpak-Packaging).
+**Aktueller Stand:** Phase 0–5 abgeschlossen & verifiziert. Phase 5.5 (Browse) implementiert, wartet auf User-Verifikation. Danach: Phase 6 (Flatpak-Packaging).
 
 ---
 
@@ -62,6 +62,30 @@ Verifiziert 2026-04-08.
 - `„Continue Watching"-Reihe` wurde bewusst weggelassen (vom User nicht gewünscht).
 - VOD-Karte zeigt: Fortschrittsbalken (lila), `0:16 von 6:22`, `Vor X Min.`,
   Completed-Overlay mit Kreis-Checkmark.
+
+---
+
+---
+
+### ⏳ Phase 5.5 — Browse-Menü (implementiert, Verifikation ausstehend)
+
+#### Neue/geänderte Dateien:
+- `src/main/twitch/types.ts` — `HelixGame`, `GameInfo`
+- `src/main/twitch/helixClient.ts` — `getTopGames()`, `getTopStreams(gameId?)`
+- `src/main/ipc/handlers.ts` — `twitch:get-top-games`, `twitch:get-top-streams`
+- `src/preload/index.ts` — `GameInfo`-Typ + neue API-Methoden
+- `src/renderer/src/types/t4sd.d.ts` — `GameInfo`, T4sdApi erweitert
+- `src/renderer/src/input/gamepad.ts` — Button 2 (X) → `'x'`, Button 3 (Y) → `'y'`
+- `src/renderer/src/screens/BrowseScreen.tsx` — Shelf + Grid (komplett neu)
+- `src/renderer/src/screens/CategoryScreen.tsx` — neu
+- `src/renderer/src/screens/AppShell.tsx` — `selectedCategory`-Routing
+- `src/renderer/src/styles/global.css` — Browse/Game-Card-Styles
+
+#### Key-Mapping Browse + Category:
+- **Enter / A**: Stream → direkt Live starten · Kategorie → Drilldown
+- **X**: Stream-Karte → ChannelScreen öffnen (VOD-Shelf + Live-Button)
+- **Y**: Refresh
+- **Escape / B**: Category → zurück zu Browse · Browse → Sidebar
 
 ---
 

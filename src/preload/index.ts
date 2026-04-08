@@ -10,6 +10,8 @@ const IPC = {
 
   twitchGetFollowed: 'twitch:get-followed',
   twitchGetVideos: 'twitch:get-videos',
+  twitchGetTopGames: 'twitch:get-top-games',
+  twitchGetTopStreams: 'twitch:get-top-streams',
   historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
@@ -40,6 +42,7 @@ export interface FollowedChannelInfo {
   profileImageUrl: string
   isLive: boolean
   streamTitle?: string
+  gameId?: string
   gameName?: string
   viewerCount?: number
   thumbnailUrl?: string
@@ -50,6 +53,13 @@ export interface PlaybackEvent {
   kind: 'started' | 'stopped' | 'error'
   channelLogin?: string
   message?: string
+}
+
+export interface GameInfo {
+  id: string
+  name: string
+  boxArtUrl: string
+  viewerCount?: number
 }
 
 export interface VodInfo {
@@ -85,7 +95,11 @@ const api = {
     getFollowed: (): Promise<FollowedChannelInfo[]> =>
       ipcRenderer.invoke(IPC.twitchGetFollowed),
     getVideos: (broadcasterId: string): Promise<VodInfo[]> =>
-      ipcRenderer.invoke(IPC.twitchGetVideos, broadcasterId)
+      ipcRenderer.invoke(IPC.twitchGetVideos, broadcasterId),
+    getTopGames: (cursor?: string): Promise<{ games: GameInfo[]; cursor?: string }> =>
+      ipcRenderer.invoke(IPC.twitchGetTopGames, cursor),
+    getTopStreams: (gameId?: string): Promise<FollowedChannelInfo[]> =>
+      ipcRenderer.invoke(IPC.twitchGetTopStreams, gameId)
   },
   history: {
     getProgress: (vodIds: string[]): Promise<Record<string, VodProgress>> =>

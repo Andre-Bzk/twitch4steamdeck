@@ -22,10 +22,18 @@ export interface FollowedChannelInfo {
   profileImageUrl: string
   isLive: boolean
   streamTitle?: string
+  gameId?: string
   gameName?: string
   viewerCount?: number
   thumbnailUrl?: string
   startedAt?: string
+}
+
+export interface GameInfo {
+  id: string
+  name: string
+  boxArtUrl: string
+  viewerCount?: number
 }
 
 export interface PlaybackEvent {
@@ -62,6 +70,8 @@ export interface T4sdApi {
   twitch: {
     getFollowed: () => Promise<FollowedChannelInfo[]>
     getVideos: (broadcasterId: string) => Promise<VodInfo[]>
+    getTopGames: (cursor?: string) => Promise<{ games: GameInfo[]; cursor?: string }>
+    getTopStreams: (gameId?: string) => Promise<FollowedChannelInfo[]>
   }
   history: {
     getProgress: (vodIds: string[]) => Promise<Record<string, VodProgress>>

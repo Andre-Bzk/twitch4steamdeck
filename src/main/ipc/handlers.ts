@@ -16,6 +16,8 @@ export const IPC = {
 
   twitchGetFollowed: 'twitch:get-followed',
   twitchGetVideos: 'twitch:get-videos',
+  twitchGetTopGames: 'twitch:get-top-games',
+  twitchGetTopStreams: 'twitch:get-top-streams',
   historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
@@ -45,6 +47,14 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
+  ipcMain.handle(
+    IPC.twitchGetTopGames,
+    (_e, cursor?: string) => helix.getTopGames(40, cursor)
+  )
+  ipcMain.handle(
+    IPC.twitchGetTopStreams,
+    (_e, gameId?: string) => helix.getTopStreams(gameId ? { gameId, limit: 40 } : { limit: 100 })
+  )
   ipcMain.handle(
     IPC.twitchGetVideos,
     (_e, broadcasterId: string) => helix.getVideos(broadcasterId)
