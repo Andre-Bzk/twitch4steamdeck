@@ -1,9 +1,9 @@
 # Twitch4SteamDeck — Fortschritts-Snapshot
 
-> Stand: **2026-04-08 (Session 4)**. Diese Datei dient als Übergabe zwischen Sessions.
+> Stand: **2026-04-09 (Session 5)**. Diese Datei dient als Übergabe zwischen Sessions.
 > **Lies zuerst:** diese Datei + `todo.md` + `plan.md`.
 
-**Aktueller Stand:** Phase 0–5.6 abgeschlossen & verifiziert. Als nächstes: Phase 6 (Flatpak-Packaging).
+**Aktueller Stand:** Phase 0–5.6 abgeschlossen & verifiziert. Phase 6 (Flatpak-Packaging): Manifest + Hilfs-Dateien geschrieben, wartet auf User-Verifikation in WSL2 + Steam Deck.
 
 ---
 
@@ -131,17 +131,39 @@ Verifiziert 2026-04-08.
 
 ---
 
-## Nächster Schritt: Phase 6 — Flatpak-Packaging
+## Phase 6 — Flatpak-Packaging (in Arbeit, wartet auf WSL2 + Steam Deck)
 
 Ziel: App läuft auf dem Steam Deck als Flatpak.
 
-Wichtige offene Punkte:
-- mpv + streamlink müssen als Flatpak-Module gebündelt werden
-- `--hwdec=vaapi` für Linux (Steam Deck) statt `auto` (Windows)
-- IPC-Pfad: Unix Socket `/tmp/twitch4sd-mpv.sock` (bereits implementiert für non-win32)
-- better-sqlite3 muss für Linux/ARM64 (Steam Deck) cross-compiliert werden
-- Flatpak-Manifest: `flatpak/tv.twitch4steamdeck.App.yml`
-- **Flaggen-Emojis erst hier testbar** (Noto Color Emoji auf Linux)
+#### Neue Dateien (Phase 6):
+- `flatpak/tv.twitch4steamdeck.App.yml` — Flatpak-Manifest (mpv + streamlink als Module)
+- `flatpak/twitch4steamdeck.sh` — Launcher mit `zypak-wrapper` (Electron-Sandbox)
+- `flatpak/tv.twitch4steamdeck.App.desktop` — Desktop-Eintrag
+- `flatpak/build-flatpak.sh` — Build-Skript für WSL2 (prüft deps, füllt SHA256, baut)
+- `resources/icons/icon.svg` — App-Icon (Platzhalter, konvertiert zu PNG beim Build)
+
+#### Architektur-Entscheidungen:
+- **Pre-Build in WSL2:** `npm install` + `@electron/rebuild` + `npm run build` laufen
+  AUSSERHALB von flatpak-builder in WSL2. Das Manifest kopiert nur die Artefakte.
+  → Vermeidet npm-im-Flatpak-Sandbox-Probleme.
+- **Electron-Binary aus npm:** Das Electron-Binary kommt aus `node_modules/electron/dist/electron`
+  (npm install für Linux), NICHT aus dem BaseApp. BaseApp liefert nur Chrome-Runtime-Libs + zypak.
+- **zypak-wrapper:** Ersetzt Chrome-Setuid-Sandbox für Flatpak-Kompatibilität.
+- **mpv:** Aus Sources gebaut, libplacebo deaktiviert (entfernt Vulkan-Abhängigkeitskette),
+  ffmpeg/libass/libva kommen aus freedesktop SDK 24.08.
+- **streamlink:** Via pip install ins Flatpak gebaut. Für sauberen Offline-Build:
+  `flatpak-pip-generator` für Python-Dependencies verwenden (TODO beim echten Build).
+- **better-sqlite3:** Muss für Linux x64 rebuilt werden (Steam Deck = AMD Zen2 x86_64,
+  NICHT ARM64 — die alte ARM64-Notiz war falsch).
+- **IPC-Socket:** `os.tmpdir()` → `/tmp` — beide Prozesse (Electron-Main + mpv-Child)
+  teilen denselben Flatpak-Sandbox-Namespace. Kein Code-Fix nötig.
+- **VAAPI:** `--hwdec=vaapi` bereits implementiert für non-win32 in `streamlink.ts:73`.
+- **Flaggen-Emojis erst hier testbar** (Noto Color Emoji aus freedesktop Platform Runtime)
+
+#### Noch ausstehend (User):
+1. WSL2-Setup: `sudo apt install flatpak flatpak-builder librsvg2-bin`
+2. `bash flatpak/build-flatpak.sh` (in WSL2, aus `/mnt/c/Projekte/twitch4steamdeck`)
+3. Verifikation auf Steam Deck: Login, Live, VOD, Resume, Gamepad, Gaming Mode
 
 ---
 

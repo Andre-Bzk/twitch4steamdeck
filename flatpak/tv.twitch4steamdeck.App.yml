@@ -1,0 +1,129 @@
+app-id: tv.twitch4steamdeck.App
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+# Stellt Chrome-Runtime-Bibliotheken (GTK, GLib, etc.) + zypak-wrapper bereit.
+# Das Electron-Binary selbst kommt aus node_modules/electron/dist/electron (npm install in WSL2).
+base: org.electronjs.Electron2.BaseApp
+base-version: '24.08'
+command: twitch4steamdeck
+
+finish-args:
+  - --share=network            # Twitch Helix-API + Streamlink (HLS)
+  - --share=ipc                # X11 shared memory (Wayland-Fallback)
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio        # Audio für mpv
+  - --device=dri               # GPU-Zugriff für VAAPI-Hardware-Decoding
+  - --talk-name=org.freedesktop.Notifications
+  # Electron userData liegt automatisch in ~/.var/app/tv.twitch4steamdeck.App/config/
+  # Kein extra --filesystem nötig.
+
+# Build-Voraussetzung (WSL2, VOR flatpak-builder):
+#   cd /mnt/c/Projekte/twitch4steamdeck
+#   npm install                        # installiert Electron 33 für Linux + alle Deps
+#   npx @electron/rebuild              # rebuildet better-sqlite3 für Linux x64
+#   npm run build                      # kompiliert TS → out/
+# Das Projektverzeichnis (inkl. out/ und node_modules/) wird als type:dir Source
+# in den Manifest-Build-Schritt kopiert.
+
+modules:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1) mpv — Media-Player für Live-Streams und VODs
+  #    Gebaut aus Sources; libplacebo deaktiviert (entfernt Vulkan/Shader-Chain).
+  #    ffmpeg, libass und libva (VAAPI) kommen aus dem freedesktop SDK 24.08.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: mpv
+    buildsystem: meson
+    config-opts:
+      - -Dlibplacebo=disabled
+      - -Dvaapi=enabled
+      - -Dpulse=enabled
+      - -Dalsa=disabled
+      - -Dlua=disabled
+      - -Djavascript=disabled
+      - -Drubberband=disabled
+      - -Dvapoursynth=disabled
+      - -Dbuild-date=false
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.38.0.tar.gz
+        # sha256 generieren: sha256sum mpv-0.38.0.tar.gz
+        # oder: curl -L <url> | sha256sum
+        sha256: FILL_IN_sha256sum_of_mpv_0.38.0_tarball
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2) streamlink (Python) — liefert HLS-URLs aus Twitch-Streams
+  #    Python 3 kommt aus dem freedesktop SDK.
+  #
+  #    Vorbereitung (einmalig, in WSL2 Ubuntu):
+  #      pip3 install flatpak-pip-generator
+  #      python3 flatpak-pip-generator streamlink --output flatpak/python-streamlink-deps
+  #    → erzeugt flatpak/python-streamlink-deps.json mit allen pinned Deps + sha256.
+  #    Dann dieses Modul hier durch die generierte Datei ersetzen:
+  #      - name: python3-streamlink-deps
+  #        buildsystem: simple
+  #        build-commands: [...]   # generiert durch flatpak-pip-generator
+  #        sources: [...]          # alle .whl/.tar.gz mit echten sha256
+  #
+  #    Vereinfachte Variante (erfordert Netzwerk-Build — nur für lokale Tests):
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: python3-streamlink
+    buildsystem: simple
+    build-commands:
+      # --no-deps: Dependencies separat via flatpak-pip-generator auflösen
+      - pip3 install --prefix=/app --no-build-isolation --no-deps .
+    sources:
+      - type: archive
+        url: https://github.com/streamlink/streamlink/archive/refs/tags/6.11.0.tar.gz
+        # sha256 generieren: sha256sum streamlink-6.11.0.tar.gz
+        sha256: FILL_IN_sha256sum_of_streamlink_tarball
+    # ACHTUNG: Vor dem echten Build alle Python-Dependencies (requests, websocket-client,
+    # pycountry, pycryptodome, ...) mit flatpak-pip-generator als separate file-Sources
+    # einbinden. Sonst schlägt der offline Build fehl.
+    # Kurzfristig: 'build-network-access: true' setzen um online-pip zu nutzen (nur lokal!).
+    build-options:
+      build-args:
+        - --allow-network-access
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3) Haupt-App
+  #    Voraussetzung: npm install + @electron/rebuild + npm run build wurden
+  #    AUSSERHALB (in WSL2) ausgeführt. Dieses Modul kopiert nur die Artefakte.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: twitch4steamdeck
+    buildsystem: simple
+    build-commands:
+      # App-Artefakte installieren
+      - mkdir -p /app/lib/twitch4steamdeck
+      - cp -r out /app/lib/twitch4steamdeck/out
+      # node_modules wird für better-sqlite3 (native .node-Datei) zur Laufzeit benötigt.
+      # Nur die notwendigen Teile kopieren, um die Paketgröße zu begrenzen.
+      - mkdir -p /app/lib/twitch4steamdeck/node_modules
+      - cp -r node_modules/better-sqlite3 /app/lib/twitch4steamdeck/node_modules/
+      - cp -r node_modules/bindings /app/lib/twitch4steamdeck/node_modules/
+      - cp -r node_modules/file-uri-to-path /app/lib/twitch4steamdeck/node_modules/
+      # Electron-Binary (Linux, via npm install in WSL2)
+      - cp -r node_modules/electron /app/lib/twitch4steamdeck/node_modules/
+      # package.json für node require-Resolution
+      - cp package.json /app/lib/twitch4steamdeck/
+      # Launcher-Skript
+      - install -Dm755 flatpak/twitch4steamdeck.sh /app/bin/twitch4steamdeck
+      # Icon (512×512 PNG, aus SVG konvertiert oder direkt abgelegt)
+      - |
+        if [ -f resources/icons/icon.png ]; then
+          install -Dm644 resources/icons/icon.png \
+            /app/share/icons/hicolor/512x512/apps/tv.twitch4steamdeck.App.png
+        elif [ -f resources/icons/icon.svg ]; then
+          rsvg-convert -w 512 -h 512 resources/icons/icon.svg \
+            -o /tmp/icon.png
+          install -Dm644 /tmp/icon.png \
+            /app/share/icons/hicolor/512x512/apps/tv.twitch4steamdeck.App.png
+        fi
+      # .desktop-Eintrag
+      - install -Dm644 flatpak/tv.twitch4steamdeck.App.desktop \
+          /app/share/applications/tv.twitch4steamdeck.App.desktop
+    sources:
+      # Gesamtes Projektverzeichnis (inkl. aus/ + node_modules/ aus WSL2-Prebuild)
+      - type: dir
+        path: ..
