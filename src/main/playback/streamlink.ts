@@ -35,9 +35,14 @@ const MPV_BIN = resolveMpvBin()
 
 /** Startet streamlink so dass es mpv als Player verwendet (für Live-Streams). */
 export function spawnStreamlink(url: string, quality: string): ChildProcess {
-  return spawn(STREAMLINK_BIN, ['--player', MPV_BIN, '--player-args', '--fullscreen', url, quality], {
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
+  // --vo=gpu: Legacy-OpenGL-Renderer (gpu-next/libplacebo scheitert in Flatpak ohne Vulkan)
+  // --hwdec=auto: VAAPI-Fallback auf SW-Dekodierung wenn nötig
+  // --force-window=yes: Fenster auch bei vo-Init-Problemen erzwingen
+  return spawn(
+    STREAMLINK_BIN,
+    ['--player', MPV_BIN, '--player-args', '--fullscreen --vo=gpu --hwdec=auto --force-window=yes', url, quality],
+    { stdio: ['ignore', 'pipe', 'pipe'] }
+  )
 }
 
 /**
@@ -70,12 +75,13 @@ export interface MpvOptions {
 
 /** Startet mpv direkt mit einer URL (HLS oder lokal). IPC-Socket wird gesetzt. */
 export function spawnMpv(url: string, { ipcPath, startSeconds }: MpvOptions): ChildProcess {
-  const hwdec = process.platform === 'win32' ? 'auto' : 'vaapi'
   const args = [
     url,
     `--input-ipc-server=${ipcPath}`,
     '--fullscreen',
-    `--hwdec=${hwdec}`
+    '--vo=gpu',
+    '--hwdec=auto',
+    '--force-window=yes'
   ]
   if (startSeconds && startSeconds > 0) {
     args.push(`--start=${startSeconds}`)

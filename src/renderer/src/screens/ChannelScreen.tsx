@@ -257,7 +257,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             )}
 
             {playState === 'error' && (
-              <p className="channel-screen__error">{errorMsg}</p>
+              <p className="channel-screen__error" style={{ whiteSpace: 'pre-wrap', fontSize: '13px', maxHeight: '8em', overflowY: 'auto' }}>{errorMsg}</p>
             )}
           </div>
         </div>

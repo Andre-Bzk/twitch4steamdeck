@@ -126,8 +126,11 @@
 - [x] `flatpak/build-flatpak.sh` Build-Skript für WSL2 (inkl. SHA256-Auflösung)
 - [x] `resources/icons/icon.svg` App-Icon (Platzhalter)
 - [x] mpv + streamlink als Flatpak-Module im Manifest definiert
+- [x] **Fix (Phase 6.1):** streamlink Python-Deps via `flatpak-pip-generator` eingebunden
+      (`build-flatpak.sh` Schritt 4b + `!include python3-streamlink.json` im Manifest)
+- [x] **Fix (Phase 6.1):** mpv-Patch `patches/mpv-ffmpeg7-avio-const.patch` ins Manifest eingebunden
 - [ ] **User:** WSL2-Setup (flatpak, flatpak-builder, Runtimes) — einmalig
-- [ ] **User:** `bash flatpak/build-flatpak.sh` in WSL2 ausführen
+- [ ] **User:** `bash flatpak/build-flatpak.sh` in WSL2 neu ausführen (nach 6.1-Fix)
 - [ ] **User:** Auf Steam Deck installieren und Login + Live + VOD durchspielen
 - [ ] **User:** Als Non-Steam-Game in Gaming Mode hinzufügen, dort testen
 

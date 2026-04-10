@@ -64,14 +64,26 @@ modules:
         sha256: 7f5da41b872302208f0e10c22d3e108ab9fdb1f253eb47c18651698c65d6b426
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1c) mpv — Media-Player für Live-Streams und VODs
-  #    ffmpeg, libass, libplacebo, libva (VAAPI) verfügbar.
+  # 1c) libXpresent — X11-Extension für VSync/Frame-Timing (mpv X11-Dependency)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: libxpresent
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://xorg.freedesktop.org/releases/individual/lib/libXpresent-1.0.1.tar.xz
+        sha256: b964df9e5a066daa5e08d2dc82692c57ca27d00b8cc257e8e960c9f1cf26231b
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1d) mpv — Media-Player für Live-Streams und VODs
+  #    ffmpeg, libass, libplacebo, libva (VAAPI), X11 verfügbar.
   # ─────────────────────────────────────────────────────────────────────────────
   - name: mpv
     buildsystem: meson
     config-opts:
       - -Dvaapi=enabled
       - -Dpulse=enabled
+      - -Dx11=enabled
+      - -Degl-x11=enabled
       - -Dalsa=disabled
       - -Dlua=disabled
       - -Djavascript=disabled
@@ -85,33 +97,13 @@ modules:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2) streamlink (Python) — liefert HLS-URLs aus Twitch-Streams
-  #    Python 3 kommt aus dem freedesktop SDK.
-  #
-  #    Vorbereitung (einmalig, in WSL2 Ubuntu):
-  #      pip3 install flatpak-pip-generator
-  #      python3 flatpak-pip-generator streamlink --output flatpak/python-streamlink-deps
-  #    → erzeugt flatpak/python-streamlink-deps.json mit allen pinned Deps + sha256.
-  #    Dann dieses Modul hier durch die generierte Datei ersetzen:
-  #      - name: python3-streamlink-deps
-  #        buildsystem: simple
-  #        build-commands: [...]   # generiert durch flatpak-pip-generator
-  #        sources: [...]          # alle .whl/.tar.gz mit echten sha256
-  #
-  #    Vereinfachte Variante (erfordert Netzwerk-Build — nur für lokale Tests):
+  #    Wird von build-flatpak.sh via flatpak-pip-generator generiert:
+  #      python3 -m flatpak_pip_generator streamlink==6.11.0 \
+  #        --output flatpak/python3-streamlink
+  #    Das erzeugt flatpak/python3-streamlink.json mit allen Deps + sha256-Hashes.
+  #    flatpak-builder lädt alle Sources offline herunter und installiert sie sauber.
   # ─────────────────────────────────────────────────────────────────────────────
-  - name: python3-streamlink
-    buildsystem: simple
-    build-commands:
-      # --no-deps: Dependencies separat via flatpak-pip-generator auflösen
-      - pip3 install --prefix=/app --no-build-isolation --no-deps .
-    sources:
-      - type: archive
-        url: https://github.com/streamlink/streamlink/archive/refs/tags/6.11.0.tar.gz
-        # sha256 generieren: sha256sum streamlink-6.11.0.tar.gz
-        sha256: fbed984049b33f176e3a63e4bce302180d1ef24feffa24ea7306aad1a24bff40
-    # ACHTUNG: Vor dem echten Release-Build alle Python-Dependencies (requests,
-    # websocket-client, pycountry, pycryptodome, ...) mit flatpak-pip-generator
-    # als separate file-Sources einbinden. Sonst ist Streamlink zur Laufzeit unvollständig.
+  - !include python3-streamlink.json
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 3) Haupt-App

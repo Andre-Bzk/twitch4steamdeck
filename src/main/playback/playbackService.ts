@@ -24,20 +24,34 @@ export class PlaybackService extends EventEmitter {
     if (this.current) await this.stop()
 
     const proc = spawnStreamlink(`twitch.tv/${channelLogin}`, quality)
-    this._attachLogs(proc)
+
+    let stderrBuf = ''
+    proc.stdout?.on('data', (d: Buffer) => console.log('[streamlink]', d.toString().trim()))
+    proc.stderr?.on('data', (d: Buffer) => {
+      const s = d.toString()
+      console.log('[streamlink stderr]', s.trim())
+      stderrBuf += s
+    })
 
     proc.on('error', (e: Error) => {
       if (this.current?.process === proc) this.current = null
       this.emit('playback-event', {
         kind: 'error',
-        message: `streamlink Fehler: ${e.message}`
+        message: `streamlink nicht gefunden: ${e.message}`
       } satisfies PlaybackEvent)
     })
 
     proc.on('exit', (code) => {
       if (this.current?.process === proc) this.current = null
-      if (code !== 0 && code !== null) console.warn('[streamlink] exit code', code)
-      this.emit('playback-event', { kind: 'stopped' } satisfies PlaybackEvent)
+      if (code !== 0 && code !== null) {
+        const snippet = stderrBuf.trim().split('\n').slice(-6).join('\n').substring(0, 500)
+        this.emit('playback-event', {
+          kind: 'error',
+          message: `streamlink Exit ${code}:\n${snippet || '(kein Output)'}`
+        } satisfies PlaybackEvent)
+      } else {
+        this.emit('playback-event', { kind: 'stopped' } satisfies PlaybackEvent)
+      }
     })
 
     // Für Live: mpv wird von streamlink gestartet, kein direkter IPC nötig
@@ -75,20 +89,34 @@ export class PlaybackService extends EventEmitter {
     }
 
     const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath, startSeconds: resumePos })
-    this._attachLogs(proc)
+
+    let mpvStderrBuf = ''
+    proc.stdout?.on('data', (d: Buffer) => console.log('[mpv]', d.toString().trim()))
+    proc.stderr?.on('data', (d: Buffer) => {
+      const s = d.toString()
+      console.log('[mpv stderr]', s.trim())
+      mpvStderrBuf += s
+    })
 
     proc.on('error', (e: Error) => {
       if (this.current?.process === proc) this.current = null
       this.emit('playback-event', {
         kind: 'error',
-        message: `mpv Fehler: ${e.message}`
+        message: `mpv nicht gefunden: ${e.message}`
       } satisfies PlaybackEvent)
     })
 
     proc.on('exit', (code) => {
       if (this.current?.process === proc) this.current = null
-      if (code !== 0 && code !== null) console.warn('[mpv] exit code', code)
-      this.emit('playback-event', { kind: 'stopped' } satisfies PlaybackEvent)
+      if (code !== 0 && code !== null) {
+        const snippet = mpvStderrBuf.trim().split('\n').slice(-6).join('\n').substring(0, 500)
+        this.emit('playback-event', {
+          kind: 'error',
+          message: `mpv Exit ${code}:\n${snippet || '(kein Output)'}`
+        } satisfies PlaybackEvent)
+      } else {
+        this.emit('playback-event', { kind: 'stopped' } satisfies PlaybackEvent)
+      }
     })
 
     const mpv = new MpvController(this.ipcPath)
@@ -129,8 +157,4 @@ export class PlaybackService extends EventEmitter {
     this.stop().catch(() => {})
   }
 
-  private _attachLogs(proc: ChildProcess): void {
-    proc.stdout?.on('data', (d: Buffer) => console.log('[player stdout]', d.toString().trim()))
-    proc.stderr?.on('data', (d: Buffer) => console.log('[player stderr]', d.toString().trim()))
-  }
 }

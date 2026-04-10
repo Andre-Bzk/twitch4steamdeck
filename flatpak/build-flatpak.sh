@@ -102,6 +102,23 @@ if [ -f "$NATIVE_NODE" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Schritt 4b: Python-Deps für streamlink via flatpak-pip-generator
+# Erzeugt flatpak/python3-streamlink.json mit allen pip-Deps + sha256-Hashes.
+# Die Datei wird von tv.twitch4steamdeck.App.yml per !include eingebunden.
+# ─────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "=== [4b] Python-Deps für streamlink generieren ==="
+if ! python3 -c "import flatpak_pip_generator" &>/dev/null; then
+  echo "  → Installiere flatpak-pip-generator ..."
+  # Ubuntu 24.04: externally-managed-environment → --break-system-packages nötig
+  pip3 install --quiet --break-system-packages flatpak-pip-generator
+fi
+python3 -m flatpak_pip_generator \
+  streamlink==6.11.0 \
+  --output flatpak/python3-streamlink
+echo "  ✓ flatpak/python3-streamlink.json generiert ($(wc -l < flatpak/python3-streamlink.json) Zeilen)"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Schritt 5: Manifest-SHA256-Werte füllen (interaktiv)
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
