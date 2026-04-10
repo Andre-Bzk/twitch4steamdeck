@@ -90,12 +90,22 @@ export default function FollowingScreen({
           e.preventDefault()
           setFocusedIndex((i) => Math.max(i - cols, 0))
           break
+        case 'Enter': {
+          e.preventDefault()
+          const ch = channels[focusedIndex]
+          if (ch) onSelectChannel(ch)
+          break
+        }
+        case 'Escape':
+          e.preventDefault()
+          onRequestSidebar()
+          break
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, loadState, channels.length, getColumns, onRequestSidebar, load])
+  }, [hasFocus, loadState, channels, focusedIndex, getColumns, onRequestSidebar, load])
 
   const liveCount = channels.filter((c) => c.isLive).length
 

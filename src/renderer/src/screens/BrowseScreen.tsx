@@ -39,6 +39,7 @@ export default function BrowseScreen({
   const [gridIndex, setGridIndex] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -79,6 +80,13 @@ export default function BrowseScreen({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    return window.t4sd.playback.onEvent((ev) => {
+      if (ev.kind === 'started') setIsPlaying(true)
+      else if (ev.kind === 'stopped' || ev.kind === 'error') setIsPlaying(false)
+    })
+  }, [])
 
   // Nächste Seite automatisch nachladen wenn letztes Element fokussiert wird
   useEffect(() => {
@@ -137,6 +145,12 @@ export default function BrowseScreen({
             if (ch) onSelectChannel(ch)
             break
           }
+          case 'Escape': {
+            e.preventDefault()
+            if (isPlaying) void window.t4sd.playback.stop()
+            else onRequestSidebar()
+            break
+          }
         }
       } else {
         // grid region
@@ -170,13 +184,19 @@ export default function BrowseScreen({
             if (game) onSelectCategory(game)
             break
           }
+          case 'Escape': {
+            e.preventDefault()
+            if (isPlaying) void window.t4sd.playback.stop()
+            else onRequestSidebar()
+            break
+          }
         }
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, loadState, focusRegion, shelfIndex, gridIndex, topStreams, topGames, getGridColumns, onRequestSidebar, onSelectChannel, onSelectCategory, load])
+  }, [hasFocus, loadState, focusRegion, shelfIndex, gridIndex, topStreams, topGames, getGridColumns, onRequestSidebar, onSelectChannel, onSelectCategory, load, isPlaying])
 
   // Grid-Karte in den Viewport scrollen wenn fokussiert
   useEffect(() => {

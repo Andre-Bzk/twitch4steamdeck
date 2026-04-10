@@ -78,6 +78,11 @@ export function registerIpcHandlers(
   playback.on('playback-event', (event: PlaybackEvent) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.playbackEvent, event)
+      // Auf Windows stiehlt mpv den OS-Fokus → Electron refokussieren,
+      // damit navigator.getGamepads() weiter Daten liefert.
+      if (process.platform === 'win32' && event.kind === 'started') {
+        win.focus()
+      }
     }
   })
 }

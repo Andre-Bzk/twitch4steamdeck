@@ -17,7 +17,9 @@ const IPC = {
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
-  playbackEvent: 'playback:event'
+  playbackEvent: 'playback:event',
+
+  gamepadInput: 'gamepad-input'
 } as const
 
 export type AuthStatus = 'logged-out' | 'logged-in'
@@ -116,6 +118,13 @@ const api = {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)
       return () => ipcRenderer.removeListener(IPC.playbackEvent, listener)
+    }
+  },
+  gamepad: {
+    onInput: (cb: (key: string) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, key: string): void => cb(key)
+      ipcRenderer.on(IPC.gamepadInput, listener)
+      return () => ipcRenderer.removeListener(IPC.gamepadInput, listener)
     }
   }
 }

@@ -78,6 +78,13 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           e.preventDefault()
           setFocusRegion('shelf')
           setShelfIndex(0)
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          if (playState === 'playing' || playState === 'starting') {
+            void window.t4sd.playback.stop()
+          } else if (channel.isLive) {
+            void handleWatch()
+          }
         } else if (e.key === 'Escape') {
           e.preventDefault()
           if (playState === 'playing' || playState === 'starting') {

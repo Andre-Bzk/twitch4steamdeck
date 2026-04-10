@@ -83,6 +83,9 @@ export interface T4sdApi {
     stop: () => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
+  gamepad: {
+    onInput: (cb: (key: string) => void) => () => void
+  }
 }
 
 declare global {

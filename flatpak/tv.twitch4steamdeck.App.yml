@@ -14,7 +14,7 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --socket=pulseaudio        # Audio für mpv
-  - --device=dri               # GPU-Zugriff für VAAPI-Hardware-Decoding
+  - --device=all               # GPU + /dev/input/* (Gamepad API braucht Input-Devices)
   - --talk-name=org.freedesktop.Notifications
   # Electron userData liegt automatisch in ~/.var/app/tv.twitch4steamdeck.App/config/
   # Kein extra --filesystem nötig.

@@ -4,6 +4,7 @@ import { AuthService } from './auth/authService'
 import { HelixClient } from './twitch/helixClient'
 import { PlaybackService } from './playback/playbackService'
 import { registerIpcHandlers } from './ipc/handlers'
+import { startGamepadReader } from './input/gamepadReader'
 
 const isDev = !app.isPackaged
 
@@ -49,7 +50,10 @@ app.whenReady().then(async () => {
 
   registerIpcHandlers(auth, helix, playback)
 
+  const stopGamepad = startGamepadReader(() => BrowserWindow.getAllWindows()[0] ?? null)
+
   app.on('before-quit', () => {
+    stopGamepad()
     playback.stopAll()
   })
 
