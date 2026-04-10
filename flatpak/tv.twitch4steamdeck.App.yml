@@ -29,14 +29,47 @@ finish-args:
 
 modules:
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1) mpv — Media-Player für Live-Streams und VODs
-  #    Gebaut aus Sources; libplacebo deaktiviert (entfernt Vulkan/Shader-Chain).
-  #    ffmpeg, libass und libva (VAAPI) kommen aus dem freedesktop SDK 24.08.
+  # 1a) libass — Untertitel-Rendering (nicht im freedesktop SDK 24.08 enthalten)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: libass
+    config-opts:
+      - --disable-static
+      - --libdir=/app/lib
+    sources:
+      - type: archive
+        url: https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.gz
+        sha256: da7c348deb6fa6c24507afab2dee7545ba5dd5bbf90a137bfe9e738f7df68537
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1b) libplacebo — Pflicht-Abhängigkeit für mpv 0.38+ (gpu-next renderer)
+  #    vulkan=disabled: kein Vulkan-Renderer, OpenGL/EGL+VAAPI reicht für uns.
+  #    shaderc + lcms2 kommen aus dem freedesktop SDK 24.08.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: libplacebo
+    buildsystem: meson
+    config-opts:
+      - -Dlibdir=lib
+      - -Dvulkan=disabled
+      - -Dglslang=disabled
+      - -Dshaderc=enabled
+      - -Dlcms=enabled
+      - -Ddemos=false
+      - -Dtests=false
+    sources:
+      - type: archive
+        # Lokaler Tarball mit glad2-Submodul (GitHub-Tarball enthält Submodule nicht).
+        # Erstellen: siehe flatpak/build-flatpak.sh oder README.
+        # In WSL2: liegt unter ~/twitch4steamdeck/flatpak/libplacebo-6.338.2-full.tar.gz
+        path: libplacebo-6.338.2-full.tar.gz
+        sha256: 7f5da41b872302208f0e10c22d3e108ab9fdb1f253eb47c18651698c65d6b426
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1c) mpv — Media-Player für Live-Streams und VODs
+  #    ffmpeg, libass, libplacebo, libva (VAAPI) verfügbar.
   # ─────────────────────────────────────────────────────────────────────────────
   - name: mpv
     buildsystem: meson
     config-opts:
-      - -Dlibplacebo=disabled
       - -Dvaapi=enabled
       - -Dpulse=enabled
       - -Dalsa=disabled
@@ -48,9 +81,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.38.0.tar.gz
-        # sha256 generieren: sha256sum mpv-0.38.0.tar.gz
-        # oder: curl -L <url> | sha256sum
-        sha256: FILL_IN_sha256sum_of_mpv_0.38.0_tarball
+        sha256: 86d9ef40b6058732f67b46d0bbda24a074fae860b3eaae05bab3145041303066
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2) streamlink (Python) — liefert HLS-URLs aus Twitch-Streams
@@ -77,14 +108,10 @@ modules:
       - type: archive
         url: https://github.com/streamlink/streamlink/archive/refs/tags/6.11.0.tar.gz
         # sha256 generieren: sha256sum streamlink-6.11.0.tar.gz
-        sha256: FILL_IN_sha256sum_of_streamlink_tarball
-    # ACHTUNG: Vor dem echten Build alle Python-Dependencies (requests, websocket-client,
-    # pycountry, pycryptodome, ...) mit flatpak-pip-generator als separate file-Sources
-    # einbinden. Sonst schlägt der offline Build fehl.
-    # Kurzfristig: 'build-network-access: true' setzen um online-pip zu nutzen (nur lokal!).
-    build-options:
-      build-args:
-        - --allow-network-access
+        sha256: fbed984049b33f176e3a63e4bce302180d1ef24feffa24ea7306aad1a24bff40
+    # ACHTUNG: Vor dem echten Release-Build alle Python-Dependencies (requests,
+    # websocket-client, pycountry, pycryptodome, ...) mit flatpak-pip-generator
+    # als separate file-Sources einbinden. Sonst ist Streamlink zur Laufzeit unvollständig.
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 3) Haupt-App
@@ -123,6 +150,23 @@ modules:
       # .desktop-Eintrag
       - install -Dm644 flatpak/tv.twitch4steamdeck.App.desktop \
           /app/share/applications/tv.twitch4steamdeck.App.desktop
+      # WSL/Windows-Checkouts können 0777 an viele Dateien vererben; OSTree lehnt das ab.
+      - find /app -type d -exec chmod 755 {} +
+      - find /app -type f -exec chmod 644 {} +
+      - find /app/bin -type f -exec chmod 755 {} +
+      - find /app/lib -type f -name '*.so*' -exec chmod 755 {} +
+      - |
+        if [ -d /app/libexec ]; then
+          find /app/libexec -type f -exec chmod 755 {} +
+        fi
+      - |
+        if [ -f /app/lib/twitch4steamdeck/node_modules/electron/dist/electron ]; then
+          chmod 755 /app/lib/twitch4steamdeck/node_modules/electron/dist/electron
+        fi
+      - |
+        if [ -f /app/lib/twitch4steamdeck/node_modules/electron/dist/chrome-sandbox ]; then
+          chmod 755 /app/lib/twitch4steamdeck/node_modules/electron/dist/chrome-sandbox
+        fi
     sources:
       # Gesamtes Projektverzeichnis (inkl. aus/ + node_modules/ aus WSL2-Prebuild)
       - type: dir

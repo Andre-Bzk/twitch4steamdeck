@@ -82,7 +82,13 @@ twitch4steamdeck/
 ├── electron-builder.yml                  ✅
 ├── .env.example                          ✅
 ├── flatpak/
-│   └── tv.twitch4steamdeck.App.yml       ⏳ Phase 6
+│   ├── tv.twitch4steamdeck.App.yml       ✅ Phase 6
+│   ├── twitch4steamdeck.sh               ✅ Phase 6
+│   ├── tv.twitch4steamdeck.App.desktop   ✅ Phase 6
+│   └── build-flatpak.sh                  ✅ Phase 6
+├── resources/
+│   └── icons/
+│       └── icon.svg                      ✅ Phase 6 (Platzhalter)
 ├── src/
 │   ├── main/
 │   │   ├── index.ts                      ✅ (Auth + Helix instanziiert)
@@ -255,11 +261,15 @@ CREATE INDEX IF NOT EXISTS idx_history_watched ON vod_history(watched_at DESC);
 - `LanguageBadge` rendert in Thumbnails: unten-rechts (gegenüber Viewer-Count unten-links)
 - 38 Sprachen gemappt (pragmatische Twitch-Dominanz: `pt→🇧🇷`, `en→🇺🇸`, `zh→🇹🇼`)
 
-### Flatpak (⏳ Phase 6)
-- Runtime: `org.freedesktop.Platform//23.08`, `org.electronjs.Electron2.BaseApp`
-- Module: app-bundle, `mpv`, `streamlink` (pip), evtl. `streamlink-ttvlol`
+### Flatpak (✅ Phase 6 — Dateien erstellt, Verifikation auf Steam Deck ausstehend)
+- Runtime: `org.freedesktop.Platform//24.08`, `org.electronjs.Electron2.BaseApp//24.08`
+- Module: `mpv` (aus Sources, libplacebo disabled), `streamlink` (pip), App-Bundle
 - Permissions: `--share=network`, `--share=ipc`, `--socket=wayland`, `--socket=fallback-x11`,
   `--socket=pulseaudio`, `--device=dri`
+- Pre-Build-Strategie: `npm install` + `@electron/rebuild` + `npm run build` in WSL2,
+  dann Artefakte per `type:dir` Source ins Flatpak kopieren
+- Launcher: `zypak-wrapper node_modules/electron/dist/electron out/main/index.js`
+- Build-Skript: `flatpak/build-flatpak.sh` (WSL2, prüft deps, füllt SHA256, baut)
 
 ## Verifikation
 

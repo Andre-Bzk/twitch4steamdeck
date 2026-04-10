@@ -10,6 +10,22 @@ cd "$PROJECT_DIR"
 echo "=== Arbeitsverzeichnis: $PROJECT_DIR ==="
 
 # ─────────────────────────────────────────────────────────────────────────────
+# WSL2-Dateisystem-Check: flatpak-builder kann nicht über /mnt/ (Windows 9P) bauen
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$PROJECT_DIR" == /mnt/* ]]; then
+  echo ""
+  echo "FEHLER: Das Projekt liegt auf dem Windows-Dateisystem ($PROJECT_DIR)."
+  echo "  flatpak-builder benötigt FUSE, das auf /mnt/ nicht funktioniert."
+  echo ""
+  echo "  Lösung: Projekt auf das Linux-Dateisystem kopieren und von dort bauen:"
+  echo "    cp -rp /mnt/c/Projekte/twitch4steamdeck ~/twitch4steamdeck"
+  echo "    cd ~/twitch4steamdeck"
+  echo "    bash flatpak/build-flatpak.sh"
+  echo ""
+  exit 1
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Schritt 1: Flatpak-Abhängigkeiten prüfen
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
@@ -123,6 +139,7 @@ flatpak-builder \
   --user \
   --install \
   --force-clean \
+  --disable-rofiles-fuse \
   build-dir \
   flatpak/tv.twitch4steamdeck.App.yml
 
