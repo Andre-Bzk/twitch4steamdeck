@@ -91,3 +91,8 @@ export interface FollowedChannelInfo {
   startedAt?: string
   language?: string
 }
+
+export interface TopStreamsResult {
+  streams: FollowedChannelInfo[]
+  cursor?: string
+}

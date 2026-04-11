@@ -94,6 +94,11 @@ export interface VodChapter {
   gameId: string | null
 }
 
+export interface TopStreamsResult {
+  streams: FollowedChannelInfo[]
+  cursor?: string
+}
+
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
   auth: {
@@ -115,8 +120,8 @@ const api = {
       ipcRenderer.invoke(IPC.twitchGetVideos, broadcasterId),
     getTopGames: (cursor?: string): Promise<{ games: GameInfo[]; cursor?: string }> =>
       ipcRenderer.invoke(IPC.twitchGetTopGames, cursor),
-    getTopStreams: (gameId?: string): Promise<FollowedChannelInfo[]> =>
-      ipcRenderer.invoke(IPC.twitchGetTopStreams, gameId),
+    getTopStreams: (options?: { gameId?: string; language?: string; cursor?: string; limit?: number }): Promise<TopStreamsResult> =>
+      ipcRenderer.invoke(IPC.twitchGetTopStreams, options),
     getVodChapters: (vodId: string): Promise<VodChapter[]> =>
       ipcRenderer.invoke(IPC.twitchGetVodChapters, vodId)
   },

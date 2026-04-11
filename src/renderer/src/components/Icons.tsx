@@ -28,6 +28,27 @@ export function CompassIcon(props: IconProps): JSX.Element {
   )
 }
 
+export function TwitchGlyphIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props} viewBox="0 0 24 24">
+      <path d="M5 3h14v10l-4 4h-4l-3 3v-3H5z" />
+      <path d="M10 8v4" />
+      <path d="M14 8v4" />
+    </svg>
+  )
+}
+
+export function ChartIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 19h16" />
+      <path d="M7 16V9" />
+      <path d="M12 16V5" />
+      <path d="M17 16v-7" />
+    </svg>
+  )
+}
+
 export function UserIcon(props: IconProps): JSX.Element {
   return (
     <svg {...base} {...props}>

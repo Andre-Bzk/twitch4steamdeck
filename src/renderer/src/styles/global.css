@@ -11,7 +11,8 @@
   --radius: 12px;
   --radius-sm: 8px;
   --font-size-body: 22px;
-  --sidebar-width: 260px;
+  --sidebar-width: 270px;
+  --badge-gap: 6px;
 }
 
 * {
@@ -166,6 +167,24 @@ body,
   font-weight: 700;
   color: var(--color-fg);
   letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar__logo svg {
+  width: 24px;
+  height: 24px;
+  color: var(--color-accent);
+}
+
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar__group--bottom {
+  margin-top: auto;
 }
 
 .sidebar__items {
@@ -177,17 +196,37 @@ body,
 .sidebar__item {
   display: flex;
   align-items: center;
-  gap: 16px;
   padding: 14px 16px;
   border-radius: var(--radius-sm);
   background: transparent;
   border: 2px solid transparent;
   color: var(--color-fg-dim);
   font: inherit;
-  font-size: 19px;
+  font-size: 18px;
   cursor: pointer;
   text-align: left;
   transition: background 0.1s, color 0.1s;
+}
+
+.sidebar__item-main {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar__item-label {
+  white-space: nowrap;
+}
+
+.sidebar__item-trailing {
+  margin-left: var(--badge-gap);
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-fg);
 }
 
 .sidebar__item:hover {
@@ -214,6 +253,7 @@ body,
   width: 22px;
   height: 22px;
   flex-shrink: 0;
+  margin-right: 16px;
 }
 
 /* ── Main Content / Screens ───────────────────────── */
@@ -297,6 +337,10 @@ body,
   padding-top: 14px;
 }
 
+.card-grid--stream-list {
+  padding-top: 14px;
+}
+
 .card-grid::-webkit-scrollbar {
   width: 8px;
 }
@@ -306,6 +350,14 @@ body,
 }
 .card-grid::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.card-grid__loading-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 18px 8px;
+  font-size: 16px;
+  color: var(--color-fg-dim);
 }
 
 /* ── Channel Card (block layout — kein flex!) ─────── */
@@ -1101,6 +1153,64 @@ body,
   color: var(--color-fg-dim);
   font-weight: 400;
   white-space: nowrap;
+}
+
+/* ── Settings Slider ─────────────────────────────── */
+.settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--color-bg-elev);
+  border: 2px solid transparent;
+  margin-top: 8px;
+  transition: border-color 0.1s;
+}
+
+.settings-slider--focused {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 2px rgba(191, 148, 255, 0.25);
+}
+
+.settings-slider__input {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-slider__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-fg);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.settings-slider__input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.settings-slider__value {
+  font-size: 20px;
+  font-weight: 700;
+  min-width: 70px;
+  text-align: right;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.settings-screen {
+  overflow-y: auto;
 }
 
 /* ── Account Screen ───────────────────────────────── */

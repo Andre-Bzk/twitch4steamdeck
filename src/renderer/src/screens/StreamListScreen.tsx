@@ -1,34 +1,60 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import FocusableCard from '../components/FocusableCard'
+import type { FollowedChannelInfo } from '../types/t4sd'
 
 interface Props {
-  game: GameInfo
+  hasFocus: boolean
+  title: string
+  language: string
+  onRequestSidebar: () => void
   onSelectChannel: (ch: FollowedChannelInfo) => void
-  onBack: () => void
 }
 
 type LoadState = 'loading' | 'ok' | 'error'
 
-export default function CategoryScreen({ game, onSelectChannel, onBack }: Props): JSX.Element {
+export default function StreamListScreen({
+  hasFocus,
+  title,
+  language,
+  onRequestSidebar,
+  onSelectChannel
+}: Props): JSX.Element {
   const [streams, setStreams] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     setLoadState('loading')
+    setNextCursor(undefined)
     try {
-      const data = await window.t4sd.twitch.getTopStreams({ gameId: game.id, limit: 40 })
-      setStreams(data.streams)
+      const result = await window.t4sd.twitch.getTopStreams({ language, limit: 20 })
+      setStreams(result.streams)
+      setNextCursor(result.cursor)
       setFocusedIndex(0)
       setLoadState('ok')
     } catch (err) {
-      console.error('[CategoryScreen] Laden fehlgeschlagen:', err)
+      console.error('[StreamListScreen] Laden fehlgeschlagen:', err)
       setLoadState('error')
     }
-  }, [game.id])
+  }, [language])
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || isLoadingMore) return
+    setIsLoadingMore(true)
+    try {
+      const result = await window.t4sd.twitch.getTopStreams({ language, limit: 20, cursor: nextCursor })
+      setStreams((prev) => [...prev, ...result.streams])
+      setNextCursor(result.cursor)
+    } catch (err) {
+      console.error('[StreamListScreen] Nachladen fehlgeschlagen:', err)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [language, nextCursor, isLoadingMore])
 
   useEffect(() => {
     void load()
@@ -41,6 +67,11 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
     })
   }, [])
 
+  useEffect(() => {
+    if (loadState !== 'ok' || focusedIndex !== streams.length - 1 || !nextCursor || isLoadingMore) return
+    void loadMore()
+  }, [focusedIndex, streams.length, nextCursor, isLoadingMore, loadMore, loadState])
+
   const getColumns = useCallback((): number => {
     const grid = gridRef.current
     if (!grid) return 4
@@ -49,8 +80,9 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
   }, [])
 
   useEffect(() => {
+    if (!hasFocus) return
+
     const onKey = (e: KeyboardEvent): void => {
-      // Während der Wiedergabe: nur Stop erlauben, Navigation blockieren
       if (isPlaying) {
         e.preventDefault()
         if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
@@ -64,13 +96,13 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
         return
       }
 
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onBack()
+      if (loadState !== 'ok' || streams.length === 0) {
+        if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+          e.preventDefault()
+          onRequestSidebar()
+        }
         return
       }
-
-      if (loadState !== 'ok' || streams.length === 0) return
 
       const cols = getColumns()
       const total = streams.length
@@ -82,8 +114,13 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
           break
         case 'ArrowLeft':
           e.preventDefault()
-          if (focusedIndex % cols === 0) onBack()
-          else setFocusedIndex((i) => i - 1)
+          setFocusedIndex((i) => {
+            if (i % cols === 0) {
+              onRequestSidebar()
+              return i
+            }
+            return i - 1
+          })
           break
         case 'ArrowDown':
           e.preventDefault()
@@ -106,33 +143,27 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
           if (ch) onSelectChannel(ch)
           break
         }
+        case 'Escape':
+          e.preventDefault()
+          onRequestSidebar()
+          break
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [loadState, streams, focusedIndex, isPlaying, getColumns, onBack, onSelectChannel, load])
+  }, [hasFocus, isPlaying, load, loadState, streams, focusedIndex, getColumns, onRequestSidebar, onSelectChannel])
 
   return (
-    <div className="category-screen">
-      <header className="category-screen__header">
-        <button className="btn category-screen__back" onClick={onBack}>
-          ← Zurück
-        </button>
-        <img
-          className="category-screen__art"
-          src={game.boxArtUrl}
-          alt=""
-          draggable={false}
-        />
-        <div className="category-screen__info">
-          <h2 className="category-screen__title">{game.name}</h2>
-          {loadState === 'ok' && (
-            <p className="category-screen__meta">
-              {streams.length} Streams · [Y] Aktualisieren · [X] Kanalseite
-            </p>
-          )}
-        </div>
+    <div className="screen screen--stream-list">
+      <header className="screen__header">
+        <h2 className="screen__title">{title}</h2>
+        {loadState === 'ok' && streams.length > 0 && (
+          <div className="screen__meta">
+            <span>{streams.length} Streams</span>
+            <span className="screen__hint">[Y] Aktualisieren · [X] Kanalseite</span>
+          </div>
+        )}
       </header>
 
       {loadState === 'loading' && (
@@ -152,21 +183,24 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
 
       {loadState === 'ok' && streams.length === 0 && (
         <div className="screen__state">
-          <p>Keine Live-Streams in dieser Kategorie.</p>
+          <p>Keine Live-Streams fuer diese Sprache gefunden.</p>
         </div>
       )}
 
       {loadState === 'ok' && streams.length > 0 && (
-        <div className="card-grid" ref={gridRef}>
+        <div className="card-grid card-grid--stream-list" ref={gridRef}>
           {streams.map((ch, i) => (
             <FocusableCard
-              key={ch.broadcasterId}
+              key={`${ch.broadcasterId}-${i}`}
               channel={ch}
-              focused={i === focusedIndex}
+              focused={hasFocus && i === focusedIndex}
               onFocus={() => setFocusedIndex(i)}
               onSelect={() => void window.t4sd.playback.startLive(ch.broadcasterLogin)}
             />
           ))}
+          {isLoadingMore && (
+            <div className="card-grid__loading-more">Lade weitere Streams…</div>
+          )}
         </div>
       )}
     </div>

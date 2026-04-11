@@ -5,6 +5,7 @@ import type {
   HelixGame,
   HelixPaginatedResponse,
   HelixStream,
+  TopStreamsResult,
   HelixUser,
   HelixVideo,
   VodChapter,
@@ -168,9 +169,16 @@ export class HelixClient {
     }
   }
 
-  async getTopStreams(opts?: { gameId?: string; limit?: number }): Promise<FollowedChannelInfo[]> {
+  async getTopStreams(opts?: {
+    gameId?: string
+    language?: string
+    limit?: number
+    cursor?: string
+  }): Promise<TopStreamsResult> {
     const params: Record<string, string> = { first: String(opts?.limit ?? 20) }
     if (opts?.gameId) params.game_id = opts.gameId
+    if (opts?.language) params.language = opts.language
+    if (opts?.cursor) params.after = opts.cursor
 
     const url = new URL(`${BASE}/streams`)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
@@ -179,13 +187,14 @@ export class HelixClient {
       const body = await res.text().catch(() => '')
       throw new Error(`Helix /streams → ${res.status}: ${body}`)
     }
-    const data = (await res.json()) as { data: HelixStream[] }
+    const data = (await res.json()) as HelixPaginatedResponse<HelixStream>
     const streams = data.data
 
     const userIds = streams.map((s) => s.user_id)
     const avatarMap = await this.getProfileImages(userIds)
 
-    return streams.map((s) => ({
+    return {
+      streams: streams.map((s) => ({
       broadcasterId: s.user_id,
       broadcasterLogin: s.user_login,
       broadcasterName: s.user_name,
@@ -198,7 +207,9 @@ export class HelixClient {
       thumbnailUrl: s.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
       startedAt: s.started_at,
       language: s.language
-    }))
+      })),
+      cursor: data.pagination?.cursor
+    }
   }
 
   private static readonly GQL_URL = 'https://gql.twitch.tv/gql'

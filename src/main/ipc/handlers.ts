@@ -60,7 +60,13 @@ export function registerIpcHandlers(
   )
   ipcMain.handle(
     IPC.twitchGetTopStreams,
-    (_e, gameId?: string) => helix.getTopStreams(gameId ? { gameId, limit: 40 } : { limit: 100 })
+    (_e, options?: { gameId?: string; language?: string; cursor?: string; limit?: number }) =>
+      helix.getTopStreams({
+        gameId: options?.gameId,
+        language: options?.language,
+        cursor: options?.cursor,
+        limit: options?.limit ?? (options?.gameId ? 40 : 100)
+      })
   )
   ipcMain.handle(
     IPC.twitchGetVideos,

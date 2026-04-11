@@ -65,6 +65,11 @@ export interface VodChapter {
   gameId: string | null
 }
 
+export interface TopStreamsResult {
+  streams: FollowedChannelInfo[]
+  cursor?: string
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -79,7 +84,7 @@ export interface T4sdApi {
     getFollowed: () => Promise<FollowedChannelInfo[]>
     getVideos: (broadcasterId: string) => Promise<VodInfo[]>
     getTopGames: (cursor?: string) => Promise<{ games: GameInfo[]; cursor?: string }>
-    getTopStreams: (gameId?: string) => Promise<FollowedChannelInfo[]>
+    getTopStreams: (options?: { gameId?: string; language?: string; cursor?: string; limit?: number }) => Promise<TopStreamsResult>
     getVodChapters: (vodId: string) => Promise<VodChapter[]>
   }
   history: {

@@ -6,6 +6,7 @@ import CategoryScreen from './CategoryScreen'
 import ChannelScreen from './ChannelScreen'
 import FollowingScreen from './FollowingScreen'
 import SettingsScreen from './SettingsScreen'
+import StreamListScreen from './StreamListScreen'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 
 type Region = 'sidebar' | 'main'
@@ -70,6 +71,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   }, [region, sidebarIndex])
 
   const mainFocus = region === 'main'
+  const activeItem = SIDEBAR_ITEMS.find((item) => item.key === tab) ?? SIDEBAR_ITEMS[0]
 
   return (
     <div className="app-layout">
@@ -86,7 +88,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       <div className="main-content">
         {selectedChannel ? (
           <ChannelScreen channel={selectedChannel} onBack={handleBack} />
-        ) : selectedCategory && tab === 'browse' ? (
+        ) : selectedCategory && activeItem.screen.kind === 'browse' ? (
           <CategoryScreen
             game={selectedCategory}
             onSelectChannel={handleSelectChannel}
@@ -94,14 +96,14 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
           />
         ) : (
           <>
-            {tab === 'following' && (
+            {activeItem.screen.kind === 'following' && (
               <FollowingScreen
                 hasFocus={mainFocus}
                 onRequestSidebar={requestSidebar}
                 onSelectChannel={handleSelectChannel}
               />
             )}
-            {tab === 'browse' && (
+            {activeItem.screen.kind === 'browse' && (
               <BrowseScreen
                 hasFocus={mainFocus}
                 onRequestSidebar={requestSidebar}
@@ -109,14 +111,23 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 onSelectCategory={handleSelectCategory}
               />
             )}
-            {tab === 'account' && (
+            {activeItem.screen.kind === 'stream-list' && (
+              <StreamListScreen
+                hasFocus={mainFocus}
+                title={activeItem.screen.title}
+                language={activeItem.screen.language}
+                onRequestSidebar={requestSidebar}
+                onSelectChannel={handleSelectChannel}
+              />
+            )}
+            {activeItem.screen.kind === 'account' && (
               <AccountScreen
                 hasFocus={mainFocus}
                 onRequestSidebar={requestSidebar}
                 onLogout={onLogout}
               />
             )}
-            {tab === 'settings' && (
+            {activeItem.screen.kind === 'settings' && (
               <SettingsScreen hasFocus={mainFocus} onRequestSidebar={requestSidebar} />
             )}
           </>

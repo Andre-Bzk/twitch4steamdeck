@@ -50,7 +50,7 @@ export default function BrowseScreen({
         window.t4sd.twitch.getTopStreams(),
         window.t4sd.twitch.getTopGames()
       ])
-      setTopStreams(streams)
+      setTopStreams(streams.streams)
       setTopGames(gamesResult.games)
       setNextCursor(gamesResult.cursor)
       setShelfIndex(0)
