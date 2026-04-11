@@ -17,6 +17,7 @@ const IPC = {
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
+  playbackSeek: 'playback:seek',
   playbackEvent: 'playback:event',
 
   gamepadInput: 'gamepad-input'
@@ -114,6 +115,7 @@ const api = {
     startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number): Promise<void> =>
       ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
+    seek: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeek, seconds),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)

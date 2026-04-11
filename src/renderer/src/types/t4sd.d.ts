@@ -81,6 +81,7 @@ export interface T4sdApi {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
     startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number) => Promise<void>
     stop: () => Promise<void>
+    seek: (seconds: number) => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
   gamepad: {

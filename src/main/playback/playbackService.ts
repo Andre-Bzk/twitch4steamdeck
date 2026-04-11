@@ -141,6 +141,10 @@ export class PlaybackService extends EventEmitter {
     })
   }
 
+  seek(seconds: number): void {
+    this.current?.mpv.seek(seconds)
+  }
+
   async stop(): Promise<void> {
     if (!this.current) return
     const { process: proc, mpv } = this.current

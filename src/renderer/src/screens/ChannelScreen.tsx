@@ -73,6 +73,39 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      const isPlaying = playState === 'playing' || playState === 'starting'
+
+      // Während der Wiedergabe: nur Playback-Steuerung erlauben, keine Navigation
+      if (isPlaying) {
+        switch (e.key) {
+          case 'l2':
+            e.preventDefault()
+            void window.t4sd.playback.seek(-300)
+            break
+          case 'r2':
+            e.preventDefault()
+            void window.t4sd.playback.seek(300)
+            break
+          case 'ArrowLeft':
+            e.preventDefault()
+            void window.t4sd.playback.seek(-30)
+            break
+          case 'ArrowRight':
+            e.preventDefault()
+            void window.t4sd.playback.seek(30)
+            break
+          case 'Enter':
+          case ' ':
+          case 'Escape':
+            e.preventDefault()
+            void window.t4sd.playback.stop()
+            break
+          default:
+            e.preventDefault() // alle anderen Tasten blockieren
+        }
+        return
+      }
+
       if (focusRegion === 'hero') {
         if (e.key === 'ArrowDown' && vods.length > 0) {
           e.preventDefault()
@@ -80,18 +113,12 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           setShelfIndex(0)
         } else if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          if (playState === 'playing' || playState === 'starting') {
-            void window.t4sd.playback.stop()
-          } else if (channel.isLive) {
+          if (channel.isLive) {
             void handleWatch()
           }
         } else if (e.key === 'Escape') {
           e.preventDefault()
-          if (playState === 'playing' || playState === 'starting') {
-            void window.t4sd.playback.stop()
-          } else {
-            onBack()
-          }
+          onBack()
         }
       } else {
         // shelf region
@@ -111,11 +138,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           if (vod) void handleWatchVod(vod)
         } else if (e.key === 'Escape') {
           e.preventDefault()
-          if (playState === 'playing' || playState === 'starting') {
-            void window.t4sd.playback.stop()
-          } else {
-            onBack()
-          }
+          onBack()
         }
       }
     }
@@ -252,7 +275,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
             {playState === 'playing' && (
               <>
-                <span className="channel-screen__playing-hint">● Wiedergabe läuft in mpv</span>
+                <span className="channel-screen__playing-hint">● Wiedergabe läuft in mpv · ← −30s · → +30s · LT −5min · RT +5min</span>
                 <button className="btn" onClick={() => void handleStop()}>
                   ■ Stop (B / Escape)
                 </button>

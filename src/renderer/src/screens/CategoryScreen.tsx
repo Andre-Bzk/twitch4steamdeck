@@ -14,6 +14,7 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
   const [streams, setStreams] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -33,6 +34,13 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
     void load()
   }, [load])
 
+  useEffect(() => {
+    return window.t4sd.playback.onEvent((ev) => {
+      if (ev.kind === 'started') setIsPlaying(true)
+      else if (ev.kind === 'stopped' || ev.kind === 'error') setIsPlaying(false)
+    })
+  }, [])
+
   const getColumns = useCallback((): number => {
     const grid = gridRef.current
     if (!grid) return 4
@@ -42,6 +50,15 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // Während der Wiedergabe: nur Stop erlauben, Navigation blockieren
+      if (isPlaying) {
+        e.preventDefault()
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          void window.t4sd.playback.stop()
+        }
+        return
+      }
+
       if (e.key === 'y' || e.key === 'Y') {
         void load()
         return
@@ -94,7 +111,7 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [loadState, streams, focusedIndex, getColumns, onBack, onSelectChannel, load])
+  }, [loadState, streams, focusedIndex, isPlaying, getColumns, onBack, onSelectChannel, load])
 
   return (
     <div className="category-screen">

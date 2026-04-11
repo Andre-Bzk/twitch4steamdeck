@@ -74,6 +74,12 @@ export class MpvController {
     })
   }
 
+  seek(seconds: number): void {
+    if (this.socket?.writable) {
+      this._send({ command: ['seek', seconds, 'relative'] })
+    }
+  }
+
   quit(): void {
     if (this.socket?.writable) {
       try {

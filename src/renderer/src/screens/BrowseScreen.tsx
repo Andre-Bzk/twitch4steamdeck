@@ -107,6 +107,15 @@ export default function BrowseScreen({
     if (!hasFocus) return
 
     const onKey = (e: KeyboardEvent): void => {
+      // Während der Wiedergabe: nur Stop erlauben, Navigation blockieren
+      if (isPlaying) {
+        e.preventDefault()
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          void window.t4sd.playback.stop()
+        }
+        return
+      }
+
       if (e.key === 'y' || e.key === 'Y') {
         void load()
         return
@@ -145,12 +154,10 @@ export default function BrowseScreen({
             if (ch) onSelectChannel(ch)
             break
           }
-          case 'Escape': {
+          case 'Escape':
             e.preventDefault()
-            if (isPlaying) void window.t4sd.playback.stop()
-            else onRequestSidebar()
+            onRequestSidebar()
             break
-          }
         }
       } else {
         // grid region
@@ -184,12 +191,10 @@ export default function BrowseScreen({
             if (game) onSelectCategory(game)
             break
           }
-          case 'Escape': {
+          case 'Escape':
             e.preventDefault()
-            if (isPlaying) void window.t4sd.playback.stop()
-            else onRequestSidebar()
+            onRequestSidebar()
             break
-          }
         }
       }
     }

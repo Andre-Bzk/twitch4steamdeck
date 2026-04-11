@@ -23,6 +23,8 @@ const BUTTON_MAP: Record<number, string> = {
   1: 'Escape',  // B
   2: 'x',       // X
   3: 'y',       // Y
+  6: 'l2',      // LT / L2
+  7: 'r2',      // RT / R2
   12: 'ArrowUp',
   13: 'ArrowDown',
   14: 'ArrowLeft',

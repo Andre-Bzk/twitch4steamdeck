@@ -23,6 +23,7 @@ export const IPC = {
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
+  playbackSeek: 'playback:seek',
   /** main → renderer */
   playbackEvent: 'playback:event'
 } as const
@@ -74,6 +75,7 @@ export function registerIpcHandlers(
       playback.startVod(vodId, channelLogin, title, durationSeconds)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
+  ipcMain.handle(IPC.playbackSeek, (_e, seconds: number) => playback.seek(seconds))
 
   playback.on('playback-event', (event: PlaybackEvent) => {
     for (const win of BrowserWindow.getAllWindows()) {

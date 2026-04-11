@@ -123,6 +123,12 @@ class JoystickReader {
     } else if (axis === 1) {
       if (value < -STICK_THRESHOLD) key = 'ArrowUp'
       else if (value > STICK_THRESHOLD) key = 'ArrowDown'
+    }
+    // Trigger (Axes 2/5): -32767 = nicht gedrückt, +32767 = voll gedrückt
+    else if (axis === 2) {
+      if (value > 0) key = 'l2'
+    } else if (axis === 5) {
+      if (value > 0) key = 'r2'
     } else {
       return
     }
