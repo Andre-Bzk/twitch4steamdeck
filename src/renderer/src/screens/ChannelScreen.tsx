@@ -69,6 +69,8 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [chaptersLoading, setChaptersLoading] = useState(false)
   const [chapterIndex, setChapterIndex] = useState(0)
   const [wasPlayingBeforeChapters, setWasPlayingBeforeChapters] = useState(false)
+  const [currentVod, setCurrentVod] = useState<VodInfo | null>(null)
+  const [pendingChapterVod, setPendingChapterVod] = useState<VodInfo | null>(null)
   const watchBtnRef = useRef<HTMLButtonElement>(null)
   const chapterListRef = useRef<HTMLUListElement>(null)
 
@@ -89,7 +91,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
       const isPlaying = playState === 'playing' || playState === 'starting' || playState === 'paused'
 
       // Kapitel-Panel hat oberste Priorität (gilt auch während Wiedergabe)
-      if (focusRegion === 'chapters') {
+      if (focusRegion === 'chapters' && chapterPanelVod) {
         const duringPlayback = isPlaying
         if (e.key === 'Escape') {
           e.preventDefault()
@@ -176,10 +178,18 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             break
           case 'y': {
             e.preventDefault()
-            const vod = vods[shelfIndex]
+            const vod = currentVod ?? vods[shelfIndex]
             if (vod) openChapterPanel(vod, true)
             break
           }
+          case 'l1':
+            e.preventDefault()
+            void jumpChapter(-1)
+            break
+          case 'r1':
+            e.preventDefault()
+            void jumpChapter(1)
+            break
           default:
             e.preventDefault()
         }
@@ -228,16 +238,17 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [focusRegion, playState, vods, shelfIndex, onBack, chapters, chapterIndex, chapterPanelVod, wasPlayingBeforeChapters])
+  }, [focusRegion, playState, vods, shelfIndex, onBack, chapters, chapterIndex, chapterPanelVod, wasPlayingBeforeChapters, currentVod])
 
   useEffect(() => {
     const unsub = window.t4sd.playback.onEvent((ev: PlaybackEvent) => {
       if (ev.kind === 'started') {
         setPlayState('playing')
       } else if (ev.kind === 'stopped') {
+        const nextChapterVod = pendingChapterVod
         setPlayState('idle')
         setChapterPanelVod(null)
-        setFocusRegion('shelf')
+        setCurrentVod(null)
         // Progress nach Stop neu laden
         if (vods.length > 0) {
           void window.t4sd.history
@@ -245,14 +256,22 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             .then(setProgressMap)
             .catch(() => {})
         }
+        if (nextChapterVod) {
+          setPendingChapterVod(null)
+          showChapterPanel(nextChapterVod)
+        } else {
+          setFocusRegion('shelf')
+        }
       } else if (ev.kind === 'error') {
         setPlayState('error')
         setChapterPanelVod(null)
+        setCurrentVod(null)
+        setPendingChapterVod(null)
         setErrorMsg(ev.message ?? 'Unbekannter Fehler')
       }
     })
     return unsub
-  }, [vods])
+  }, [pendingChapterVod, vods])
 
   useEffect(() => {
     watchBtnRef.current?.focus()
@@ -263,6 +282,42 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     const item = chapterListRef.current.children[chapterIndex] as HTMLElement | undefined
     item?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [chapterIndex])
+
+  const loadChapters = async (vodId: string): Promise<VodChapter[]> => {
+    return window.t4sd.twitch.getVodChapters(vodId)
+  }
+
+  const showChapterPanel = (vod: VodInfo): void => {
+    setChapterPanelVod(vod)
+    setChapters([])
+    setChapterIndex(0)
+    setChaptersLoading(true)
+    setFocusRegion('chapters')
+    setWasPlayingBeforeChapters(false)
+    void loadChapters(vod.id)
+      .then((loaded) => setChapters(loaded))
+      .catch(() => {})
+      .finally(() => setChaptersLoading(false))
+  }
+
+  const jumpChapter = async (direction: 1 | -1): Promise<void> => {
+    if (!currentVod) return
+
+    const [loadedChapters, currentPosition] = await Promise.all([
+      loadChapters(currentVod.id),
+      window.t4sd.playback.getCurrentPosition()
+    ])
+    if (loadedChapters.length === 0 || currentPosition === null) return
+
+    const epsilon = 1
+    const target = direction > 0
+      ? loadedChapters.find((chapter) => chapter.positionSeconds > currentPosition + epsilon)
+      : [...loadedChapters].reverse().find((chapter) => chapter.positionSeconds < currentPosition - epsilon)
+
+    if (target) {
+      await window.t4sd.playback.seekTo(target.positionSeconds)
+    }
+  }
 
   const handleWatch = async (): Promise<void> => {
     setPlayState('starting')
@@ -278,6 +333,11 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const handleWatchVod = async (vod: VodInfo): Promise<void> => {
     setPlayState('starting')
     setErrorMsg('')
+    setFocusRegion('hero')
+    setChapterPanelVod(null)
+    setWasPlayingBeforeChapters(false)
+    setCurrentVod(vod)
+    setPendingChapterVod(null)
     try {
       await window.t4sd.playback.startVod(
         vod.id,
@@ -292,26 +352,22 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   }
 
   const openChapterPanel = (vod: VodInfo, duringPlayback: boolean): void => {
-    setChapterPanelVod(vod)
-    setChapters([])
-    setChapterIndex(0)
-    setChaptersLoading(true)
-    setFocusRegion('chapters')
     if (duringPlayback) {
-      setWasPlayingBeforeChapters(playState === 'playing')
-      void window.t4sd.playback.pause()
-      setPlayState('paused')
+      setPendingChapterVod(vod)
+      void window.t4sd.playback.stop()
+      return
     }
-    window.t4sd.twitch.getVodChapters(vod.id)
-      .then((loaded) => setChapters(loaded))
-      .catch(() => {})
-      .finally(() => setChaptersLoading(false))
+    showChapterPanel(vod)
   }
 
   const handleWatchVodFromChapter = async (vod: VodInfo, startSeconds: number): Promise<void> => {
     setPlayState('starting')
     setErrorMsg('')
+    setFocusRegion('hero')
     setChapterPanelVod(null)
+    setWasPlayingBeforeChapters(false)
+    setCurrentVod(vod)
+    setPendingChapterVod(null)
     try {
       await window.t4sd.playback.startVod(
         vod.id,
@@ -404,7 +460,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             {(playState === 'playing' || playState === 'paused') && (
               <>
                 <span className="channel-screen__playing-hint">
-                  ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''} · A Pause/Resume · ← −30s · → +30s · LT −5min · RT +5min · Y Kapitel
+                  ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''} · A Pause/Resume · ← −30s · → +30s · LT −5min · RT +5min · LB Kapitel zurück · RB Kapitel vor · Y Kapitelmenü
                 </span>
                 <button className="btn" onClick={() => void handleStop()}>
                   ■ Stop (B / Escape)

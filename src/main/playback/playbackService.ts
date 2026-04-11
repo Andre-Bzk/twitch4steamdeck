@@ -163,6 +163,10 @@ export class PlaybackService extends EventEmitter {
     this.current?.mpv.seekAbsolute(seconds)
   }
 
+  getCurrentPosition(): Promise<number | null> {
+    return this.current?.mpv.getTimePos() ?? Promise.resolve(null)
+  }
+
   async stop(): Promise<void> {
     if (!this.current) return
     const { process: proc, mpv } = this.current

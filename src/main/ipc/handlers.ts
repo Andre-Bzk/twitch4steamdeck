@@ -29,6 +29,7 @@ export const IPC = {
   playbackPause: 'playback:pause',
   playbackResume: 'playback:resume',
   playbackSeekTo: 'playback:seek-to',
+  playbackGetCurrentPosition: 'playback:get-current-position',
   /** main → renderer */
   playbackEvent: 'playback:event'
 } as const
@@ -88,6 +89,7 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.playbackTogglePause, () => playback.togglePause())
   ipcMain.handle(IPC.playbackSeekTo, (_e, seconds: number) => playback.seekTo(seconds))
   ipcMain.handle(IPC.playbackResume, () => playback.resume())
+  ipcMain.handle(IPC.playbackGetCurrentPosition, () => playback.getCurrentPosition())
   ipcMain.handle(IPC.playbackPause, () => {
     playback.pause()
     for (const win of BrowserWindow.getAllWindows()) win.focus()

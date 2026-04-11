@@ -23,6 +23,7 @@ const IPC = {
   playbackPause: 'playback:pause',
   playbackResume: 'playback:resume',
   playbackSeekTo: 'playback:seek-to',
+  playbackGetCurrentPosition: 'playback:get-current-position',
   playbackEvent: 'playback:event',
 
   gamepadInput: 'gamepad-input'
@@ -134,6 +135,7 @@ const api = {
     pause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackPause),
     resume: (): Promise<void> => ipcRenderer.invoke(IPC.playbackResume),
     seekTo: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeekTo, seconds),
+    getCurrentPosition: (): Promise<number | null> => ipcRenderer.invoke(IPC.playbackGetCurrentPosition),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)

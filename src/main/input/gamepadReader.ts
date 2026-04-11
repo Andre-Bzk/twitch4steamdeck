@@ -25,7 +25,9 @@ const BUTTON_MAP: Record<number, string> = {
   0: 'Enter',   // A
   1: 'Escape',  // B
   2: 'x',       // X
-  3: 'y'        // Y
+  3: 'y',       // Y
+  4: 'l1',      // LB / L1
+  5: 'r1'       // RB / R1
 }
 
 const STICK_THRESHOLD = 16384 // ~50% von 32767
@@ -53,8 +55,9 @@ class JoystickReader {
   start(): boolean {
     try {
       this.stream = fs.createReadStream(this.devicePath)
-      this.stream.on('data', (chunk: Buffer) => {
-        this.buf = Buffer.concat([this.buf, chunk])
+      this.stream.on('data', (chunk) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+        this.buf = Buffer.concat([this.buf, buf])
         while (this.buf.length >= 8) {
           this.processEvent(this.buf.subarray(0, 8))
           this.buf = this.buf.subarray(8)

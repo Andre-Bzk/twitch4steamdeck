@@ -14,6 +14,8 @@
  *   Button  1 = B          → Escape
  *   Button  2 = X          → x
  *   Button  3 = Y          → y
+ *   Button  4 = LB         → l1
+ *   Button  5 = RB         → r1
  *   Axis  1 (left stick Y) → Up/Down
  *   Axis  0 (left stick X) → Left/Right
  */
@@ -23,6 +25,8 @@ const BUTTON_MAP: Record<number, string> = {
   1: 'Escape',  // B
   2: 'x',       // X
   3: 'y',       // Y
+  4: 'l1',      // LB / L1
+  5: 'r1',      // RB / R1
   6: 'l2',      // LT / L2
   7: 'r2',      // RT / R2
   12: 'ArrowUp',

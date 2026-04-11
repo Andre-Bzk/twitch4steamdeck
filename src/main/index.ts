@@ -45,7 +45,11 @@ app.whenReady().then(async () => {
   const clientId = import.meta.env.MAIN_VITE_TWITCH_CLIENT_ID ?? ''
   const auth = new AuthService(clientId)
   await auth.init()
-  const helix = new HelixClient(clientId, () => auth.getValidAccessToken())
+  const helix = new HelixClient(clientId, async () => {
+    const token = await auth.getValidAccessToken()
+    if (!token) throw new Error('Kein gueltiges Twitch-Access-Token vorhanden')
+    return token
+  })
   const playback = new PlaybackService()
 
   registerIpcHandlers(auth, helix, playback)

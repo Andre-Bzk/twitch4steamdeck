@@ -110,7 +110,7 @@ export default function FollowingScreen({
   const liveCount = channels.filter((c) => c.isLive).length
 
   return (
-    <div className="screen">
+    <div className="screen screen--following">
       <header className="screen__header">
         <h2 className="screen__title">Du folgst</h2>
         {loadState === 'ok' && channels.length > 0 && (
@@ -144,7 +144,7 @@ export default function FollowingScreen({
       )}
 
       {loadState === 'ok' && channels.length > 0 && (
-        <div className="card-grid" ref={gridRef}>
+        <div className="card-grid card-grid--following" ref={gridRef}>
           {channels.map((ch, i) => (
             <FocusableCard
               key={ch.broadcasterId}

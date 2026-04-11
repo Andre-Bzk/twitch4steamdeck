@@ -12,6 +12,9 @@ export function getMpvIpcPath(): string {
 export class MpvController {
   private socket: net.Socket | null = null
   private buf = ''
+  private nextRequestId = 1
+  private pendingRequests = new Map<number, (value: unknown) => void>()
+  private propertyObservers = new Map<string, Set<(value: unknown) => void>>()
 
   constructor(private ipcPath: string) {}
 
@@ -35,6 +38,7 @@ export class MpvController {
       sock.once('connect', () => {
         this.socket = sock
         sock.on('error', () => { /* ignore socket errors after connect */ })
+        sock.on('data', (chunk: Buffer) => this.onData(chunk))
         resolve()
       })
       sock.once('error', reject)
@@ -45,32 +49,15 @@ export class MpvController {
   observeTimePos(cb: (seconds: number) => void): void {
     if (!this.socket?.writable) return
 
-    // Observer registrieren
-    this._send({ command: ['observe_property', 1, 'time-pos'] })
+    let observers = this.propertyObservers.get('time-pos')
+    if (!observers) {
+      observers = new Set()
+      this.propertyObservers.set('time-pos', observers)
+      this._send({ command: ['observe_property', 1, 'time-pos'] })
+    }
 
-    this.socket.on('data', (chunk: Buffer) => {
-      this.buf += chunk.toString()
-      const lines = this.buf.split('\n')
-      this.buf = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        try {
-          const msg = JSON.parse(line) as {
-            event?: string
-            name?: string
-            data?: unknown
-          }
-          if (
-            msg.event === 'property-change' &&
-            msg.name === 'time-pos' &&
-            typeof msg.data === 'number'
-          ) {
-            cb(msg.data)
-          }
-        } catch {
-          /* ignore malformed lines */
-        }
-      }
+    observers.add((value: unknown) => {
+      if (typeof value === 'number') cb(value)
     })
   }
 
@@ -98,6 +85,12 @@ export class MpvController {
     }
   }
 
+  getTimePos(): Promise<number | null> {
+    return this.getProperty('time-pos').then((value) => (
+      typeof value === 'number' ? value : null
+    ))
+  }
+
   quit(): void {
     if (this.socket?.writable) {
       try {
@@ -112,9 +105,56 @@ export class MpvController {
     this.socket?.destroy()
     this.socket = null
     this.buf = ''
+    this.pendingRequests.clear()
+    this.propertyObservers.clear()
   }
 
   private _send(msg: object): void {
     this.socket?.write(JSON.stringify(msg) + '\n')
+  }
+
+  private getProperty(name: string): Promise<unknown> {
+    if (!this.socket?.writable) return Promise.resolve(null)
+
+    const requestId = this.nextRequestId++
+    return new Promise((resolve) => {
+      this.pendingRequests.set(requestId, resolve)
+      this._send({ command: ['get_property', name], request_id: requestId })
+    })
+  }
+
+  private onData(chunk: Buffer): void {
+    this.buf += chunk.toString()
+    const lines = this.buf.split('\n')
+    this.buf = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const msg = JSON.parse(line) as {
+          event?: string
+          name?: string
+          data?: unknown
+          request_id?: number
+        }
+
+        if (typeof msg.request_id === 'number') {
+          const resolver = this.pendingRequests.get(msg.request_id)
+          if (resolver) {
+            this.pendingRequests.delete(msg.request_id)
+            resolver(msg.data)
+          }
+        }
+
+        if (msg.event === 'property-change' && typeof msg.name === 'string') {
+          const observers = this.propertyObservers.get(msg.name)
+          if (observers) {
+            for (const observer of observers) observer(msg.data)
+          }
+        }
+      } catch {
+        /* ignore malformed lines */
+      }
+    }
   }
 }

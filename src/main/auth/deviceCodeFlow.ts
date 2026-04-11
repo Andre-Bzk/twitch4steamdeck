@@ -20,6 +20,11 @@ export interface TokenResponse {
   token_type: string
 }
 
+interface ErrorResponse {
+  message?: string
+  status?: number
+}
+
 export async function requestDeviceCode(
   clientId: string,
   scopes: readonly string[]
@@ -88,9 +93,12 @@ export async function pollForToken(opts: PollOptions): Promise<PollOutcome> {
     }
 
     // Twitch liefert bei Pending einen 400 mit message-Feld.
-    let payload: { message?: string; status?: number } = {}
+    let payload: ErrorResponse = {}
     try {
-      payload = await res.json()
+      const json = (await res.json()) as unknown
+      if (json && typeof json === 'object') {
+        payload = json as ErrorResponse
+      }
     } catch {
       /* nicht-JSON Antwort, ignorieren */
     }

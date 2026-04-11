@@ -94,6 +94,7 @@ export interface T4sdApi {
     pause: () => Promise<void>
     resume: () => Promise<void>
     seekTo: (seconds: number) => Promise<void>
+    getCurrentPosition: () => Promise<number | null>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
   gamepad: {
