@@ -18,12 +18,17 @@ export const IPC = {
   twitchGetVideos: 'twitch:get-videos',
   twitchGetTopGames: 'twitch:get-top-games',
   twitchGetTopStreams: 'twitch:get-top-streams',
+  twitchGetVodChapters: 'twitch:get-vod-chapters',
   historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
   playbackSeek: 'playback:seek',
+  playbackTogglePause: 'playback:toggle-pause',
+  playbackPause: 'playback:pause',
+  playbackResume: 'playback:resume',
+  playbackSeekTo: 'playback:seek-to',
   /** main → renderer */
   playbackEvent: 'playback:event'
 } as const
@@ -61,6 +66,10 @@ export function registerIpcHandlers(
     (_e, broadcasterId: string) => helix.getVideos(broadcasterId)
   )
   ipcMain.handle(
+    IPC.twitchGetVodChapters,
+    (_e, videoId: string) => helix.getVodChapters(videoId)
+  )
+  ipcMain.handle(
     IPC.historyGetProgress,
     (_e, vodIds: string[]) => getProgressMap(vodIds)
   )
@@ -71,11 +80,18 @@ export function registerIpcHandlers(
   )
   ipcMain.handle(
     IPC.playbackStartVod,
-    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number) =>
-      playback.startVod(vodId, channelLogin, title, durationSeconds)
+    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number) =>
+      playback.startVod(vodId, channelLogin, title, durationSeconds, startSeconds)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
   ipcMain.handle(IPC.playbackSeek, (_e, seconds: number) => playback.seek(seconds))
+  ipcMain.handle(IPC.playbackTogglePause, () => playback.togglePause())
+  ipcMain.handle(IPC.playbackSeekTo, (_e, seconds: number) => playback.seekTo(seconds))
+  ipcMain.handle(IPC.playbackResume, () => playback.resume())
+  ipcMain.handle(IPC.playbackPause, () => {
+    playback.pause()
+    for (const win of BrowserWindow.getAllWindows()) win.focus()
+  })
 
   playback.on('playback-event', (event: PlaybackEvent) => {
     for (const win of BrowserWindow.getAllWindows()) {

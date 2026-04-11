@@ -7,6 +7,7 @@ import type {
   HelixStream,
   HelixUser,
   HelixVideo,
+  VodChapter,
   VodInfo
 } from './types'
 
@@ -198,6 +199,58 @@ export class HelixClient {
       startedAt: s.started_at,
       language: s.language
     }))
+  }
+
+  private static readonly GQL_URL = 'https://gql.twitch.tv/gql'
+  // GQL requires the Twitch web client ID — the Helix app client ID is not accepted here
+  private static readonly GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
+  private static readonly CHAPTERS_QUERY =
+    'query VideoPlayer_ChapterSelectButtonVideo($videoID: ID!) {' +
+    '  video(id: $videoID) {' +
+    '    moments(momentRequestType: VIDEO_CHAPTER_MARKERS) {' +
+    '      edges { node {' +
+    '        positionMilliseconds durationMilliseconds description type' +
+    '        details { ... on GameChangeMomentDetails { game { id name } } }' +
+    '      } }' +
+    '    }' +
+    '  }' +
+    '}'
+
+  async getVodChapters(videoId: string): Promise<VodChapter[]> {
+    try {
+      const res = await fetch(HelixClient.GQL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': HelixClient.GQL_CLIENT_ID
+        },
+        body: JSON.stringify([{
+          operationName: 'VideoPlayer_ChapterSelectButtonVideo',
+          variables: { videoID: videoId },
+          query: HelixClient.CHAPTERS_QUERY
+        }])
+      })
+      if (!res.ok) return []
+      const json = await res.json() as Array<{
+        data?: { video?: { moments?: { edges: Array<{ node: {
+          positionMilliseconds: number
+          durationMilliseconds: number
+          description: string
+          details?: { game?: { id: string; name: string } | null }
+        }}> } } }
+        errors?: Array<{ message: string }>
+      }>
+      const payload = json[0]
+      if (!payload || payload.errors?.length || !payload.data?.video?.moments) return []
+      return payload.data.video.moments.edges.map(({ node }) => ({
+        positionSeconds: Math.floor(node.positionMilliseconds / 1000),
+        durationSeconds: Math.floor(node.durationMilliseconds / 1000),
+        gameName: node.details?.game?.name ?? node.description,
+        gameId: node.details?.game?.id ?? null
+      }))
+    } catch {
+      return []
+    }
   }
 
   async getFollowedWithLiveStatus(): Promise<FollowedChannelInfo[]> {

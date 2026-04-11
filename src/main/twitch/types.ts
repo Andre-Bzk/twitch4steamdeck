@@ -68,6 +68,13 @@ export interface VodInfo {
   thumbnailUrl: string
 }
 
+export interface VodChapter {
+  positionSeconds: number
+  durationSeconds: number
+  gameName: string
+  gameId: string | null
+}
+
 /** Merged type that the renderer receives. */
 export interface FollowedChannelInfo {
   broadcasterId: string

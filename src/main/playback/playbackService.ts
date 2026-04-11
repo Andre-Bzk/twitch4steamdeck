@@ -64,7 +64,8 @@ export class PlaybackService extends EventEmitter {
     vodId: string,
     channelLogin: string,
     title: string,
-    durationSeconds: number
+    durationSeconds: number,
+    startSeconds?: number
   ): Promise<void> {
     if (this.current) await this.stop()
 
@@ -88,7 +89,8 @@ export class PlaybackService extends EventEmitter {
       return
     }
 
-    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath, startSeconds: resumePos })
+    const effectiveStart = startSeconds !== undefined ? startSeconds : resumePos
+    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath, startSeconds: effectiveStart })
 
     let mpvStderrBuf = ''
     proc.stdout?.on('data', (d: Buffer) => console.log('[mpv]', d.toString().trim()))
@@ -143,6 +145,22 @@ export class PlaybackService extends EventEmitter {
 
   seek(seconds: number): void {
     this.current?.mpv.seek(seconds)
+  }
+
+  togglePause(): void {
+    this.current?.mpv.togglePause()
+  }
+
+  pause(): void {
+    this.current?.mpv.setPause(true)
+  }
+
+  resume(): void {
+    this.current?.mpv.setPause(false)
+  }
+
+  seekTo(seconds: number): void {
+    this.current?.mpv.seekAbsolute(seconds)
   }
 
   async stop(): Promise<void> {

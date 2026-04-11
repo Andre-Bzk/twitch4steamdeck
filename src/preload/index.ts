@@ -12,12 +12,17 @@ const IPC = {
   twitchGetVideos: 'twitch:get-videos',
   twitchGetTopGames: 'twitch:get-top-games',
   twitchGetTopStreams: 'twitch:get-top-streams',
+  twitchGetVodChapters: 'twitch:get-vod-chapters',
   historyGetProgress: 'history:get-progress',
 
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
   playbackSeek: 'playback:seek',
+  playbackTogglePause: 'playback:toggle-pause',
+  playbackPause: 'playback:pause',
+  playbackResume: 'playback:resume',
+  playbackSeekTo: 'playback:seek-to',
   playbackEvent: 'playback:event',
 
   gamepadInput: 'gamepad-input'
@@ -81,6 +86,13 @@ export interface VodProgress {
   completed: boolean
 }
 
+export interface VodChapter {
+  positionSeconds: number
+  durationSeconds: number
+  gameName: string
+  gameId: string | null
+}
+
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
   auth: {
@@ -103,7 +115,9 @@ const api = {
     getTopGames: (cursor?: string): Promise<{ games: GameInfo[]; cursor?: string }> =>
       ipcRenderer.invoke(IPC.twitchGetTopGames, cursor),
     getTopStreams: (gameId?: string): Promise<FollowedChannelInfo[]> =>
-      ipcRenderer.invoke(IPC.twitchGetTopStreams, gameId)
+      ipcRenderer.invoke(IPC.twitchGetTopStreams, gameId),
+    getVodChapters: (vodId: string): Promise<VodChapter[]> =>
+      ipcRenderer.invoke(IPC.twitchGetVodChapters, vodId)
   },
   history: {
     getProgress: (vodIds: string[]): Promise<Record<string, VodProgress>> =>
@@ -112,10 +126,14 @@ const api = {
   playback: {
     startLive: (channelLogin: string, quality?: string): Promise<void> =>
       ipcRenderer.invoke(IPC.playbackStartLive, channelLogin, quality),
-    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number): Promise<void> =>
-      ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds),
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds, startSeconds),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
     seek: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeek, seconds),
+    togglePause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackTogglePause),
+    pause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackPause),
+    resume: (): Promise<void> => ipcRenderer.invoke(IPC.playbackResume),
+    seekTo: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeekTo, seconds),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)

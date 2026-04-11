@@ -80,6 +80,24 @@ export class MpvController {
     }
   }
 
+  seekAbsolute(seconds: number): void {
+    if (this.socket?.writable) {
+      this._send({ command: ['seek', seconds, 'absolute'] })
+    }
+  }
+
+  togglePause(): void {
+    if (this.socket?.writable) {
+      this._send({ command: ['cycle', 'pause'] })
+    }
+  }
+
+  setPause(paused: boolean): void {
+    if (this.socket?.writable) {
+      this._send({ command: ['set_property', 'pause', paused] })
+    }
+  }
+
   quit(): void {
     if (this.socket?.writable) {
       try {

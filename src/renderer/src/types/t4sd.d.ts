@@ -58,6 +58,13 @@ export interface VodProgress {
   completed: boolean
 }
 
+export interface VodChapter {
+  positionSeconds: number
+  durationSeconds: number
+  gameName: string
+  gameId: string | null
+}
+
 export interface T4sdApi {
   appVersion: string
   auth: {
@@ -73,15 +80,20 @@ export interface T4sdApi {
     getVideos: (broadcasterId: string) => Promise<VodInfo[]>
     getTopGames: (cursor?: string) => Promise<{ games: GameInfo[]; cursor?: string }>
     getTopStreams: (gameId?: string) => Promise<FollowedChannelInfo[]>
+    getVodChapters: (vodId: string) => Promise<VodChapter[]>
   }
   history: {
     getProgress: (vodIds: string[]) => Promise<Record<string, VodProgress>>
   }
   playback: {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
-    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number) => Promise<void>
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number) => Promise<void>
     stop: () => Promise<void>
     seek: (seconds: number) => Promise<void>
+    togglePause: () => Promise<void>
+    pause: () => Promise<void>
+    resume: () => Promise<void>
+    seekTo: (seconds: number) => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
   gamepad: {
