@@ -15,6 +15,7 @@ export class MpvController {
   private nextRequestId = 1
   private pendingRequests = new Map<number, (value: unknown) => void>()
   private propertyObservers = new Map<string, Set<(value: unknown) => void>>()
+  private eventObservers = new Map<string, Set<() => void>>()
 
   constructor(private ipcPath: string) {}
 
@@ -59,6 +60,15 @@ export class MpvController {
     observers.add((value: unknown) => {
       if (typeof value === 'number') cb(value)
     })
+  }
+
+  onEvent(eventName: string, cb: () => void): void {
+    let observers = this.eventObservers.get(eventName)
+    if (!observers) {
+      observers = new Set()
+      this.eventObservers.set(eventName, observers)
+    }
+    observers.add(cb)
   }
 
   seek(seconds: number): void {
@@ -107,6 +117,7 @@ export class MpvController {
     this.buf = ''
     this.pendingRequests.clear()
     this.propertyObservers.clear()
+    this.eventObservers.clear()
   }
 
   private _send(msg: object): void {
@@ -150,6 +161,13 @@ export class MpvController {
           const observers = this.propertyObservers.get(msg.name)
           if (observers) {
             for (const observer of observers) observer(msg.data)
+          }
+        }
+
+        if (typeof msg.event === 'string') {
+          const observers = this.eventObservers.get(msg.event)
+          if (observers) {
+            for (const observer of observers) observer()
           }
         }
       } catch {

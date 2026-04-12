@@ -70,11 +70,10 @@ export function getStreamUrl(url: string, quality: string): Promise<string> {
 
 export interface MpvOptions {
   ipcPath: string
-  startSeconds?: number
 }
 
 /** Startet mpv direkt mit einer URL (HLS oder lokal). IPC-Socket wird gesetzt. */
-export function spawnMpv(url: string, { ipcPath, startSeconds }: MpvOptions): ChildProcess {
+export function spawnMpv(url: string, { ipcPath }: MpvOptions): ChildProcess {
   const args = [
     url,
     `--input-ipc-server=${ipcPath}`,
@@ -83,8 +82,5 @@ export function spawnMpv(url: string, { ipcPath, startSeconds }: MpvOptions): Ch
     '--hwdec=auto',
     '--force-window=yes'
   ]
-  if (startSeconds && startSeconds > 0) {
-    args.push(`--start=${startSeconds}`)
-  }
   return spawn(MPV_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 }

@@ -90,7 +90,7 @@ export class PlaybackService extends EventEmitter {
     }
 
     const effectiveStart = startSeconds !== undefined ? startSeconds : resumePos
-    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath, startSeconds: effectiveStart })
+    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath })
 
     let mpvStderrBuf = ''
     proc.stdout?.on('data', (d: Buffer) => console.log('[mpv]', d.toString().trim()))
@@ -125,8 +125,17 @@ export class PlaybackService extends EventEmitter {
     this.current = { process: proc, mpv }
     this.emit('playback-event', { kind: 'started' } satisfies PlaybackEvent)
 
-    // IPC verbinden und Position tracken
+    // IPC verbinden, initialen Resume-Seek erst nach `file-loaded` setzen und Position tracken.
+    // HLS-VODs reagieren auf Linux/Steam Deck robuster auf einen Seek nach dem Laden
+    // als auf `mpv --start=<sek>`.
     mpv.connect().then(() => {
+      let initialSeekDone = effectiveStart <= 0
+      mpv.onEvent('file-loaded', () => {
+        if (initialSeekDone) return
+        initialSeekDone = true
+        mpv.seekAbsolute(effectiveStart)
+      })
+
       let lastWrite = 0
       mpv.observeTimePos((seconds) => {
         const now = Date.now()
