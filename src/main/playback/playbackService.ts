@@ -1,27 +1,49 @@
 import { EventEmitter } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
+import { app } from 'electron'
+import path from 'node:path'
 import { spawnStreamlink, getStreamUrl, spawnMpv } from './streamlink'
 import { getMpvIpcPath, MpvController } from './mpvController'
+import { createTrimmedPlaylist, cleanupTrimmedPlaylist, type TrimResult } from './hlsTrimmer'
 import type { PlaybackEvent } from './types'
 import * as history from '../store/historyRepo'
 
 const POSITION_WRITE_INTERVAL_MS = 5_000
+// Relative Seeks > 60s nutzen bei fMP4 loadFile statt seek (umgeht Demuxer-Bug)
+const FMP4_LOADFILE_THRESHOLD_S = 60
 
 interface CurrentPlayback {
   process: ChildProcess
   mpv: MpvController
+  hlsUrl: string
+  isFmp4: boolean
+  playbackOffsetSeconds: number
   pendingRelativeSeekSeconds: number
   pendingAbsoluteSeekSeconds: number | null
   seekFlushTimer: NodeJS.Timeout | null
-  seekVerifyTimer?: NodeJS.Timeout | null
+  trimmedPlaylist: TrimResult | null
   stopPolling?: (() => void) | null
 }
 
 const SEEK_FLUSH_DELAY_MS = 180
 
+/** Prüft ob ein HLS-Manifest fMP4-Segmente nutzt (EXT-X-MAP → init-Segment). */
+async function detectFmp4(hlsUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(hlsUrl, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return true // im Zweifel fMP4 annehmen (loadFile ist sicher)
+    const text = await res.text()
+    return text.includes('#EXT-X-MAP')
+  } catch {
+    return true
+  }
+}
+
 export class PlaybackService extends EventEmitter {
   private current: CurrentPlayback | null = null
   private readonly ipcPath = getMpvIpcPath()
+  private readonly mpvLogPath = path.join(app.getPath('userData'), 'mpv.log')
+  private loggingEnabled = true
 
   constructor() {
     super()
@@ -66,9 +88,13 @@ export class PlaybackService extends EventEmitter {
     this.current = {
       process: proc,
       mpv,
+      hlsUrl: '',
+      isFmp4: false,
+      playbackOffsetSeconds: 0,
       pendingRelativeSeekSeconds: 0,
       pendingAbsoluteSeekSeconds: null,
-      seekFlushTimer: null
+      seekFlushTimer: null,
+      trimmedPlaylist: null
     }
     this.emit('playback-event', { kind: 'started', channelLogin } satisfies PlaybackEvent)
   }
@@ -103,7 +129,28 @@ export class PlaybackService extends EventEmitter {
     }
 
     const effectiveStart = startSeconds !== undefined ? startSeconds : resumePos
-    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath })
+    const isFmp4 = await detectFmp4(hlsUrl)
+
+    // fMP4 + großer Resume: Gekürzte Playlist erstellen, die ab dem Zielsegment beginnt.
+    // Umgeht den FFmpeg HLS-Demuxer fMP4-Seek-Bug komplett — kein Seek nötig.
+    let mpvUrl = hlsUrl
+    let trimmedPlaylist: TrimResult | null = null
+    let playbackOffsetSeconds = 0
+    if (isFmp4 && effectiveStart > 20) {
+      try {
+        const trim = await createTrimmedPlaylist(hlsUrl, effectiveStart)
+        mpvUrl = trim.url
+        trimmedPlaylist = trim
+        playbackOffsetSeconds = trim.playlistStartSeconds
+      } catch (e) {
+        console.warn('[playback] Trimmed playlist failed, falling back to original URL:', e)
+      }
+    }
+
+    const proc = spawnMpv(mpvUrl, {
+      ipcPath: this.ipcPath,
+      logPath: this.loggingEnabled ? this.mpvLogPath : undefined
+    })
 
     let mpvStderrBuf = ''
     proc.stdout?.on('data', (d: Buffer) => console.log('[mpv]', d.toString().trim()))
@@ -138,35 +185,28 @@ export class PlaybackService extends EventEmitter {
     this.current = {
       process: proc,
       mpv,
+      hlsUrl,
+      isFmp4,
+      playbackOffsetSeconds,
       pendingRelativeSeekSeconds: 0,
       pendingAbsoluteSeekSeconds: null,
-      seekFlushTimer: null
+      seekFlushTimer: null,
+      trimmedPlaylist
     }
     this.emit('playback-event', { kind: 'started' } satisfies PlaybackEvent)
 
-    // IPC verbinden, initialen Resume-Seek erst nach `file-loaded` setzen und Position tracken.
-    // HLS-VODs reagieren auf Linux/Steam Deck robuster auf einen Seek nach dem Laden
-    // als auf `mpv --start=<sek>`.
+    // IPC verbinden, initialen Resume-Seek erst nach `playback-restart` setzen und Position tracken.
     mpv.connect().then(() => {
-      let initialSeekDone = effectiveStart <= 0
+      let initialSeekDone = effectiveStart <= 0 || isFmp4
 
-      // playback-restart feuert nach dem ersten dekodierten Frame —
-      // sicherer als file-loaded, weil der HLS-Demuxer dann bereit ist.
+      // playback-restart feuert nach dem ersten dekodierten Frame.
       mpv.onEvent('playback-restart', () => {
+        if (!this.current) return
+
+        // Initialer Seek für TS-Streams (fMP4 wird über Trimmed-Playlist gelöst)
         if (initialSeekDone) return
         initialSeekDone = true
         mpv.seekAbsolute(effectiveStart)
-
-        // Nach 5s prüfen ob der Seek geklappt hat, sonst Retry
-        const verifyTimer = setTimeout(async () => {
-          if (this.current) this.current.seekVerifyTimer = null
-          const pos = await mpv.getTimePos()
-          if (pos !== null && effectiveStart > 30 && Math.abs(pos - effectiveStart) > 30) {
-            console.warn(`[mpv] Seek verify: at ${pos}, expected ~${effectiveStart}. Retry.`)
-            mpv.seekAbsolute(effectiveStart)
-          }
-        }, 5000)
-        if (this.current) this.current.seekVerifyTimer = verifyTimer
       })
 
       // Position-Tracking
@@ -175,7 +215,8 @@ export class PlaybackService extends EventEmitter {
         const now = Date.now()
         if (now - lastWrite < POSITION_WRITE_INTERVAL_MS) return
         lastWrite = now
-        const pos = Math.floor(seconds)
+        const absoluteSeconds = seconds + (this.current?.playbackOffsetSeconds ?? 0)
+        const pos = Math.floor(absoluteSeconds)
         history.updatePosition(vodId, pos)
         if (durationSeconds > 0 && pos / durationSeconds > 0.95) {
           history.markCompleted(vodId)
@@ -229,12 +270,12 @@ export class PlaybackService extends EventEmitter {
 
   async stop(): Promise<void> {
     if (!this.current) return
-    const { process: proc, mpv, seekFlushTimer, seekVerifyTimer, stopPolling } = this.current
+    const { process: proc, mpv, seekFlushTimer, trimmedPlaylist, stopPolling } = this.current
     this.current = null
 
     if (seekFlushTimer) clearTimeout(seekFlushTimer)
-    if (seekVerifyTimer) clearTimeout(seekVerifyTimer)
     if (stopPolling) stopPolling()
+    cleanupTrimmedPlaylist(trimmedPlaylist).catch(() => {})
     try { mpv.quit() } catch { /* ignore */ }
     mpv.disconnect()
 
@@ -246,27 +287,78 @@ export class PlaybackService extends EventEmitter {
     this.stop().catch(() => {})
   }
 
+  setLoggingEnabled(enabled: boolean): void {
+    this.loggingEnabled = enabled
+  }
+
+  getLogPath(): string {
+    return this.mpvLogPath
+  }
+
+  /** fMP4: Gekürzte Playlist erstellen und per loadFile laden (umgeht FFmpeg-Seek-Bug). */
+  private async fmp4SeekViaTrimmedPlaylist(targetSeconds: number): Promise<void> {
+    if (!this.current) return
+    const { hlsUrl } = this.current
+
+    // Alte lokale Playlist-Instanz aufräumen
+    if (this.current.trimmedPlaylist) {
+      cleanupTrimmedPlaylist(this.current.trimmedPlaylist).catch(() => {})
+      this.current.trimmedPlaylist = null
+    }
+
+    if (targetSeconds < 20) {
+      // Nahe am Anfang: kein Trimming nötig, einfach neu laden
+      this.current.playbackOffsetSeconds = 0
+      this.current.mpv.loadFile(hlsUrl)
+      return
+    }
+
+    try {
+      const trimmed = await createTrimmedPlaylist(hlsUrl, targetSeconds)
+      if (!this.current) return
+      this.current.trimmedPlaylist = trimmed
+      this.current.playbackOffsetSeconds = trimmed.playlistStartSeconds
+      this.current.mpv.loadFile(trimmed.url)
+    } catch (e) {
+      console.warn('[playback] Trimmed playlist failed:', e)
+    }
+  }
+
   private scheduleSeekFlush(): void {
     if (!this.current) return
     if (this.current.seekFlushTimer) {
       clearTimeout(this.current.seekFlushTimer)
     }
 
-    this.current.seekFlushTimer = setTimeout(() => {
+    this.current.seekFlushTimer = setTimeout(async () => {
       if (!this.current) return
       this.current.seekFlushTimer = null
+
+      const { isFmp4 } = this.current
 
       const absoluteSeek = this.current.pendingAbsoluteSeekSeconds
       if (absoluteSeek !== null) {
         this.current.pendingAbsoluteSeekSeconds = null
-        this.current.mpv.seekAbsolute(absoluteSeek)
+        if (isFmp4) {
+          await this.fmp4SeekViaTrimmedPlaylist(absoluteSeek)
+        } else {
+          this.current.mpv.seekAbsolute(absoluteSeek)
+        }
         return
       }
 
       const relativeSeek = this.current.pendingRelativeSeekSeconds
       this.current.pendingRelativeSeekSeconds = 0
       if (relativeSeek !== 0) {
-        this.current.mpv.seek(relativeSeek)
+        if (isFmp4 && Math.abs(relativeSeek) > FMP4_LOADFILE_THRESHOLD_S) {
+          const pos = await this.current?.mpv.getTimePos()
+          if (pos !== null && this.current) {
+            const absolutePos = this.current.playbackOffsetSeconds + pos
+            await this.fmp4SeekViaTrimmedPlaylist(Math.max(0, absolutePos + relativeSeek))
+          }
+        } else {
+          this.current.mpv.seek(relativeSeek)
+        }
       }
     }, SEEK_FLUSH_DELAY_MS)
   }

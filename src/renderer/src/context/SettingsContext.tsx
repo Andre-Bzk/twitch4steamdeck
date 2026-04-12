@@ -6,6 +6,7 @@ export interface AppSettings {
   streamBadgeMode: StreamBadgeMode
   sidebarWidth: number
   badgeGap: number
+  mpvLoggingEnabled: boolean
 }
 
 const STORAGE_KEY = 't4sd:settings'
@@ -18,7 +19,8 @@ const BADGE_GAP_DEFAULT = 6
 const DEFAULTS: AppSettings = {
   streamBadgeMode: 'language',
   sidebarWidth: SIDEBAR_DEFAULT,
-  badgeGap: BADGE_GAP_DEFAULT
+  badgeGap: BADGE_GAP_DEFAULT,
+  mpvLoggingEnabled: true
 }
 
 export { SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_DEFAULT, BADGE_GAP_MIN, BADGE_GAP_MAX, BADGE_GAP_DEFAULT }
@@ -36,7 +38,10 @@ function loadSettings(): AppSettings {
         ? (parsed.streamBadgeMode as StreamBadgeMode)
         : DEFAULTS.streamBadgeMode,
       sidebarWidth: sw >= SIDEBAR_MIN && sw <= SIDEBAR_MAX ? sw : SIDEBAR_DEFAULT,
-      badgeGap: bg >= BADGE_GAP_MIN && bg <= BADGE_GAP_MAX ? bg : BADGE_GAP_DEFAULT
+      badgeGap: bg >= BADGE_GAP_MIN && bg <= BADGE_GAP_MAX ? bg : BADGE_GAP_DEFAULT,
+      mpvLoggingEnabled: typeof parsed.mpvLoggingEnabled === 'boolean'
+        ? parsed.mpvLoggingEnabled
+        : DEFAULTS.mpvLoggingEnabled
     }
   } catch {
     return DEFAULTS
@@ -56,6 +61,7 @@ interface SettingsCtx {
   setStreamBadgeMode: (mode: StreamBadgeMode) => void
   setSidebarWidth: (width: number) => void
   setBadgeGap: (gap: number) => void
+  setMpvLoggingEnabled: (enabled: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsCtx | null>(null)
@@ -67,6 +73,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): J
     document.documentElement.style.setProperty('--sidebar-width', `${settings.sidebarWidth}px`)
     document.documentElement.style.setProperty('--badge-gap', `${settings.badgeGap}px`)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void window.t4sd.playback.setLoggingEnabled(settings.mpvLoggingEnabled)
+  }, [settings.mpvLoggingEnabled])
 
   const setStreamBadgeMode = useCallback((mode: StreamBadgeMode) => {
     setSettings((prev) => {
@@ -96,8 +106,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): J
     document.documentElement.style.setProperty('--badge-gap', `${clamped}px`)
   }, [])
 
+  const setMpvLoggingEnabled = useCallback((enabled: boolean) => {
+    setSettings((prev) => {
+      const next = { ...prev, mpvLoggingEnabled: enabled }
+      saveSettings(next)
+      return next
+    })
+  }, [])
+
   return (
-    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap }}>
+    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setMpvLoggingEnabled }}>
       {children}
     </SettingsContext.Provider>
   )

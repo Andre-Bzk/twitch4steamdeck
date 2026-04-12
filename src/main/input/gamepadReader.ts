@@ -33,6 +33,8 @@ const BUTTON_MAP: Record<number, string> = {
 const STICK_THRESHOLD = 16384 // ~50% von 32767
 const REPEAT_INITIAL_MS = 400
 const REPEAT_INTERVAL_MS = 150
+// L2/R2 Trigger: kein Auto-Repeat, da 300s-Spruenge nicht wiederholt werden sollen.
+const NO_REPEAT_AXES = new Set([2, 5])
 const SCAN_INTERVAL_MS = 3000
 
 interface AxisState {
@@ -151,15 +153,17 @@ class JoystickReader {
 
       if (key && !isInit) {
         this.onKey(key)
-        const k = key
-        state.timer = setTimeout(() => {
-          if (state!.key === k) {
-            this.onKey(k)
-            state!.interval = setInterval(() => {
-              if (state!.key === k) this.onKey(k)
-            }, REPEAT_INTERVAL_MS)
-          }
-        }, REPEAT_INITIAL_MS)
+        if (!NO_REPEAT_AXES.has(axis)) {
+          const k = key
+          state.timer = setTimeout(() => {
+            if (state!.key === k) {
+              this.onKey(k)
+              state!.interval = setInterval(() => {
+                if (state!.key === k) this.onKey(k)
+              }, REPEAT_INTERVAL_MS)
+            }
+          }, REPEAT_INITIAL_MS)
+        }
       }
     }
   }

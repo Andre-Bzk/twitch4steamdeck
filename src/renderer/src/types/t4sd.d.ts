@@ -100,6 +100,8 @@ export interface T4sdApi {
     resume: () => Promise<void>
     seekTo: (seconds: number) => Promise<void>
     getCurrentPosition: () => Promise<number | null>
+    setLoggingEnabled: (enabled: boolean) => Promise<void>
+    getLogPath: () => Promise<string>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
   }
   gamepad: {

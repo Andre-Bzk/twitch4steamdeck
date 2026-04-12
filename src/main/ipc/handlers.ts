@@ -30,6 +30,8 @@ export const IPC = {
   playbackResume: 'playback:resume',
   playbackSeekTo: 'playback:seek-to',
   playbackGetCurrentPosition: 'playback:get-current-position',
+  playbackSetLoggingEnabled: 'playback:set-logging-enabled',
+  playbackGetLogPath: 'playback:get-log-path',
   /** main → renderer */
   playbackEvent: 'playback:event'
 } as const
@@ -96,6 +98,8 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.playbackSeekTo, (_e, seconds: number) => playback.seekTo(seconds))
   ipcMain.handle(IPC.playbackResume, () => playback.resume())
   ipcMain.handle(IPC.playbackGetCurrentPosition, () => playback.getCurrentPosition())
+  ipcMain.handle(IPC.playbackSetLoggingEnabled, (_e, enabled: boolean) => playback.setLoggingEnabled(enabled))
+  ipcMain.handle(IPC.playbackGetLogPath, () => playback.getLogPath())
   ipcMain.handle(IPC.playbackPause, () => {
     playback.pause()
     for (const win of BrowserWindow.getAllWindows()) win.focus()

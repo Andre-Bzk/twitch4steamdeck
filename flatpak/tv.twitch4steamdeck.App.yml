@@ -8,6 +8,17 @@ base: org.electronjs.Electron2.BaseApp
 base-version: '24.08'
 command: twitch4steamdeck
 
+# ffmpeg-full: Stellt den vollen FFmpeg-Codec-Stack bereit (h264, h264_vaapi, etc.).
+# Das freedesktop SDK 24.08 liefert nur ein reduziertes FFmpeg ohne patentbehaftete Codecs,
+# daher hat mpv sonst nur libopenh264 — zu langsam fuer Seek-Recovery bei HLS-VODs.
+add-extensions:
+  org.freedesktop.Platform.ffmpeg-full:
+    directory: lib/ffmpeg
+    version: '24.08'
+    add-ld-path: .
+    no-autodownload: false
+    autodelete: false
+
 finish-args:
   - --share=network            # Twitch Helix-API + Streamlink (HLS)
   - --share=ipc                # X11 shared memory (Wayland-Fallback)
@@ -135,6 +146,14 @@ modules:
   #    flatpak-builder lädt alle Sources offline herunter und installiert sie sauber.
   # ─────────────────────────────────────────────────────────────────────────────
   - !include python3-streamlink.json
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2b) Mountpoint fuer ffmpeg-full Extension (muss vor App-Modul existieren)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: ffmpeg-full-mountpoint
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/ffmpeg
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 3) Haupt-App

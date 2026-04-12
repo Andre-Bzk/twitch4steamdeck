@@ -24,6 +24,8 @@ const IPC = {
   playbackResume: 'playback:resume',
   playbackSeekTo: 'playback:seek-to',
   playbackGetCurrentPosition: 'playback:get-current-position',
+  playbackSetLoggingEnabled: 'playback:set-logging-enabled',
+  playbackGetLogPath: 'playback:get-log-path',
   playbackEvent: 'playback:event',
 
   gamepadInput: 'gamepad-input'
@@ -141,6 +143,8 @@ const api = {
     resume: (): Promise<void> => ipcRenderer.invoke(IPC.playbackResume),
     seekTo: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeekTo, seconds),
     getCurrentPosition: (): Promise<number | null> => ipcRenderer.invoke(IPC.playbackGetCurrentPosition),
+    setLoggingEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.playbackSetLoggingEnabled, enabled),
+    getLogPath: (): Promise<string> => ipcRenderer.invoke(IPC.playbackGetLogPath),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)

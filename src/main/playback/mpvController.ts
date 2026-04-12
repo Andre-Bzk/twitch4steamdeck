@@ -91,6 +91,17 @@ export class MpvController {
     }
   }
 
+  /** Lädt eine URL neu (oder dieselbe) mit optionaler Startposition.
+   *  Erzwingt komplette Demuxer-Neuinitialisierung — umgeht fMP4-Seek-Bug. */
+  loadFile(url: string, startSeconds?: number): void {
+    if (!this.socket?.writable) return
+    if (startSeconds !== undefined && startSeconds > 0) {
+      this._send({ command: ['loadfile', url, 'replace', '-1', `start=${startSeconds}`] })
+    } else {
+      this._send({ command: ['loadfile', url, 'replace'] })
+    }
+  }
+
   togglePause(): void {
     if (this.socket?.writable) {
       this._send({ command: ['cycle', 'pause'] })
