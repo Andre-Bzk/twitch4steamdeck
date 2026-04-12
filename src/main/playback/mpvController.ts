@@ -62,6 +62,14 @@ export class MpvController {
     })
   }
 
+  pollTimePos(intervalMs: number, cb: (seconds: number) => void): () => void {
+    const id = setInterval(async () => {
+      const pos = await this.getTimePos()
+      if (pos !== null) cb(pos)
+    }, intervalMs)
+    return () => clearInterval(id)
+  }
+
   onEvent(eventName: string, cb: () => void): void {
     let observers = this.eventObservers.get(eventName)
     if (!observers) {
@@ -73,13 +81,13 @@ export class MpvController {
 
   seek(seconds: number): void {
     if (this.socket?.writable) {
-      this._send({ command: ['seek', seconds, 'relative'] })
+      this._send({ command: ['seek', seconds, 'relative+keyframes'] })
     }
   }
 
   seekAbsolute(seconds: number): void {
     if (this.socket?.writable) {
-      this._send({ command: ['seek', seconds, 'absolute'] })
+      this._send({ command: ['seek', seconds, 'absolute+keyframes'] })
     }
   }
 
