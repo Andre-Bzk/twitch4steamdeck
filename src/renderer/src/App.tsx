@@ -22,6 +22,7 @@ export default function App(): JSX.Element {
 
   // Browser Gamepad API (funktioniert im Desktop-Modus / Windows)
   useEffect(() => {
+    if (navigator.userAgent.toLowerCase().includes('linux')) return
     gamepadService.start()
     return () => gamepadService.stop()
   }, [])

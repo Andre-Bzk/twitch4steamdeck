@@ -36,6 +36,9 @@ const REPEAT_INTERVAL_MS = 150
 // L2/R2 Trigger: kein Auto-Repeat, da 300s-Spruenge nicht wiederholt werden sollen.
 const NO_REPEAT_AXES = new Set([2, 5])
 const SCAN_INTERVAL_MS = 3000
+// Bluetooth-/Steam-Setups liefern dieselbe Eingabe teils über mehrere js*-Devices.
+// Nahezu zeitgleiche identische Events werden deshalb global entdoppelt.
+const DUPLICATE_EVENT_WINDOW_MS = 40
 
 interface AxisState {
   key: string | null
@@ -177,8 +180,14 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
   if (process.platform !== 'linux') return () => {}
 
   const readers = new Map<string, JoystickReader>()
+  const lastKeyAt = new Map<string, number>()
 
   const onKey = (key: string): void => {
+    const now = Date.now()
+    const lastAt = lastKeyAt.get(key) ?? 0
+    if (now - lastAt < DUPLICATE_EVENT_WINDOW_MS) return
+    lastKeyAt.set(key, now)
+
     const win = getWindow()
     if (!win || win.isDestroyed()) return
     win.webContents.send('gamepad-input', key)
