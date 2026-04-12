@@ -74,8 +74,39 @@ modules:
         sha256: b964df9e5a066daa5e08d2dc82692c57ca27d00b8cc257e8e960c9f1cf26231b
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1d) mpv — Media-Player für Live-Streams und VODs
+  # 1d) Lua 5.2 — Laufzeit + Dev-Dateien für mpv-Scripts/OSC/ytdl-Hooks
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: lua
+    buildsystem: simple
+    build-commands:
+      - make clean
+      - make linux MYCFLAGS="$CFLAGS -fPIC" MYLDFLAGS="$LDFLAGS"
+      - make INSTALL_TOP=/app INSTALL_INC=/app/include/lua5.2 INSTALL_LIB=/app/lib INSTALL_MAN=/app/share/man install
+      - mkdir -p /app/lib/pkgconfig
+      - |
+        cat > /app/lib/pkgconfig/lua52.pc <<'EOF'
+        prefix=/app
+        exec_prefix=${prefix}
+        libdir=${exec_prefix}/lib
+        includedir=${prefix}/include/lua5.2
+        
+        Name: Lua
+        Description: Embedded scripting language
+        Version: 5.2.4
+        Libs: -L${libdir} -llua -lm -ldl
+        Cflags: -I${includedir}
+        EOF
+      - cp /app/lib/pkgconfig/lua52.pc /app/lib/pkgconfig/lua5.2.pc
+      - cp /app/lib/pkgconfig/lua52.pc /app/lib/pkgconfig/lua-5.2.pc
+    sources:
+      - type: archive
+        url: https://www.lua.org/ftp/lua-5.2.4.tar.gz
+        sha256: b9e2e4aad6789b3b63a056d442f7b39f0ecfca3ae0f1fc0ae4e9614401b69f4b
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1e) mpv — Media-Player für Live-Streams und VODs
   #    ffmpeg, libass, libplacebo, libva (VAAPI), X11 verfügbar.
+  #    Lua aktiviert, damit das Bundle näher am Desktop-mpv liegt.
   # ─────────────────────────────────────────────────────────────────────────────
   - name: mpv
     buildsystem: meson
@@ -85,15 +116,15 @@ modules:
       - -Dx11=enabled
       - -Degl-x11=enabled
       - -Dalsa=disabled
-      - -Dlua=disabled
+      - -Dlua=enabled
       - -Djavascript=disabled
       - -Drubberband=disabled
       - -Dvapoursynth=disabled
       - -Dbuild-date=false
     sources:
       - type: archive
-        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.38.0.tar.gz
-        sha256: 86d9ef40b6058732f67b46d0bbda24a074fae860b3eaae05bab3145041303066
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz
+        sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2) streamlink (Python) — liefert HLS-URLs aus Twitch-Streams

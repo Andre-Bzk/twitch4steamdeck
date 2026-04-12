@@ -103,7 +103,7 @@ export class PlaybackService extends EventEmitter {
     }
 
     const effectiveStart = startSeconds !== undefined ? startSeconds : resumePos
-    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath, isVod: true })
+    const proc = spawnMpv(hlsUrl, { ipcPath: this.ipcPath })
 
     let mpvStderrBuf = ''
     proc.stdout?.on('data', (d: Buffer) => console.log('[mpv]', d.toString().trim()))

@@ -125,14 +125,14 @@ echo ""
 echo "=== [5/6] SHA256-Prüfsummen für Manifest-Sources ==="
 echo ""
 
-MPV_URL="https://github.com/mpv-player/mpv/archive/refs/tags/v0.38.0.tar.gz"
+MPV_URL="https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"
 SL_URL="https://github.com/streamlink/streamlink/archive/refs/tags/6.11.0.tar.gz"
 MANIFEST="flatpak/tv.twitch4steamdeck.App.yml"
 
-MPV_ARCHIVE="/tmp/mpv-0.38.0.tar.gz"
+MPV_ARCHIVE="/tmp/mpv-0.41.0.tar.gz"
 SL_ARCHIVE="/tmp/streamlink-6.11.0.tar.gz"
 
-echo "Lade mpv 0.38.0 ..."
+echo "Lade mpv 0.41.0 ..."
 curl -L --progress-bar -o "$MPV_ARCHIVE" "$MPV_URL"
 MPV_SHA=$(sha256sum "$MPV_ARCHIVE" | awk '{print $1}')
 echo "  mpv sha256: $MPV_SHA"
@@ -143,7 +143,7 @@ SL_SHA=$(sha256sum "$SL_ARCHIVE" | awk '{print $1}')
 echo "  streamlink sha256: $SL_SHA"
 
 # Platzhalter im Manifest ersetzen
-sed -i "s/FILL_IN_sha256sum_of_mpv_0\.38\.0_tarball/$MPV_SHA/" "$MANIFEST"
+sed -i "s/FILL_IN_sha256sum_of_mpv_0\.41\.0_tarball/$MPV_SHA/" "$MANIFEST"
 sed -i "s/FILL_IN_sha256sum_of_streamlink_tarball/$SL_SHA/" "$MANIFEST"
 echo "  ✓ Manifest aktualisiert"
 
@@ -171,3 +171,7 @@ echo "      twitch4steamdeck.flatpak tv.twitch4steamdeck.App"
 echo "    # Dann twitch4steamdeck.flatpak per USB/SSH auf Deck kopieren"
 echo "    # Dort: flatpak install --user twitch4steamdeck.flatpak"
 echo "======================================================"
+echo "=== flatpak build-bundle  ==="
+flatpak build-bundle ~/.local/share/flatpak/repo twitch4steamdeck.flatpak tv.twitch4steamdeck.App
+echo "=== Übertrage auf Steamdeck  ==="
+scp twitch4steamdeck.flatpak steamdeck:/home/deck/
