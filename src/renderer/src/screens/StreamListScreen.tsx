@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import FocusableCard from '../components/FocusableCard'
+import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
 
 interface Props {
@@ -161,7 +162,11 @@ export default function StreamListScreen({
         {loadState === 'ok' && streams.length > 0 && (
           <div className="screen__meta">
             <span>{streams.length} Streams</span>
-            <span className="screen__hint">[Y] Aktualisieren · [X] Kanalseite</span>
+            <span className="screen__hint gamepad-hint-line">
+              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+            </span>
           </div>
         )}
       </header>

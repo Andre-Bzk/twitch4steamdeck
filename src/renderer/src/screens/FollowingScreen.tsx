@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import FocusableCard from '../components/FocusableCard'
+import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
 
 interface Props {
@@ -117,7 +118,9 @@ export default function FollowingScreen({
           <div className="screen__meta">
             {liveCount > 0 && <span className="screen__live-count">● {liveCount} live</span>}
             <span>{channels.length} Kanäle</span>
-            <span className="screen__hint">[Y] Aktualisieren</span>
+            <span className="screen__hint gamepad-hint-line">
+              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+            </span>
           </div>
         )}
       </header>

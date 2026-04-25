@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 const IPC = {
+  appQuit: 'app:quit',
   authStatus: 'auth:get-status',
   authStart: 'auth:start-device-flow',
   authCancel: 'auth:cancel',
@@ -103,6 +104,9 @@ export interface TopStreamsResult {
 
 const api = {
   appVersion: process.env.npm_package_version ?? '0.0.0',
+  app: {
+    quit: (): Promise<void> => ipcRenderer.invoke(IPC.appQuit)
+  },
   auth: {
     isConfigured: (): Promise<boolean> => ipcRenderer.invoke(IPC.authConfigured),
     getStatus: (): Promise<AuthStatus> => ipcRenderer.invoke(IPC.authStatus),

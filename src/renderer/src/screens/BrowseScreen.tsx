@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { GamepadHintItem } from '../components/GamepadPrompt'
 import LanguageBadge from '../components/LanguageBadge'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 
@@ -220,7 +221,11 @@ export default function BrowseScreen({
         <h2 className="screen__title">Durchsuchen</h2>
         {loadState === 'ok' && (
           <div className="screen__meta">
-            <span className="screen__hint">[Y] Aktualisieren · [X] Kanalseite</span>
+            <span className="screen__hint gamepad-hint-line">
+              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+            </span>
           </div>
         )}
       </header>
@@ -247,8 +252,13 @@ export default function BrowseScreen({
             <h3 className="browse-section__title">
               Top Live-Streams
               {focusRegion === 'shelf' && (
-                <span className="browse-section__hint">
-                  {' '}· Enter Live · X Kanalseite · ↓ Kategorien
+                <span className="browse-section__hint gamepad-hint-line">
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="a">Live</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="dpad-down">Kategorien</GamepadHintItem>
                 </span>
               )}
             </h3>
@@ -287,8 +297,11 @@ export default function BrowseScreen({
             <h3 className="browse-section__title">
               Kategorien
               {focusRegion === 'grid' && (
-                <span className="browse-section__hint">
-                  {' '}· Enter öffnen · ↑ zurück zu Streams
+                <span className="browse-section__hint gamepad-hint-line">
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="a">Öffnen</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="dpad-up">Zurück zu Streams</GamepadHintItem>
                 </span>
               )}
             </h3>

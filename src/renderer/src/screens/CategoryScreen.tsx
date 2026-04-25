@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import FocusableCard from '../components/FocusableCard'
 
@@ -128,8 +129,12 @@ export default function CategoryScreen({ game, onSelectChannel, onBack }: Props)
         <div className="category-screen__info">
           <h2 className="category-screen__title">{game.name}</h2>
           {loadState === 'ok' && (
-            <p className="category-screen__meta">
-              {streams.length} Streams · [Y] Aktualisieren · [X] Kanalseite
+            <p className="category-screen__meta gamepad-hint-line">
+              <span>{streams.length} Streams</span>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
             </p>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { SettingsIcon } from '../components/Icons'
 import {
   type StreamBadgeMode,
@@ -164,7 +165,15 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
         <h3 className="settings-section__title">Sidebar-Breite</h3>
         <p className="settings-section__hint">
           Breite der Seitenleiste anpassen ({SIDEBAR_MIN}–{SIDEBAR_MAX} px).
-          Mit Links/Rechts verschieben, Enter setzt auf Standard ({SIDEBAR_DEFAULT} px) zurück.
+          {' '}
+          <span className="gamepad-hint-line">
+            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>verschieben</GamepadHintItem>
+            <span className="gamepad-hint-separator">·</span>
+            <span className="gamepad-inline-action">
+              <GamepadPrompt prompt="a" />
+              <span>setzt auf Standard ({SIDEBAR_DEFAULT} px) zurück.</span>
+            </span>
+          </span>
         </p>
 
         <div
@@ -193,7 +202,15 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
         <h3 className="settings-section__title">Flaggen-Badge Abstand</h3>
         <p className="settings-section__hint">
           Abstand zwischen Menütext und Flaggen-Badge ({BADGE_GAP_MIN}–{BADGE_GAP_MAX} px).
-          Mit Links/Rechts verschieben, Enter setzt auf Standard ({BADGE_GAP_DEFAULT} px) zurück.
+          {' '}
+          <span className="gamepad-hint-line">
+            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>verschieben</GamepadHintItem>
+            <span className="gamepad-hint-separator">·</span>
+            <span className="gamepad-inline-action">
+              <GamepadPrompt prompt="a" />
+              <span>setzt auf Standard ({BADGE_GAP_DEFAULT} px) zurück.</span>
+            </span>
+          </span>
         </p>
 
         <div

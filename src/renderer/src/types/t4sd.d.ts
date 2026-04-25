@@ -72,6 +72,9 @@ export interface TopStreamsResult {
 
 export interface T4sdApi {
   appVersion: string
+  app: {
+    quit: () => Promise<void>
+  }
   auth: {
     isConfigured: () => Promise<boolean>
     getStatus: () => Promise<AuthStatus>

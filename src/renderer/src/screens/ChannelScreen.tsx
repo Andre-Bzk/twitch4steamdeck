@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo, PlaybackEvent, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
 
 interface Props {
@@ -459,11 +460,29 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
             {(playState === 'playing' || playState === 'paused') && (
               <>
-                <span className="channel-screen__playing-hint">
-                  ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''} · A Pause/Resume · ← −30s · → +30s · LT −5min · RT +5min · LB Kapitel zurück · RB Kapitel vor · Y Kapitelmenü
+                <span className="channel-screen__playing-hint gamepad-hint-line">
+                  <span>● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''}</span>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="a">Pause/Resume</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="dpad-left">−30s</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="dpad-right">+30s</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="lt">−5min</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="rt">+5min</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="lb">Kapitel zurück</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="rb">Kapitel vor</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="y">Kapitelmenü</GamepadHintItem>
+                  <span className="gamepad-hint-separator">·</span>
+                  <GamepadHintItem prompt="b">Stop</GamepadHintItem>
                 </span>
                 <button className="btn" onClick={() => void handleStop()}>
-                  ■ Stop (B / Escape)
+                  ■ Stop
                 </button>
               </>
             )}
@@ -483,7 +502,14 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         <h3 className="channel-screen__vods-title">
           Vergangene Streams
           {focusRegion === 'shelf' && (
-            <span className="channel-screen__vods-hint"> · ↑ zurück · A abspielen · Y Kapitel</span>
+            <span className="channel-screen__vods-hint gamepad-hint-line">
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="dpad-up">Zurück</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="a">Abspielen</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="y">Kapitel</GamepadHintItem>
+            </span>
           )}
         </h3>
         {vodsLoading && <p className="channel-screen__vods-loading">Lade VODs…</p>}
@@ -560,12 +586,28 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
               <span className="chapter-overlay__title">Kapitel wählen</span>
               <span className="chapter-overlay__vod-name">{chapterPanelVod.title}</span>
             </div>
-            <p className="chapter-overlay__hint">↑↓ navigieren · A öffnen · B schließen</p>
+            <p className="chapter-overlay__hint gamepad-hint-line">
+              <GamepadHintItem prompt={['dpad-up', 'dpad-down']}>Navigieren</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="a">Öffnen</GamepadHintItem>
+              <span className="gamepad-hint-separator">·</span>
+              <GamepadHintItem prompt="b">Schließen</GamepadHintItem>
+            </p>
             {chaptersLoading && <p className="chapter-overlay__msg">Lade Kapitel…</p>}
             {!chaptersLoading && chapters.length === 0 && (
               <p className="chapter-overlay__msg">
                 Keine Kapitel gefunden.{' '}
-                {(playState === 'playing' || playState === 'paused') ? 'A zum Fortsetzen.' : 'A zum Abspielen.'}
+                {(playState === 'playing' || playState === 'paused') ? (
+                  <span className="gamepad-inline-action">
+                    <GamepadPrompt prompt="a" />
+                    <span>zum Fortsetzen.</span>
+                  </span>
+                ) : (
+                  <span className="gamepad-inline-action">
+                    <GamepadPrompt prompt="a" />
+                    <span>zum Abspielen.</span>
+                  </span>
+                )}
               </p>
             )}
             {chapters.length > 0 && (
