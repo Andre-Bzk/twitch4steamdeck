@@ -1,7 +1,9 @@
 /**
  * Erzeugt eine gekürzte HLS-Playlist, die erst ab einem Zielsegment beginnt.
- * Umgeht den FFmpeg 7.0.3 fMP4-Seek-Bug: mpv startet nahe der Zielposition
- * ohne einen Seek im HLS-Demuxer ausführen zu müssen.
+ * Einsatzfälle:
+ * - laufende Twitch-Live-VODs als statischen Snapshot einfrieren
+ * - fMP4-Streams nahe der Zielposition starten, ohne HLS-internen Seek
+ *   im Demuxer ausführen zu müssen
  *
  * Wichtig: Die Playlist wird über localhost ausgeliefert statt als lokale Datei.
  * FFmpeg blockiert bei file://-HLS-Playlists ansonsten https-Subrequests
@@ -151,14 +153,16 @@ export async function createTrimmedPlaylist(
   // Neue Playlist zusammenbauen
   const lines: string[] = []
 
-  // Header
+  // Header — PLAYLIST-TYPE wird herausgefiltert und unten neu als VOD gesetzt
   for (const h of playlist.headerLines) {
-    lines.push(h)
+    if (!h.startsWith('#EXT-X-PLAYLIST-TYPE')) {
+      lines.push(h)
+    }
   }
-  // EXT-X-PLAYLIST-TYPE:VOD sicherstellen
-  if (!playlist.headerLines.some((l) => l.startsWith('#EXT-X-PLAYLIST-TYPE'))) {
-    lines.push('#EXT-X-PLAYLIST-TYPE:VOD')
-  }
+  // Immer VOD setzen: getrimmte Playlist ist ein statischer Snapshot.
+  // Live-VODs haben ggf. EVENT-Type oder gar keinen Type — beides führt dazu,
+  // dass mpv die Playlist als Live-Stream behandelt und den Seek ignoriert.
+  lines.push('#EXT-X-PLAYLIST-TYPE:VOD')
   // Media-Sequence passend setzen
   lines.push(`#EXT-X-MEDIA-SEQUENCE:${playlist.mediaSequence + trimStart}`)
 
@@ -177,9 +181,10 @@ export async function createTrimmedPlaylist(
     lines.push(seg.uri)
   }
 
-  if (playlist.hasEndList) {
-    lines.push('#EXT-X-ENDLIST')
-  }
+  // Immer ENDLIST setzen — statischer Snapshot endet hier.
+  // Ohne ENDLIST wäre eine VOD-Playlist laut HLS-Spec (RFC 8216) ungültig,
+  // und mpv würde weiter auf neue Segmente warten statt die Datei als fertig zu behandeln.
+  lines.push('#EXT-X-ENDLIST')
 
   const playlistText = lines.join('\n')
   const route = `/trimmed-${Date.now()}-${Math.random().toString(36).slice(2)}.m3u8`

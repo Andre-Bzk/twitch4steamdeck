@@ -9,8 +9,6 @@ import type { PlaybackEvent } from './types'
 import * as history from '../store/historyRepo'
 
 const POSITION_WRITE_INTERVAL_MS = 5_000
-// Relative Seeks > 60s nutzen bei fMP4 loadFile statt seek (umgeht Demuxer-Bug)
-const FMP4_LOADFILE_THRESHOLD_S = 60
 
 interface CurrentPlayback {
   process: ChildProcess
@@ -18,24 +16,45 @@ interface CurrentPlayback {
   hlsUrl: string
   isFmp4: boolean
   playbackOffsetSeconds: number
+  lastKnownAbsolutePositionSeconds: number | null
   pendingRelativeSeekSeconds: number
   pendingAbsoluteSeekSeconds: number | null
   seekFlushTimer: NodeJS.Timeout | null
   trimmedPlaylist: TrimResult | null
+  seekGeneration: number
+  loadGeneration: number
+  pendingLoadGeneration: number | null
   stopPolling?: (() => void) | null
 }
 
 const SEEK_FLUSH_DELAY_MS = 180
 
-/** Prüft ob ein HLS-Manifest fMP4-Segmente nutzt (EXT-X-MAP → init-Segment). */
-async function detectFmp4(hlsUrl: string): Promise<boolean> {
+interface InspectedVodPlaylist {
+  isFmp4: boolean
+  isOpenEnded: boolean
+}
+
+/**
+ * Laufende Twitch-VODs liefern oft eine offene EVENT-/DVR-Playlist.
+ * Diese muss lokal als statischer Snapshot eingefroren werden, sonst startet mpv am Live-Rand.
+ */
+async function inspectVodPlaylist(hlsUrl: string): Promise<InspectedVodPlaylist> {
   try {
     const res = await fetch(hlsUrl, { signal: AbortSignal.timeout(3000) })
-    if (!res.ok) return true // im Zweifel fMP4 annehmen (loadFile ist sicher)
+    if (!res.ok) {
+      return { isFmp4: true, isOpenEnded: false }
+    }
     const text = await res.text()
-    return text.includes('#EXT-X-MAP')
+    const playlistTypeMatch = text.match(/^#EXT-X-PLAYLIST-TYPE:(.+)$/m)
+    const playlistType = playlistTypeMatch?.[1]?.trim().toUpperCase() ?? null
+    const hasEndList = text.includes('#EXT-X-ENDLIST')
+
+    return {
+      isFmp4: text.includes('#EXT-X-MAP'),
+      isOpenEnded: !hasEndList || playlistType === 'EVENT'
+    }
   } catch {
-    return true
+    return { isFmp4: true, isOpenEnded: false }
   }
 }
 
@@ -47,6 +66,24 @@ export class PlaybackService extends EventEmitter {
 
   constructor() {
     super()
+  }
+
+  private isReloading(current: CurrentPlayback): boolean {
+    return current.seekGeneration !== current.loadGeneration
+  }
+
+  private async getAbsolutePlaybackPosition(current: CurrentPlayback): Promise<number | null> {
+    if (this.isReloading(current) && current.lastKnownAbsolutePositionSeconds !== null) {
+      return current.lastKnownAbsolutePositionSeconds
+    }
+
+    const pos = await current.mpv.getTimePos()
+    if (this.current !== current) return null
+    if (pos === null) return current.lastKnownAbsolutePositionSeconds
+
+    const absolutePos = current.playbackOffsetSeconds + pos
+    current.lastKnownAbsolutePositionSeconds = absolutePos
+    return absolutePos
   }
 
   async startLive(channelLogin: string, quality = 'best'): Promise<void> {
@@ -91,10 +128,14 @@ export class PlaybackService extends EventEmitter {
       hlsUrl: '',
       isFmp4: false,
       playbackOffsetSeconds: 0,
+      lastKnownAbsolutePositionSeconds: null,
       pendingRelativeSeekSeconds: 0,
       pendingAbsoluteSeekSeconds: null,
       seekFlushTimer: null,
-      trimmedPlaylist: null
+      trimmedPlaylist: null,
+      seekGeneration: 0,
+      loadGeneration: 0,
+      pendingLoadGeneration: null
     }
     this.emit('playback-event', { kind: 'started', channelLogin } satisfies PlaybackEvent)
   }
@@ -129,14 +170,17 @@ export class PlaybackService extends EventEmitter {
     }
 
     const effectiveStart = startSeconds !== undefined ? startSeconds : resumePos
-    const isFmp4 = await detectFmp4(hlsUrl)
+    const { isFmp4, isOpenEnded } = await inspectVodPlaylist(hlsUrl)
 
-    // fMP4 + großer Resume: Gekürzte Playlist erstellen, die ab dem Zielsegment beginnt.
-    // Umgeht den FFmpeg HLS-Demuxer fMP4-Seek-Bug komplett — kein Seek nötig.
+    // Laufende Live-VODs kommen als offene EVENT-/DVR-Playlist zurück.
+    // Diese muss unabhängig vom Container als lokaler Snapshot eingefroren werden,
+    // sonst startet mpv am Live-Rand statt am VOD-Anfang bzw. Kapitel-Offset.
+    // Geschlossene fMP4-VODs nutzen denselben Pfad weiterhin als Seek-Workaround.
     let mpvUrl = hlsUrl
     let trimmedPlaylist: TrimResult | null = null
     let playbackOffsetSeconds = 0
-    if (isFmp4 && effectiveStart > 20) {
+    const shouldStartViaTrimmedPlaylist = isOpenEnded || (isFmp4 && effectiveStart > 20)
+    if (shouldStartViaTrimmedPlaylist) {
       try {
         const trim = await createTrimmedPlaylist(hlsUrl, effectiveStart)
         mpvUrl = trim.url
@@ -188,20 +232,33 @@ export class PlaybackService extends EventEmitter {
       hlsUrl,
       isFmp4,
       playbackOffsetSeconds,
+      lastKnownAbsolutePositionSeconds: effectiveStart > 0 ? effectiveStart : 0,
       pendingRelativeSeekSeconds: 0,
       pendingAbsoluteSeekSeconds: null,
       seekFlushTimer: null,
-      trimmedPlaylist
+      trimmedPlaylist,
+      seekGeneration: 0,
+      loadGeneration: 0,
+      pendingLoadGeneration: null
     }
     this.emit('playback-event', { kind: 'started' } satisfies PlaybackEvent)
 
     // IPC verbinden, initialen Resume-Seek erst nach `playback-restart` setzen und Position tracken.
     mpv.connect().then(() => {
-      let initialSeekDone = effectiveStart <= 0 || isFmp4
+      let initialSeekDone = effectiveStart <= 0 || shouldStartViaTrimmedPlaylist || isFmp4
+
+      if (!shouldStartViaTrimmedPlaylist && isFmp4 && effectiveStart > 0 && effectiveStart < 20) {
+        void this.reloadFmp4AtAbsolutePosition(effectiveStart)
+      }
 
       // playback-restart feuert nach dem ersten dekodierten Frame.
       mpv.onEvent('playback-restart', () => {
-        if (!this.current) return
+        if (!this.current || this.current.mpv !== mpv) return
+
+        if (this.current.pendingLoadGeneration !== null) {
+          this.current.loadGeneration = this.current.pendingLoadGeneration
+          this.current.pendingLoadGeneration = null
+        }
 
         // Initialer Seek für TS-Streams (fMP4 wird über Trimmed-Playlist gelöst)
         if (initialSeekDone) return
@@ -214,8 +271,12 @@ export class PlaybackService extends EventEmitter {
       const writePosition = (seconds: number): void => {
         const now = Date.now()
         if (now - lastWrite < POSITION_WRITE_INTERVAL_MS) return
+        if (!this.current || this.current.mpv !== mpv) return
+        if (this.isReloading(this.current)) return
+
         lastWrite = now
-        const absoluteSeconds = seconds + (this.current?.playbackOffsetSeconds ?? 0)
+        const absoluteSeconds = seconds + this.current.playbackOffsetSeconds
+        this.current.lastKnownAbsolutePositionSeconds = absoluteSeconds
         const pos = Math.floor(absoluteSeconds)
         history.updatePosition(vodId, pos)
         if (durationSeconds > 0 && pos / durationSeconds > 0.95) {
@@ -265,7 +326,8 @@ export class PlaybackService extends EventEmitter {
   }
 
   getCurrentPosition(): Promise<number | null> {
-    return this.current?.mpv.getTimePos() ?? Promise.resolve(null)
+    if (!this.current) return Promise.resolve(null)
+    return this.getAbsolutePlaybackPosition(this.current)
   }
 
   async stop(): Promise<void> {
@@ -295,31 +357,46 @@ export class PlaybackService extends EventEmitter {
     return this.mpvLogPath
   }
 
-  /** fMP4: Gekürzte Playlist erstellen und per loadFile laden (umgeht FFmpeg-Seek-Bug). */
-  private async fmp4SeekViaTrimmedPlaylist(targetSeconds: number): Promise<void> {
+  /** fMP4: Auf eine absolute VOD-Zeit neu laden, ohne mpv-internen HLS-Seek zu verwenden. */
+  private async reloadFmp4AtAbsolutePosition(targetSeconds: number): Promise<void> {
     if (!this.current) return
-    const { hlsUrl } = this.current
 
-    // Alte lokale Playlist-Instanz aufräumen
-    if (this.current.trimmedPlaylist) {
-      cleanupTrimmedPlaylist(this.current.trimmedPlaylist).catch(() => {})
-      this.current.trimmedPlaylist = null
-    }
+    const current = this.current
+    const generation = current.seekGeneration + 1
+    const normalizedTarget = Math.max(0, targetSeconds)
+    const previousTrimmed = current.trimmedPlaylist
+    const previousAbsolutePosition = current.lastKnownAbsolutePositionSeconds
 
-    if (targetSeconds < 20) {
-      // Nahe am Anfang: kein Trimming nötig, einfach neu laden
-      this.current.playbackOffsetSeconds = 0
-      this.current.mpv.loadFile(hlsUrl)
+    current.seekGeneration = generation
+    current.lastKnownAbsolutePositionSeconds = normalizedTarget
+
+    if (normalizedTarget < 20) {
+      current.playbackOffsetSeconds = 0
+      current.trimmedPlaylist = null
+      current.pendingLoadGeneration = generation
+      current.mpv.loadFile(current.hlsUrl, normalizedTarget > 0 ? normalizedTarget : undefined)
+      cleanupTrimmedPlaylist(previousTrimmed).catch(() => {})
       return
     }
 
     try {
-      const trimmed = await createTrimmedPlaylist(hlsUrl, targetSeconds)
-      if (!this.current) return
-      this.current.trimmedPlaylist = trimmed
-      this.current.playbackOffsetSeconds = trimmed.playlistStartSeconds
-      this.current.mpv.loadFile(trimmed.url)
+      const trimmed = await createTrimmedPlaylist(current.hlsUrl, normalizedTarget)
+      if (this.current !== current || current.seekGeneration !== generation) {
+        await cleanupTrimmedPlaylist(trimmed)
+        return
+      }
+
+      current.playbackOffsetSeconds = trimmed.playlistStartSeconds
+      current.trimmedPlaylist = trimmed
+      current.pendingLoadGeneration = generation
+      current.mpv.loadFile(trimmed.url)
+      cleanupTrimmedPlaylist(previousTrimmed).catch(() => {})
     } catch (e) {
+      if (this.current === current && current.seekGeneration === generation) {
+        current.seekGeneration = current.loadGeneration
+        current.pendingLoadGeneration = null
+        current.lastKnownAbsolutePositionSeconds = previousAbsolutePosition
+      }
       console.warn('[playback] Trimmed playlist failed:', e)
     }
   }
@@ -340,7 +417,7 @@ export class PlaybackService extends EventEmitter {
       if (absoluteSeek !== null) {
         this.current.pendingAbsoluteSeekSeconds = null
         if (isFmp4) {
-          await this.fmp4SeekViaTrimmedPlaylist(absoluteSeek)
+          await this.reloadFmp4AtAbsolutePosition(absoluteSeek)
         } else {
           this.current.mpv.seekAbsolute(absoluteSeek)
         }
@@ -350,11 +427,10 @@ export class PlaybackService extends EventEmitter {
       const relativeSeek = this.current.pendingRelativeSeekSeconds
       this.current.pendingRelativeSeekSeconds = 0
       if (relativeSeek !== 0) {
-        if (isFmp4 && Math.abs(relativeSeek) > FMP4_LOADFILE_THRESHOLD_S) {
-          const pos = await this.current?.mpv.getTimePos()
-          if (pos !== null && this.current) {
-            const absolutePos = this.current.playbackOffsetSeconds + pos
-            await this.fmp4SeekViaTrimmedPlaylist(Math.max(0, absolutePos + relativeSeek))
+        if (isFmp4) {
+          const absolutePos = await this.getAbsolutePlaybackPosition(this.current)
+          if (absolutePos !== null && this.current) {
+            await this.reloadFmp4AtAbsolutePosition(absolutePos + relativeSeek)
           }
         } else {
           this.current.mpv.seek(relativeSeek)
