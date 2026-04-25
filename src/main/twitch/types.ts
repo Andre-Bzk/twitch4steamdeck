@@ -5,6 +5,13 @@ export interface HelixUser {
   profile_image_url: string
 }
 
+export interface OwnUserInfo {
+  id: string
+  login: string
+  displayName: string
+  profileImageUrl: string
+}
+
 export interface HelixFollowedChannel {
   broadcaster_id: string
   broadcaster_login: string

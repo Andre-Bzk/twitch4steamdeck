@@ -10,6 +10,7 @@ const IPC = {
   authEvent: 'auth:event',
 
   twitchGetFollowed: 'twitch:get-followed',
+  twitchGetOwnUser: 'twitch:get-own-user',
   twitchGetVideos: 'twitch:get-videos',
   twitchGetTopGames: 'twitch:get-top-games',
   twitchGetTopStreams: 'twitch:get-top-streams',
@@ -62,6 +63,13 @@ export interface FollowedChannelInfo {
   language?: string
 }
 
+export interface OwnUserInfo {
+  id: string
+  login: string
+  displayName: string
+  profileImageUrl: string
+}
+
 export interface PlaybackEvent {
   kind: 'started' | 'stopped' | 'error'
   channelLogin?: string
@@ -103,7 +111,7 @@ export interface TopStreamsResult {
 }
 
 const api = {
-  appVersion: process.env.npm_package_version ?? '0.0.0',
+  appVersion: process.env.APP_VERSION ?? process.env.npm_package_version ?? '0.0.0-dev',
   app: {
     quit: (): Promise<void> => ipcRenderer.invoke(IPC.appQuit)
   },
@@ -122,6 +130,8 @@ const api = {
   twitch: {
     getFollowed: (): Promise<FollowedChannelInfo[]> =>
       ipcRenderer.invoke(IPC.twitchGetFollowed),
+    getOwnUser: (): Promise<OwnUserInfo> =>
+      ipcRenderer.invoke(IPC.twitchGetOwnUser),
     getVideos: (broadcasterId: string): Promise<VodInfo[]> =>
       ipcRenderer.invoke(IPC.twitchGetVideos, broadcasterId),
     getTopGames: (cursor?: string): Promise<{ games: GameInfo[]; cursor?: string }> =>

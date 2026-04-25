@@ -5,6 +5,7 @@ import type {
   HelixGame,
   HelixPaginatedResponse,
   HelixStream,
+  OwnUserInfo,
   TopStreamsResult,
   HelixUser,
   HelixVideo,
@@ -60,6 +61,16 @@ export class HelixClient {
     if (!user) throw new Error('Keine Nutzer-Daten von /users erhalten')
     this.cachedUserId = user.id
     return user
+  }
+
+  async getOwnUserInfo(): Promise<OwnUserInfo> {
+    const user = await this.getOwnUser()
+    return {
+      id: user.id,
+      login: user.login,
+      displayName: user.display_name,
+      profileImageUrl: user.profile_image_url
+    }
   }
 
   private async getOwnUserId(): Promise<string> {

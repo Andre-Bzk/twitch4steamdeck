@@ -30,6 +30,13 @@ export interface FollowedChannelInfo {
   language?: string
 }
 
+export interface OwnUserInfo {
+  id: string
+  login: string
+  displayName: string
+  profileImageUrl: string
+}
+
 export interface GameInfo {
   id: string
   name: string
@@ -85,6 +92,7 @@ export interface T4sdApi {
   }
   twitch: {
     getFollowed: () => Promise<FollowedChannelInfo[]>
+    getOwnUser: () => Promise<OwnUserInfo>
     getVideos: (broadcasterId: string) => Promise<VodInfo[]>
     getTopGames: (cursor?: string) => Promise<{ games: GameInfo[]; cursor?: string }>
     getTopStreams: (options?: { gameId?: string; language?: string; cursor?: string; limit?: number }) => Promise<TopStreamsResult>
