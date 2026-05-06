@@ -1,6 +1,6 @@
 # Twitch4SteamDeck — CLAUDE.md
 
-Ad-freier Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Screen-UI (1280x800). Unterstützt Live-Streams und VODs mit Resume. Deployment als Flatpak auf dem Steam Deck.
+Ad-freier Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Screen-UI (auf Linux/Steam Deck: Fenster maximiert auf Primärdisplay; im Windows-Dev: 1280x800). Unterstützt Live-Streams und VODs mit Resume und Kapitelwahl. Deployment als Flatpak auf dem Steam Deck.
 
 ---
 
@@ -82,7 +82,7 @@ Das Skript: prüft deps → npm-Build → Python-Deps generieren → mpv/Streaml
 
 ```
 src/main/
-  index.ts                    — Electron-Einstiegspunkt, Service-Wiring, Window
+  index.ts                    — Electron-Einstiegspunkt, Service-Wiring, Window (Linux: maximiert auf Primärdisplay; Windows: 1280x800)
   env.d.ts                    — Typ für MAIN_VITE_TWITCH_CLIENT_ID
   auth/
     authService.ts            — Auth-Lifecycle, Token-Refresh, Event-Emitter

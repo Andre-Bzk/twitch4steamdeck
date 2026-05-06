@@ -1,31 +1,198 @@
+[English](#english) | [Deutsch](#deutsch)
+
+---
+
+<a name="english"></a>
 # Twitch4SteamDeck
 
-Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, Gamepad-Steuerung und VOD-Wiedergabe mit Resume-Funktion.
+Ad-free Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and VOD playback with resume.
 
 ## Features
 
-- **Live-Streams** -- Wiedergabe ueber Streamlink + mpv, werbefrei
-- **VOD-Wiedergabe** -- Aufnahmen ansehen mit automatischem Resume an der letzten Position
-- **Gamepad-Steuerung** -- Volle Bedienung per Steam Deck Controller oder Xbox-Gamepad, auch im Gaming Mode (liest `/dev/input/js*` direkt, umgeht Chromium-Sandbox-Limitierungen)
-- **Big-Screen-UI** -- 10-Foot-Interface optimiert fuer TV/Deck (React + Electron)
-- **Twitch-Login** -- Device Code Flow mit QR-Code (kein Browser noetig)
-- **Gefolgte Kanaele** -- Live-Status und Uebersicht der gefolgten Streamer
-- **Kategorie-Browser** -- Twitch-Kategorien durchsuchen
-- **VOD-Verlauf** -- Lokale SQLite-Datenbank mit Wiedergabe-Historie und Fortschritt
-- **VAAPI Hardware-Decoding** -- GPU-beschleunigte Videowiedergabe auf dem Steam Deck
+- **Live Streams** — Ad-free playback via Streamlink + mpv
+- **VOD Playback** — Watch recordings with automatic resume at last position
+- **VOD Chapters** — Browse and jump to chapters within VODs
+- **Gamepad Control** — Full control via Steam Deck controller or Xbox gamepad, including Gaming Mode (reads `/dev/input/js*` directly, bypasses Chromium sandbox limitations)
+- **Big-Screen UI** — 10-foot interface optimized for TV/deck; fills the screen on Steam Deck and on external TVs when docked (React + Electron)
+- **Twitch Login** — Device Code Flow with QR code (no browser required)
+- **Following** — Live status and overview of followed streamers
+- **Category Browser** — Browse Twitch categories and top streams
+- **Language-Filtered Streams** — Top streams filtered by German/English
+- **Account Screen** — User profile, app version, logout
+- **VOD History** — Local SQLite database with playback history and progress
+- **VAAPI Hardware Decoding** — GPU-accelerated video playback on Steam Deck
+- **Quit Dialog** — Confirm quit via Xbox/Start button
+
+## Architecture
+
+```
+Electron (Main Process)
+  ├── Auth          -- Twitch Device Code Flow + token management (Electron safeStorage)
+  ├── Helix Client  -- Twitch API (followed channels, streams, VODs, categories, chapters via GQL)
+  ├── Playback      -- Streamlink (Live) / mpv (VODs) with IPC control
+  ├── Gamepad       -- Linux joystick API (/dev/input/js*)
+  └── History       -- SQLite (better-sqlite3) for VOD history + resume
+
+Electron (Renderer)
+  └── React UI      -- Screens: Login, Following, Browse, Category, Channel,
+                       StreamList (DE/EN), Settings, Account
+```
+
+## Installation (Steam Deck)
+
+```bash
+flatpak install --user twitch4steamdeck.flatpak
+flatpak run tv.twitch4steamdeck.App
+```
+
+Finished Flatpak bundles include everything (incl. mpv, Streamlink, and Twitch integration) — no further setup required.
+
+---
+
+## Build yourself (developers)
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) >= 20
+- npm
+- For Flatpak build: WSL2 (Ubuntu) with `flatpak`, `flatpak-builder`, `librsvg2-bin`
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/<user>/twitch4steamdeck.git
+   cd twitch4steamdeck
+   ```
+
+2. Register your own Twitch app at https://dev.twitch.tv/console/apps:
+   - **OAuth Redirect URLs:** `http://localhost`
+   - **Client Type:** Public
+
+3. Create `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   Enter the Client ID from step 2 into `.env`:
+   ```
+   MAIN_VITE_TWITCH_CLIENT_ID=your_client_id_here
+   ```
+
+   > The Client ID is embedded into the app at build time. End users installing a finished Flatpak do not need to register their own Twitch app.
+
+4. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Starts Electron with Hot-Reload (electron-vite).
+
+## Build
+
+### Desktop (AppImage)
+
+```bash
+npm run package
+```
+
+Creates a Linux AppImage under `dist/`.
+
+### Flatpak (Steam Deck)
+
+The Flatpak build must run in WSL2 on the Linux filesystem (not under `/mnt/`):
+
+```bash
+# Copy project to Linux filesystem
+cp -rp /mnt/c/Projekte/twitch4steamdeck ~/twitch4steamdeck
+cd ~/twitch4steamdeck
+
+# Run full build (incl. mpv, streamlink, Electron)
+bash flatpak/build-flatpak.sh
+```
+
+The script handles automatically:
+1. Install Flatpak runtimes (freedesktop SDK 24.08, Electron2 BaseApp)
+2. npm install + rebuild native modules (better-sqlite3 for Linux x64)
+3. electron-vite build
+4. Generate Streamlink Python deps
+5. Run flatpak-builder (builds mpv 0.41.0, libass, libplacebo, Lua 5.2)
+6. Create Flatpak bundle and transfer via SCP to Steam Deck
+
+## Gamepad Layout
+
+| Button | Function |
+|--------|----------|
+| A | Confirm / Select / Play-Pause |
+| B | Back |
+| D-Pad / Left Stick | Navigation |
+| LB / RB | Switch tabs |
+| L2 | Rewind (VODs) |
+| R2 | Fast forward (VODs) |
+| Xbox / Start | Quit dialog |
+
+## Security
+
+- **Twitch tokens** are stored encrypted in the OS keystore (Electron `safeStorage`) and never end up in the build or repository
+- **Client ID** is a public identifier (Public App) and not a secret
+- `.env`, `out/`, `dist/` and `userData/` are excluded in `.gitignore`
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Framework | Electron 33 + electron-vite |
+| UI | React 18 + TypeScript |
+| Video (Live) | Streamlink + mpv |
+| Video (VOD) | mpv (direct, IPC-controlled) |
+| Database | better-sqlite3 |
+| Gamepad | Linux joystick API (`/dev/input/js*`) |
+| Packaging | Flatpak / electron-builder (AppImage) |
+| HW Decoding | VAAPI (via mpv + ffmpeg-full extension) |
+
+## License
+
+---
+
+<a name="deutsch"></a>
+# Twitch4SteamDeck
+
+Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-Steuerung und VOD-Wiedergabe mit Resume.
+
+## Features
+
+- **Live-Streams** — Werbefreie Wiedergabe ueber Streamlink + mpv
+- **VOD-Wiedergabe** — Aufnahmen ansehen mit automatischem Resume an der letzten Position
+- **VOD-Kapitel** — Kapitel in VODs durchsuchen und direkt anspringen
+- **Gamepad-Steuerung** — Volle Bedienung per Steam Deck Controller oder Xbox-Gamepad, auch im Gaming Mode (liest `/dev/input/js*` direkt, umgeht Chromium-Sandbox-Limitierungen)
+- **Big-Screen-UI** — 10-Foot-Interface optimiert fuer TV/Deck; bildschirmfuellend auf dem Steam Deck und auf externen TVs im Docking-Betrieb (React + Electron)
+- **Twitch-Login** — Device Code Flow mit QR-Code (kein Browser noetig)
+- **Gefolgte Kanaele** — Live-Status und Uebersicht der gefolgten Streamer
+- **Kategorie-Browser** — Twitch-Kategorien und Top-Streams durchsuchen
+- **Sprachgefilterte Streams** — Top-Streams gefiltert nach Deutsch/Englisch
+- **Account-Ansicht** — Nutzerprofil, App-Version, Abmelden
+- **VOD-Verlauf** — Lokale SQLite-Datenbank mit Wiedergabe-Historie und Fortschritt
+- **VAAPI Hardware-Decoding** — GPU-beschleunigte Videowiedergabe auf dem Steam Deck
+- **Quit-Dialog** — Beenden per Xbox/Start-Button bestaetigen
 
 ## Architektur
 
 ```
 Electron (Main Process)
   ├── Auth          -- Twitch Device Code Flow + Token-Verwaltung (Electron safeStorage)
-  ├── Helix Client  -- Twitch API (gefolgete Kanaele, Streams, VODs, Kategorien)
+  ├── Helix Client  -- Twitch API (gefolgte Kanaele, Streams, VODs, Kategorien, Kapitel via GQL)
   ├── Playback      -- Streamlink (Live) / mpv (VODs) mit IPC-Steuerung
   ├── Gamepad       -- Linux joystick API (/dev/input/js*)
   └── History       -- SQLite (better-sqlite3) fuer VOD-Verlauf + Resume
 
 Electron (Renderer)
-  └── React UI      -- Screens: Login, Following, Browse, Channel, Settings
+  └── React UI      -- Screens: Login, Following, Browse, Category, Channel,
+                       StreamList (DE/EN), Settings, Account
 ```
 
 ## Installation (Steam Deck)
@@ -118,13 +285,13 @@ Das Script erledigt automatisch:
 
 | Taste | Funktion |
 |-------|----------|
-| A | Bestaetigen / Auswaehlen |
+| A | Bestaetigen / Auswaehlen / Play-Pause |
 | B | Zurueck |
-| D-Pad | Navigation |
-| Left Stick | Navigation |
+| D-Pad / Left Stick | Navigation |
 | LB / RB | Tab wechseln |
-| R2 | Vorspulen (VODs) |
 | L2 | Zurueckspulen (VODs) |
+| R2 | Vorspulen (VODs) |
+| Xbox / Start | Quit-Dialog |
 
 ## Sicherheit
 
@@ -146,4 +313,3 @@ Das Script erledigt automatisch:
 | HW-Decoding | VAAPI (via mpv + ffmpeg-full Extension) |
 
 ## Lizenz
-
