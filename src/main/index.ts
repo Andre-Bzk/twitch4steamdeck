@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, screen } from 'electron'
 import { join } from 'node:path'
 import { AuthService } from './auth/authService'
 import { HelixClient } from './twitch/helixClient'
@@ -9,9 +9,14 @@ import { startGamepadReader } from './input/gamepadReader'
 const isDev = !app.isPackaged
 
 function createWindow(): BrowserWindow {
+  const isLinux = process.platform === 'linux'
+  const { width, height } = isLinux
+    ? screen.getPrimaryDisplay().workAreaSize
+    : { width: 1280, height: 800 }
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width,
+    height,
     minWidth: 1024,
     minHeight: 640,
     show: false,
@@ -25,7 +30,10 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (isLinux) win.maximize()
+    win.show()
+  })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)

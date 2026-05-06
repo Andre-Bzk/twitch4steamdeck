@@ -1,6 +1,6 @@
 {
   "name": "twitch4steamdeck",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Werbefreier Twitch-Client für das Steam Deck (Live & VOD, Big-Screen-UI)",
   "main": "out/main/index.js",
   "author": "twitch4steamdeck",
