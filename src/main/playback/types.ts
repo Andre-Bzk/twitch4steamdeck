@@ -12,4 +12,10 @@ export interface PlaybackEvent {
   kind: 'started' | 'stopped' | 'error'
   channelLogin?: string
   message?: string
+  durationSeconds?: number
+  isLive?: boolean
+}
+
+export interface PlaybackTimeUpdate {
+  positionSeconds: number
 }

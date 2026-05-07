@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
+import { PlaybackOverlay } from '../components/PlaybackOverlay'
 import type { FollowedChannelInfo, PlaybackEvent, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
 
 interface Props {
@@ -72,6 +73,10 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [wasPlayingBeforeChapters, setWasPlayingBeforeChapters] = useState(false)
   const [currentVod, setCurrentVod] = useState<VodInfo | null>(null)
   const [pendingChapterVod, setPendingChapterVod] = useState<VodInfo | null>(null)
+  // Overlay state
+  const [currentPosition, setCurrentPosition] = useState(0)
+  const [vodDuration, setVodDuration] = useState(0)
+  const [isLivePlayback, setIsLivePlayback] = useState(false)
   const watchBtnRef = useRef<HTMLButtonElement>(null)
   const chapterListRef = useRef<HTMLUListElement>(null)
 
@@ -245,6 +250,9 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     const unsub = window.t4sd.playback.onEvent((ev: PlaybackEvent) => {
       if (ev.kind === 'started') {
         setPlayState('playing')
+        setVodDuration(ev.durationSeconds ?? 0)
+        setIsLivePlayback(ev.isLive ?? false)
+        setCurrentPosition(0)
       } else if (ev.kind === 'stopped') {
         const nextChapterVod = pendingChapterVod
         setPlayState('idle')
@@ -273,6 +281,15 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     })
     return unsub
   }, [pendingChapterVod, vods])
+
+  // Subscribe to ~1 Hz position updates from main process for the overlay seek bar
+  useEffect(() => {
+    if (playState !== 'playing' && playState !== 'paused') return
+    const unsub = window.t4sd.playback.onTimeUpdate(({ positionSeconds }) => {
+      setCurrentPosition(positionSeconds)
+    })
+    return unsub
+  }, [playState])
 
   useEffect(() => {
     watchBtnRef.current?.focus()
@@ -459,32 +476,9 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             )}
 
             {(playState === 'playing' || playState === 'paused') && (
-              <>
-                <span className="channel-screen__playing-hint gamepad-hint-line">
-                  <span>● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''}</span>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="a">Pause/Resume</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="dpad-left">−30s</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="dpad-right">+30s</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="lt">−5min</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="rt">+5min</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="lb">Kapitel zurück</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="rb">Kapitel vor</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="y">Kapitelmenü</GamepadHintItem>
-                  <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="b">Stop</GamepadHintItem>
-                </span>
-                <button className="btn" onClick={() => void handleStop()}>
-                  ■ Stop
-                </button>
-              </>
+              <span className="channel-screen__playing-hint">
+                ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''}
+              </span>
             )}
 
             {!channel.isLive && playState === 'idle' && (
@@ -626,6 +620,31 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             )}
           </div>
         </div>
+      )}
+
+      {/* Player overlay – shown during VOD/Live playback */}
+      {(playState === 'playing' || playState === 'paused') && (
+        <PlaybackOverlay
+          playState={playState}
+          durationSeconds={vodDuration}
+          isLive={isLivePlayback}
+          currentPosition={currentPosition}
+          channelName={channel.broadcasterName}
+          channelAvatar={channel.profileImageUrl}
+          title={isLivePlayback ? (channel.streamTitle ?? '') : (currentVod?.title ?? '')}
+          onTogglePause={() => {
+            if (playState === 'playing') {
+              void window.t4sd.playback.pause()
+              setPlayState('paused')
+            } else {
+              void window.t4sd.playback.resume()
+              setPlayState('playing')
+            }
+          }}
+          onSeek={(s) => void window.t4sd.playback.seek(s)}
+          onSeekTo={(s) => void window.t4sd.playback.seekTo(s)}
+          onStop={() => void handleStop()}
+        />
       )}
     </div>
   )

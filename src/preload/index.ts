@@ -29,6 +29,7 @@ const IPC = {
   playbackSetLoggingEnabled: 'playback:set-logging-enabled',
   playbackGetLogPath: 'playback:get-log-path',
   playbackEvent: 'playback:event',
+  playbackTimeUpdate: 'playback:time-update',
 
   gamepadInput: 'gamepad-input'
 } as const
@@ -74,6 +75,8 @@ export interface PlaybackEvent {
   kind: 'started' | 'stopped' | 'error'
   channelLogin?: string
   message?: string
+  durationSeconds?: number
+  isLive?: boolean
 }
 
 export interface GameInfo {
@@ -163,6 +166,11 @@ const api = {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)
       return () => ipcRenderer.removeListener(IPC.playbackEvent, listener)
+    },
+    onTimeUpdate: (cb: (data: { positionSeconds: number }) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, data: { positionSeconds: number }): void => cb(data)
+      ipcRenderer.on(IPC.playbackTimeUpdate, listener)
+      return () => ipcRenderer.removeListener(IPC.playbackTimeUpdate, listener)
     }
   },
   gamepad: {

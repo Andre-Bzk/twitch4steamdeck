@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import type { AuthEvent, AuthService } from '../auth/authService'
 import type { HelixClient } from '../twitch/helixClient'
 import type { PlaybackService } from '../playback/playbackService'
-import type { PlaybackEvent } from '../playback/types'
+import type { PlaybackEvent, PlaybackTimeUpdate } from '../playback/types'
 import { getProgressMap } from '../store/historyRepo'
 
 export const IPC = {
@@ -35,7 +35,9 @@ export const IPC = {
   playbackSetLoggingEnabled: 'playback:set-logging-enabled',
   playbackGetLogPath: 'playback:get-log-path',
   /** main → renderer */
-  playbackEvent: 'playback:event'
+  playbackEvent: 'playback:event',
+  /** main → renderer: ~1 Hz position updates during VOD playback */
+  playbackTimeUpdate: 'playback:time-update'
 } as const
 
 export function registerIpcHandlers(
@@ -120,6 +122,12 @@ export function registerIpcHandlers(
       if (process.platform === 'win32' && event.kind === 'started') {
         win.focus()
       }
+    }
+  })
+
+  playback.on('playback-time-update', (data: PlaybackTimeUpdate) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.playbackTimeUpdate, data)
     }
   })
 }

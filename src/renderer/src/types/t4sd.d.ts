@@ -48,6 +48,8 @@ export interface PlaybackEvent {
   kind: 'started' | 'stopped' | 'error'
   channelLogin?: string
   message?: string
+  durationSeconds?: number
+  isLive?: boolean
 }
 
 export interface VodInfo {
@@ -114,6 +116,7 @@ export interface T4sdApi {
     setLoggingEnabled: (enabled: boolean) => Promise<void>
     getLogPath: () => Promise<string>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
+    onTimeUpdate: (cb: (data: { positionSeconds: number }) => void) => () => void
   }
   gamepad: {
     onInput: (cb: (key: string) => void) => () => void

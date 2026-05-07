@@ -58,6 +58,31 @@ export function UserIcon(props: IconProps): JSX.Element {
   )
 }
 
+export function PlayIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props} fill="currentColor" stroke="none">
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  )
+}
+
+export function PauseIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props} fill="currentColor" stroke="none">
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  )
+}
+
+export function StopIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props} fill="currentColor" stroke="none">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+    </svg>
+  )
+}
+
 export function SettingsIcon(props: IconProps): JSX.Element {
   return (
     <svg {...base} {...props}>

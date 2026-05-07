@@ -1541,3 +1541,322 @@ body,
   box-shadow: 0 0 0 3px rgba(191, 148, 255, 0.22), 0 14px 28px rgba(0, 0, 0, 0.32);
   transform: translateY(-1px);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   PLAYBACK OVERLAY
+   Covers the full window during playback. Fades in/out.
+   z-index 300 places it above the chapter overlay (z-index 200).
+═══════════════════════════════════════════════════════════════════ */
+
+.playback-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  /* Always capture pointer events so touch can re-show the overlay.
+     The overlay only renders during active playback, so nothing useful
+     sits beneath it that the user needs to reach. */
+  pointer-events: auto;
+  /* Fade transition */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.playback-overlay[data-visible='true'] {
+  opacity: 1;
+}
+
+/* Top gradient scrim – darkens top-third for readability */
+.playback-overlay__scrim-top {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 30%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Bottom gradient scrim – covers bottom half */
+.playback-overlay__scrim-bottom {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 50%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* ── Top hints bar ───────────────────────────────────────────────── */
+
+.playback-overlay__top-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 2px;
+  padding: 18px 28px 0;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.playback-overlay__hint-sep {
+  margin: 0 4px;
+  opacity: 0.4;
+}
+
+/* ── Center play/pause ───────────────────────────────────────────── */
+
+.playback-overlay__center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.playback-overlay__center-btn {
+  /* Visual circle */
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+  /* Larger touch/click target via padding trick */
+  padding: 0;
+  /* Minimum accessible touch target */
+  min-width: 88px;
+  min-height: 88px;
+  flex-shrink: 0;
+}
+
+.playback-overlay__center-btn:hover,
+.playback-overlay__center-btn:focus-visible {
+  background: rgba(145, 71, 255, 0.45);
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.playback-overlay__center-btn:active {
+  transform: scale(0.93);
+}
+
+/* ── Bottom bar ──────────────────────────────────────────────────── */
+
+.playback-overlay__bottom {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 28px 24px;
+}
+
+/* Channel badge row */
+.playback-overlay__channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playback-overlay__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.playback-overlay__channel-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.playback-overlay__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Fills the full bottom-bar width (minus 28px padding each side).
+     Wider screens (docked Steam Deck at 1080p/4K) naturally show more text. */
+  max-width: 100%;
+}
+
+.playback-overlay__live-badge {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: var(--color-live);
+  border-radius: 4px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+
+/* Progress row: time — seekbar — time */
+.playback-overlay__progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.playback-overlay__time {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.playback-overlay__time:last-child {
+  text-align: right;
+}
+
+/* Seek bar container – tall hit target, visual bar inside */
+.playback-overlay__seek-bar {
+  flex: 1;
+  height: 44px; /* large touch target */
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.playback-overlay__seek-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  transition: height 0.15s;
+}
+
+.playback-overlay__seek-bar:hover .playback-overlay__seek-track,
+.playback-overlay__seek-bar:active .playback-overlay__seek-track {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.playback-overlay__seek-filled {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.playback-overlay__seek-knob {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--color-accent), 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transition: transform 0.1s, width 0.1s, height 0.1s;
+}
+
+.playback-overlay__seek-bar:hover .playback-overlay__seek-knob,
+.playback-overlay__seek-bar:active .playback-overlay__seek-knob {
+  width: 22px;
+  height: 22px;
+}
+
+/* Live indicator (no seekbar) */
+.playback-overlay__live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.playback-overlay__live-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-live);
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Stop button */
+.playback-overlay__stop-btn {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 44px;
+}
+
+.playback-overlay__stop-btn:hover,
+.playback-overlay__stop-btn:focus-visible {
+  background: rgba(235, 4, 0, 0.35);
+  border-color: var(--color-live);
+  outline: none;
+}
+
+/* Double-tap skip feedback */
+.playback-overlay__skip-feedback {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  animation: skip-fade 0.7s ease-out forwards;
+  z-index: 2;
+}
+
+.playback-overlay__skip-feedback--left {
+  left: 60px;
+}
+
+.playback-overlay__skip-feedback--right {
+  right: 60px;
+}
+
+@keyframes skip-fade {
+  0% { opacity: 1; transform: translateY(-50%); }
+  60% { opacity: 0.9; transform: translateY(calc(-50% - 12px)); }
+  100% { opacity: 0; transform: translateY(calc(-50% - 24px)); }
+}

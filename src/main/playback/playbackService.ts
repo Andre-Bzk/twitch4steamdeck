@@ -5,7 +5,7 @@ import path from 'node:path'
 import { spawnStreamlink, getStreamUrl, spawnMpv } from './streamlink'
 import { getMpvIpcPath, MpvController } from './mpvController'
 import { createTrimmedPlaylist, cleanupTrimmedPlaylist, type TrimResult } from './hlsTrimmer'
-import type { PlaybackEvent } from './types'
+import type { PlaybackEvent, PlaybackTimeUpdate } from './types'
 import * as history from '../store/historyRepo'
 
 const POSITION_WRITE_INTERVAL_MS = 5_000
@@ -137,7 +137,7 @@ export class PlaybackService extends EventEmitter {
       loadGeneration: 0,
       pendingLoadGeneration: null
     }
-    this.emit('playback-event', { kind: 'started', channelLogin } satisfies PlaybackEvent)
+    this.emit('playback-event', { kind: 'started', channelLogin, isLive: true } satisfies PlaybackEvent)
   }
 
   async startVod(
@@ -241,7 +241,7 @@ export class PlaybackService extends EventEmitter {
       loadGeneration: 0,
       pendingLoadGeneration: null
     }
-    this.emit('playback-event', { kind: 'started' } satisfies PlaybackEvent)
+    this.emit('playback-event', { kind: 'started', durationSeconds } satisfies PlaybackEvent)
 
     // IPC verbinden, initialen Resume-Seek erst nach `playback-restart` setzen und Position tracken.
     mpv.connect().then(() => {
@@ -268,15 +268,24 @@ export class PlaybackService extends EventEmitter {
 
       // Position-Tracking
       let lastWrite = 0
+      let lastTimeUpdateEmit = 0
       const writePosition = (seconds: number): void => {
         const now = Date.now()
-        if (now - lastWrite < POSITION_WRITE_INTERVAL_MS) return
         if (!this.current || this.current.mpv !== mpv) return
         if (this.isReloading(this.current)) return
 
-        lastWrite = now
         const absoluteSeconds = seconds + this.current.playbackOffsetSeconds
         this.current.lastKnownAbsolutePositionSeconds = absoluteSeconds
+
+        // ~1 Hz push to renderer for the player overlay seek bar
+        if (now - lastTimeUpdateEmit >= 1_000) {
+          lastTimeUpdateEmit = now
+          this.emit('playback-time-update', { positionSeconds: absoluteSeconds } satisfies PlaybackTimeUpdate)
+        }
+
+        // 5s throttle for SQLite history writes
+        if (now - lastWrite < POSITION_WRITE_INTERVAL_MS) return
+        lastWrite = now
         const pos = Math.floor(absoluteSeconds)
         history.updatePosition(vodId, pos)
         if (durationSeconds > 0 && pos / durationSeconds > 0.95) {
