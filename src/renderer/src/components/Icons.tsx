@@ -91,3 +91,34 @@ export function SettingsIcon(props: IconProps): JSX.Element {
     </svg>
   )
 }
+
+export function EyeIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+export function GamepadIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2" y="6" width="20" height="12" rx="4" />
+      <path d="M6 12h4" />
+      <path d="M8 10v4" />
+      <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="13" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function ClapperboardIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 11H20V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11z" />
+      <path d="M4 11V7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4" />
+      <path d="M4 9l4-3 4 3 4-3" />
+    </svg>
+  )
+}

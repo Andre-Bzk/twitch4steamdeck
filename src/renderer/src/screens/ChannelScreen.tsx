@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { PlaybackOverlay } from '../components/PlaybackOverlay'
 import { VideoPlayer, type VideoPlayerHandle } from '../components/VideoPlayer'
@@ -69,6 +69,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [shelfIndex, setShelfIndex] = useState(0)
   const [chapterPanelVod, setChapterPanelVod] = useState<VodInfo | null>(null)
   const [chapters, setChapters] = useState<VodChapter[]>([])
+  const [vodChaptersLoaded, setVodChaptersLoaded] = useState(false)
   const [chaptersLoading, setChaptersLoading] = useState(false)
   const [chapterIndex, setChapterIndex] = useState(0)
   const [wasPlayingBeforeChapters, setWasPlayingBeforeChapters] = useState(false)
@@ -80,6 +81,16 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [isLivePlayback, setIsLivePlayback] = useState(false)
   // HLS-Player state
   const [hlsPayload, setHlsPayload] = useState<HlsUrlPayload | null>(null)
+
+  // Derive active chapter name from chapters list + current playback position.
+  // Three states: loading → undefined (chip hidden), loaded+empty → 'Unbekannt', loaded+chapters → active chapter.
+  const currentChapterName = useMemo<string | undefined>(() => {
+    if (isLivePlayback) return undefined
+    if (!vodChaptersLoaded) return undefined
+    if (chapters.length === 0) return 'Unbekannt'
+    const active = [...chapters].reverse().find((ch) => ch.positionSeconds <= currentPosition)
+    return active?.gameName ?? 'Unbekannt'
+  }, [chapters, vodChaptersLoaded, currentPosition, isLivePlayback])
 
   const watchBtnRef = useRef<HTMLButtonElement>(null)
   const chapterListRef = useRef<HTMLUListElement>(null)
@@ -363,6 +374,10 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     setWasPlayingBeforeChapters(false)
     setCurrentVod(vod)
     setPendingChapterVod(null)
+    setVodChaptersLoaded(false)
+    void loadChapters(vod.id)
+      .then((loaded) => { setChapters(loaded); setVodChaptersLoaded(true) })
+      .catch(() => { setVodChaptersLoaded(true) })
     try {
       await window.t4sd.playback.startVod(
         vod.id,
@@ -403,6 +418,10 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     setWasPlayingBeforeChapters(false)
     setCurrentVod(vod)
     setPendingChapterVod(null)
+    setVodChaptersLoaded(false)
+    void loadChapters(vod.id)
+      .then((loaded) => { setChapters(loaded); setVodChaptersLoaded(true) })
+      .catch(() => { setVodChaptersLoaded(true) })
     try {
       await window.t4sd.playback.startVod(
         vod.id,
@@ -672,6 +691,9 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           channelName={channel.broadcasterName}
           channelAvatar={channel.profileImageUrl}
           title={isLivePlayback ? (channel.streamTitle ?? '') : (currentVod?.title ?? '')}
+          viewerCount={isLivePlayback ? (channel.viewerCount ?? undefined) : undefined}
+          viewCount={!isLivePlayback ? (currentVod?.viewCount ?? undefined) : undefined}
+          gameName={isLivePlayback ? (channel.gameName ?? undefined) : currentChapterName}
           onTogglePause={() => {
             if (playState === 'playing') {
               void window.t4sd.playback.pause()

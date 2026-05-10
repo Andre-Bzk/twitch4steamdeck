@@ -321,6 +321,8 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                   channelName={liveChannel?.broadcasterName ?? ''}
                   channelAvatar={liveChannel?.profileImageUrl ?? ''}
                   title={liveChannel?.streamTitle ?? ''}
+                  viewerCount={liveChannel?.viewerCount ?? undefined}
+                  gameName={liveChannel?.gameName ?? undefined}
                   onTogglePause={() => {
                     if (livePlayState === 'playing') {
                       liveVideoRef.current?.pause()

@@ -1809,6 +1809,42 @@ body,
   50% { opacity: 0.4; }
 }
 
+/* Meta-Info-Zeile (Live-Indikator + Chips) */
+.playback-overlay__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Info-Chip: Auge+Zahl / Gamepad+Name */
+.playback-overlay__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+/* VOD-Badge (analog zum LIVE-Badge, aber Twitch-Lila statt rot) */
+.playback-overlay__vod-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--color-accent);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
 /* Stop button */
 .playback-overlay__stop-btn {
   align-self: flex-end;

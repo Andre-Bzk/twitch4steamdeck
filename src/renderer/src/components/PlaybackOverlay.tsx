@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from './GamepadPrompt'
-import { PauseIcon, PlayIcon, StopIcon } from './Icons'
+import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, StopIcon } from './Icons'
 
 interface PlaybackOverlayProps {
   playState: 'playing' | 'paused'
@@ -10,10 +10,19 @@ interface PlaybackOverlayProps {
   channelName: string
   channelAvatar: string
   title: string
+  viewerCount?: number
+  viewCount?: number
+  gameName?: string
   onTogglePause: () => void
   onSeek: (seconds: number) => void
   onSeekTo: (seconds: number) => void
   onStop: () => void
+}
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
 }
 
 /** Formats seconds as HH:MM:SS */
@@ -36,6 +45,9 @@ export function PlaybackOverlay({
   channelName,
   channelAvatar,
   title,
+  viewerCount,
+  viewCount,
+  gameName,
   onTogglePause,
   onSeek,
   onSeekTo,
@@ -253,38 +265,72 @@ export function PlaybackOverlay({
         {/* Video title */}
         {title && <p className="playback-overlay__title">{title}</p>}
 
-        {/* Progress row */}
-        {!isLive && durationSeconds > 0 ? (
-          <div className="playback-overlay__progress-row">
-            <span className="playback-overlay__time">{fmt(displayPosition)}</span>
-
-            <div
-              ref={seekBarRef}
-              className="playback-overlay__seek-bar"
-              onPointerDown={onSeekBarPointerDown}
-              onPointerMove={onSeekBarPointerMove}
-              onPointerUp={onSeekBarPointerUp}
-              onPointerCancel={onSeekBarPointerUp}
-            >
-              <div className="playback-overlay__seek-track">
-                <div
-                  className="playback-overlay__seek-filled"
-                  style={{ width: `${progress * 100}%` }}
-                />
-                <div
-                  className="playback-overlay__seek-knob"
-                  style={{ left: `${progress * 100}%` }}
-                />
-              </div>
+        {/* Progress row / status row */}
+        {isLive ? (
+          <div className="playback-overlay__meta-row">
+            <div className="playback-overlay__live-indicator">
+              <span className="playback-overlay__live-dot" />
+              Live
             </div>
+            {viewerCount !== undefined && viewerCount > 0 && (
+              <span className="playback-overlay__meta-chip">
+                <EyeIcon width={14} height={14} />
+                {formatCount(viewerCount)}
+              </span>
+            )}
+            {gameName && (
+              <span className="playback-overlay__meta-chip">
+                <GamepadIcon width={14} height={14} />
+                {gameName}
+              </span>
+            )}
+          </div>
+        ) : durationSeconds > 0 ? (
+          <>
+            <div className="playback-overlay__meta-row">
+              <div className="playback-overlay__vod-badge">
+                <ClapperboardIcon width={13} height={13} />
+                VOD
+              </div>
+              {viewCount !== undefined && viewCount > 0 && (
+                <span className="playback-overlay__meta-chip">
+                  <EyeIcon width={14} height={14} />
+                  {formatCount(viewCount)}
+                </span>
+              )}
+              {gameName && (
+                <span className="playback-overlay__meta-chip">
+                  <GamepadIcon width={14} height={14} />
+                  {gameName}
+                </span>
+              )}
+            </div>
+            <div className="playback-overlay__progress-row">
+              <span className="playback-overlay__time">{fmt(displayPosition)}</span>
 
-            <span className="playback-overlay__time">{fmt(durationSeconds)}</span>
-          </div>
-        ) : isLive ? (
-          <div className="playback-overlay__live-indicator">
-            <span className="playback-overlay__live-dot" />
-            Live
-          </div>
+              <div
+                ref={seekBarRef}
+                className="playback-overlay__seek-bar"
+                onPointerDown={onSeekBarPointerDown}
+                onPointerMove={onSeekBarPointerMove}
+                onPointerUp={onSeekBarPointerUp}
+                onPointerCancel={onSeekBarPointerUp}
+              >
+                <div className="playback-overlay__seek-track">
+                  <div
+                    className="playback-overlay__seek-filled"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                  <div
+                    className="playback-overlay__seek-knob"
+                    style={{ left: `${progress * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <span className="playback-overlay__time">{fmt(durationSeconds)}</span>
+            </div>
+          </>
         ) : null}
 
         {/* Stop button */}
