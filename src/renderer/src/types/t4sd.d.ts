@@ -52,6 +52,14 @@ export interface PlaybackEvent {
   isLive?: boolean
 }
 
+export interface HlsUrlPayload {
+  url: string
+  isLive: boolean
+  startPosition: number
+  durationSeconds: number
+  vodId?: string
+}
+
 export interface VodInfo {
   id: string
   title: string
@@ -107,16 +115,10 @@ export interface T4sdApi {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
     startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number) => Promise<void>
     stop: () => Promise<void>
-    seek: (seconds: number) => Promise<void>
-    togglePause: () => Promise<void>
     pause: () => Promise<void>
-    resume: () => Promise<void>
-    seekTo: (seconds: number) => Promise<void>
-    getCurrentPosition: () => Promise<number | null>
-    setLoggingEnabled: (enabled: boolean) => Promise<void>
-    getLogPath: () => Promise<string>
+    reportPosition: (vodId: string, positionSeconds: number, durationSeconds: number) => Promise<void>
     onEvent: (cb: (event: PlaybackEvent) => void) => () => void
-    onTimeUpdate: (cb: (data: { positionSeconds: number }) => void) => () => void
+    onHlsUrl: (cb: (payload: HlsUrlPayload) => void) => () => void
   }
   gamepad: {
     onInput: (cb: (key: string) => void) => () => void

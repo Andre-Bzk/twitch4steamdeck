@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -16,38 +16,11 @@ function resolveStreamlinkBin(): string {
   return 'streamlink'
 }
 
-function resolveMpvBin(): string {
-  if (process.platform === 'win32') {
-    const candidates = [
-      join(process.env.ProgramFiles ?? '', 'MPV Player', 'mpv.exe'),
-      join(process.env.LOCALAPPDATA ?? '', 'Programs', 'mpv', 'mpv.exe'),
-      join(process.env.LOCALAPPDATA ?? '', 'Programs', 'mpv-player', 'mpv.exe')
-    ]
-    for (const p of candidates) {
-      if (existsSync(p)) return p
-    }
-  }
-  return 'mpv'
-}
-
 const STREAMLINK_BIN = resolveStreamlinkBin()
-const MPV_BIN = resolveMpvBin()
-
-/** Startet streamlink so dass es mpv als Player verwendet (für Live-Streams). */
-export function spawnStreamlink(url: string, quality: string): ChildProcess {
-  // --vo=gpu: Legacy-OpenGL-Renderer (gpu-next/libplacebo scheitert in Flatpak ohne Vulkan)
-  // --hwdec=auto: VAAPI-Fallback auf SW-Dekodierung wenn nötig
-  // --force-window=yes: Fenster auch bei vo-Init-Problemen erzwingen
-  return spawn(
-    STREAMLINK_BIN,
-    ['--player', MPV_BIN, '--player-args', '--fullscreen --vo=gpu --hwdec=auto --force-window=yes', url, quality],
-    { stdio: ['ignore', 'pipe', 'pipe'] }
-  )
-}
 
 /**
- * Fragt streamlink nach der direkten HLS-URL für einen VOD.
- * mpv kann diese URL dann nativ laden und darin seeked.
+ * Fragt streamlink nach der direkten HLS-URL für einen Stream oder VOD.
+ * Wird für Live-Streams (twitch.tv/<login>) und VODs (twitch.tv/videos/<id>) verwendet.
  */
 export function getStreamUrl(url: string, quality: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -58,31 +31,13 @@ export function getStreamUrl(url: string, quality: string): Promise<string> {
     proc.stdout?.on('data', (d: Buffer) => { out += d.toString() })
     proc.on('error', reject)
     proc.on('exit', (code) => {
-      const hlsUrl = out.trim()
+      // Nimm die letzte Zeile die mit https:// beginnt — ignoriert Info-/Warn-Zeilen
+      const hlsUrl = out.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('https://')).at(-1) ?? ''
       if (code === 0 && hlsUrl) {
         resolve(hlsUrl)
       } else {
-        reject(new Error(`streamlink --stream-url exit ${code}`))
+        reject(new Error(`streamlink --stream-url exit ${code}, stdout: ${out.trim().slice(0, 200)}`))
       }
     })
   })
-}
-
-export interface MpvOptions {
-  ipcPath: string
-  logPath?: string
-}
-
-/** Startet mpv direkt mit einer URL (HLS oder lokal). IPC-Socket wird gesetzt. */
-export function spawnMpv(url: string, { ipcPath, logPath }: MpvOptions): ChildProcess {
-  const args = [
-    url,
-    `--input-ipc-server=${ipcPath}`,
-    '--fullscreen',
-    '--msg-level=all=v'
-  ]
-  if (logPath) {
-    args.push(`--log-file=${logPath}`)
-  }
-  return spawn(MPV_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 }

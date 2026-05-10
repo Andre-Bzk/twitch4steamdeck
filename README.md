@@ -9,9 +9,10 @@ Ad-free Twitch client for the Steam Deck with Big-Screen UI, full gamepad contro
 
 ## Features
 
-- **Live Streams** — Ad-free playback via Streamlink + mpv
+- **Live Streams** — Ad-free playback via Streamlink + hls.js (HTML5 video, no external player)
 - **VOD Playback** — Watch recordings with automatic resume at last position
 - **VOD Chapters** — Browse and jump to chapters within VODs
+- **Direct Stream Start** — Press A on any stream card in Browse/Top Streams/Category to start immediately without leaving the browse view
 - **Gamepad Control** — Full control via Steam Deck controller or Xbox gamepad, including Gaming Mode (reads `/dev/input/js*` directly, bypasses Chromium sandbox limitations)
 - **Big-Screen UI** — 10-foot interface optimized for TV/deck; fills the screen on Steam Deck and on external TVs when docked (React + Electron)
 - **Twitch Login** — Device Code Flow with QR code (no browser required)
@@ -20,7 +21,7 @@ Ad-free Twitch client for the Steam Deck with Big-Screen UI, full gamepad contro
 - **Language-Filtered Streams** — Top streams filtered by German/English
 - **Account Screen** — User profile, app version, logout
 - **VOD History** — Local SQLite database with playback history and progress
-- **VAAPI Hardware Decoding** — GPU-accelerated video playback on Steam Deck
+- **Hardware Decoding** — GPU-accelerated video via Chromium's built-in VA-API on Steam Deck
 - **Quit Dialog** — Confirm quit via Xbox/Start button
 
 ## Architecture
@@ -29,13 +30,15 @@ Ad-free Twitch client for the Steam Deck with Big-Screen UI, full gamepad contro
 Electron (Main Process)
   ├── Auth          -- Twitch Device Code Flow + token management (Electron safeStorage)
   ├── Helix Client  -- Twitch API (followed channels, streams, VODs, categories, chapters via GQL)
-  ├── Playback      -- Streamlink (Live) / mpv (VODs) with IPC control
+  ├── Playback      -- Streamlink --stream-url → HLS URL → IPC event to renderer
   ├── Gamepad       -- Linux joystick API (/dev/input/js*)
   └── History       -- SQLite (better-sqlite3) for VOD history + resume
 
 Electron (Renderer)
-  └── React UI      -- Screens: Login, Following, Browse, Category, Channel,
-                       StreamList (DE/EN), Settings, Account
+  ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
+  │                    StreamList (DE/EN), Settings, Account
+  ├── VideoPlayer   -- hls.js <video> wrapper (forwardRef, imperative handle)
+  └── AppShell      -- Global playback overlay for direct stream start
 ```
 
 ## Installation (Steam Deck)
@@ -45,7 +48,7 @@ flatpak install --user twitch4steamdeck.flatpak
 flatpak run tv.twitch4steamdeck.App
 ```
 
-Finished Flatpak bundles include everything (incl. mpv, Streamlink, and Twitch integration) — no further setup required.
+Finished Flatpak bundles include everything (incl. Streamlink and Twitch integration) — no further setup required.
 
 ---
 
@@ -55,6 +58,7 @@ Finished Flatpak bundles include everything (incl. mpv, Streamlink, and Twitch i
 
 - [Node.js](https://nodejs.org/) >= 20
 - npm
+- Windows: Streamlink installed at `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
 - For Flatpak build: WSL2 (Ubuntu) with `flatpak`, `flatpak-builder`, `librsvg2-bin`
 
 ### Setup
@@ -91,7 +95,7 @@ Finished Flatpak bundles include everything (incl. mpv, Streamlink, and Twitch i
 npm run dev
 ```
 
-Starts Electron with Hot-Reload (electron-vite).
+Starts Electron with Hot-Reload (electron-vite). Open DevTools with `Ctrl+Shift+I`.
 
 ## Build
 
@@ -112,7 +116,7 @@ The Flatpak build must run in WSL2 on the Linux filesystem (not under `/mnt/`):
 cp -rp /mnt/c/Projekte/twitch4steamdeck ~/twitch4steamdeck
 cd ~/twitch4steamdeck
 
-# Run full build (incl. mpv, streamlink, Electron)
+# Run full build (incl. streamlink, Electron)
 bash flatpak/build-flatpak.sh
 ```
 
@@ -121,20 +125,26 @@ The script handles automatically:
 2. npm install + rebuild native modules (better-sqlite3 for Linux x64)
 3. electron-vite build
 4. Generate Streamlink Python deps
-5. Run flatpak-builder (builds mpv 0.41.0, libass, libplacebo, Lua 5.2)
+5. Run flatpak-builder
 6. Create Flatpak bundle and transfer via SCP to Steam Deck
 
 ## Gamepad Layout
 
-| Button | Function |
-|--------|----------|
-| A | Confirm / Select / Play-Pause |
-| B | Back |
-| D-Pad / Left Stick | Navigation |
-| LB / RB | Switch tabs |
-| L2 | Rewind (VODs) |
-| R2 | Fast forward (VODs) |
-| Xbox / Start | Quit dialog |
+| Button | Context | Function |
+|--------|---------|----------|
+| A | Browse / Top Streams / Category | Start stream directly (full-screen overlay) |
+| X | Browse / Top Streams / Category | Open channel page |
+| A | Following | Open channel page |
+| A | Channel page | Play live stream / confirm |
+| A | During playback | Pause / Resume |
+| B | During playback | Stop |
+| ← / → (D-Pad) | During playback | Seek ±30s |
+| LT / RT | During playback (VOD) | Seek ±5min |
+| LB / RB | During playback (VOD) | Previous / next chapter |
+| B | Navigation | Back |
+| D-Pad / Left Stick | Navigation | Navigate |
+| LB / RB | Navigation | Switch tabs |
+| Xbox / Start | Navigation | Quit dialog |
 
 ## Security
 
@@ -148,12 +158,12 @@ The script handles automatically:
 |-----------|------------|
 | Framework | Electron 33 + electron-vite |
 | UI | React 18 + TypeScript |
-| Video (Live) | Streamlink + mpv |
-| Video (VOD) | mpv (direct, IPC-controlled) |
+| Video | hls.js 1.6 (HTML5 `<video>` in Renderer) |
+| Stream URL | Streamlink 8.2.1 (Windows dev) / 6.11.0 (Flatpak) via `--stream-url` |
 | Database | better-sqlite3 |
 | Gamepad | Linux joystick API (`/dev/input/js*`) |
 | Packaging | Flatpak / electron-builder (AppImage) |
-| HW Decoding | VAAPI (via mpv + ffmpeg-full extension) |
+| HW Decoding | Chromium VA-API (automatic on Steam Deck) |
 
 ## License
 
@@ -166,9 +176,10 @@ Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-
 
 ## Features
 
-- **Live-Streams** — Werbefreie Wiedergabe ueber Streamlink + mpv
+- **Live-Streams** — Werbefreie Wiedergabe ueber Streamlink + hls.js (HTML5-Video, kein externer Player)
 - **VOD-Wiedergabe** — Aufnahmen ansehen mit automatischem Resume an der letzten Position
 - **VOD-Kapitel** — Kapitel in VODs durchsuchen und direkt anspringen
+- **Direkter Stream-Start** — A-Button auf einer Stream-Karte in Durchsuchen/Top-Streams/Kategorie startet den Stream sofort als Vollbild-Overlay, ohne die Browse-Ansicht zu verlassen
 - **Gamepad-Steuerung** — Volle Bedienung per Steam Deck Controller oder Xbox-Gamepad, auch im Gaming Mode (liest `/dev/input/js*` direkt, umgeht Chromium-Sandbox-Limitierungen)
 - **Big-Screen-UI** — 10-Foot-Interface optimiert fuer TV/Deck; bildschirmfuellend auf dem Steam Deck und auf externen TVs im Docking-Betrieb (React + Electron)
 - **Twitch-Login** — Device Code Flow mit QR-Code (kein Browser noetig)
@@ -177,7 +188,7 @@ Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-
 - **Sprachgefilterte Streams** — Top-Streams gefiltert nach Deutsch/Englisch
 - **Account-Ansicht** — Nutzerprofil, App-Version, Abmelden
 - **VOD-Verlauf** — Lokale SQLite-Datenbank mit Wiedergabe-Historie und Fortschritt
-- **VAAPI Hardware-Decoding** — GPU-beschleunigte Videowiedergabe auf dem Steam Deck
+- **Hardware-Decoding** — GPU-beschleunigte Videowiedergabe ueber Chromiums eingebaute VA-API auf dem Steam Deck
 - **Quit-Dialog** — Beenden per Xbox/Start-Button bestaetigen
 
 ## Architektur
@@ -186,13 +197,15 @@ Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-
 Electron (Main Process)
   ├── Auth          -- Twitch Device Code Flow + Token-Verwaltung (Electron safeStorage)
   ├── Helix Client  -- Twitch API (gefolgte Kanaele, Streams, VODs, Kategorien, Kapitel via GQL)
-  ├── Playback      -- Streamlink (Live) / mpv (VODs) mit IPC-Steuerung
+  ├── Playback      -- Streamlink --stream-url → HLS-URL → IPC-Event an Renderer
   ├── Gamepad       -- Linux joystick API (/dev/input/js*)
   └── History       -- SQLite (better-sqlite3) fuer VOD-Verlauf + Resume
 
 Electron (Renderer)
-  └── React UI      -- Screens: Login, Following, Browse, Category, Channel,
-                       StreamList (DE/EN), Settings, Account
+  ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
+  │                    StreamList (DE/EN), Settings, Account
+  ├── VideoPlayer   -- hls.js <video> Wrapper (forwardRef, imperative handle)
+  └── AppShell      -- Globaler Playback-Overlay fuer Direkt-Stream-Start
 ```
 
 ## Installation (Steam Deck)
@@ -202,7 +215,7 @@ flatpak install --user twitch4steamdeck.flatpak
 flatpak run tv.twitch4steamdeck.App
 ```
 
-Fertige Flatpak-Bundles enthalten alles (inkl. mpv, Streamlink und Twitch-Anbindung) -- keine weitere Einrichtung noetig.
+Fertige Flatpak-Bundles enthalten alles (inkl. Streamlink und Twitch-Anbindung) -- keine weitere Einrichtung noetig.
 
 ---
 
@@ -212,6 +225,7 @@ Fertige Flatpak-Bundles enthalten alles (inkl. mpv, Streamlink und Twitch-Anbind
 
 - [Node.js](https://nodejs.org/) >= 20
 - npm
+- Windows: Streamlink unter `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
 - Fuer Flatpak-Build: WSL2 (Ubuntu) mit `flatpak`, `flatpak-builder`, `librsvg2-bin`
 
 ### Einrichtung
@@ -248,7 +262,7 @@ Fertige Flatpak-Bundles enthalten alles (inkl. mpv, Streamlink und Twitch-Anbind
 npm run dev
 ```
 
-Startet Electron mit Hot-Reload (electron-vite).
+Startet Electron mit Hot-Reload (electron-vite). DevTools oeffnen mit `Ctrl+Shift+I`.
 
 ## Build
 
@@ -269,7 +283,7 @@ Der Flatpak-Build muss in WSL2 auf dem Linux-Dateisystem ausgefuehrt werden (nic
 cp -rp /mnt/c/Projekte/twitch4steamdeck ~/twitch4steamdeck
 cd ~/twitch4steamdeck
 
-# Kompletten Build ausfuehren (inkl. mpv, streamlink, Electron)
+# Kompletten Build ausfuehren (inkl. Streamlink, Electron)
 bash flatpak/build-flatpak.sh
 ```
 
@@ -278,20 +292,26 @@ Das Script erledigt automatisch:
 2. npm install + native Module rebuilden (better-sqlite3 fuer Linux x64)
 3. electron-vite Build
 4. Streamlink Python-Deps generieren
-5. flatpak-builder ausfuehren (baut mpv 0.41.0, libass, libplacebo, Lua 5.2 mit)
+5. flatpak-builder ausfuehren
 6. Flatpak-Bundle erstellen und per SCP aufs Steam Deck uebertragen
 
 ## Gamepad-Belegung
 
-| Taste | Funktion |
-|-------|----------|
-| A | Bestaetigen / Auswaehlen / Play-Pause |
-| B | Zurueck |
-| D-Pad / Left Stick | Navigation |
-| LB / RB | Tab wechseln |
-| L2 | Zurueckspulen (VODs) |
-| R2 | Vorspulen (VODs) |
-| Xbox / Start | Quit-Dialog |
+| Taste | Kontext | Funktion |
+|-------|---------|----------|
+| A | Durchsuchen / Top-Streams / Kategorie | Stream direkt starten (Vollbild-Overlay) |
+| X | Durchsuchen / Top-Streams / Kategorie | Kanalseite oeffnen |
+| A | Du folgst | Kanalseite oeffnen |
+| A | Kanalseite | Live-Stream starten / Bestaetigen |
+| A | Waehrend Wiedergabe | Pause / Fortsetzen |
+| B | Waehrend Wiedergabe | Stop |
+| ← / → (D-Pad) | Waehrend Wiedergabe | ±30s springen |
+| LT / RT | Waehrend Wiedergabe (VOD) | ±5min springen |
+| LB / RB | Waehrend Wiedergabe (VOD) | Vorheriges / naechstes Kapitel |
+| B | Navigation | Zurueck |
+| D-Pad / Left Stick | Navigation | Navigieren |
+| LB / RB | Navigation | Tab wechseln |
+| Xbox / Start | Navigation | Quit-Dialog |
 
 ## Sicherheit
 
@@ -305,11 +325,11 @@ Das Script erledigt automatisch:
 |-----------|-------------|
 | Framework | Electron 33 + electron-vite |
 | UI | React 18 + TypeScript |
-| Video (Live) | Streamlink + mpv |
-| Video (VOD) | mpv (direkt, IPC-gesteuert) |
+| Video | hls.js 1.6 (HTML5 `<video>` im Renderer) |
+| Stream-URL | Streamlink 8.2.1 (Windows-Dev) / 6.11.0 (Flatpak) via `--stream-url` |
 | Datenbank | better-sqlite3 |
 | Gamepad | Linux joystick API (`/dev/input/js*`) |
 | Packaging | Flatpak / electron-builder (AppImage) |
-| HW-Decoding | VAAPI (via mpv + ffmpeg-full Extension) |
+| HW-Decoding | Chromium VA-API (automatisch auf Steam Deck) |
 
 ## Lizenz

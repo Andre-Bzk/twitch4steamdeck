@@ -9,7 +9,7 @@ Ad-freier Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierb
 | Schicht | Technologie |
 |---|---|
 | Framework | Electron 33, electron-vite, React 18, TypeScript 5.5 |
-| Playback | mpv 0.41.0 (direkt gespawnt), Streamlink 6.11.0 im Flatpak-Build / 8.2.1 im aktuellen Windows-Dev-Setup |
+| Playback | hls.js 1.6 (HTML5 `<video>` im Renderer), Streamlink 6.11.0 im Flatpak-Build / 8.2.1 im Windows-Dev (nur für `--stream-url`) |
 | DB | better-sqlite3 (VOD-Verlauf + Resume-Positionen) |
 | Packaging | Flatpak (freedesktop SDK 24.08, Electron2 BaseApp) |
 | Build-Host | Windows, Flatpak-Build läuft in WSL2 |
@@ -24,9 +24,7 @@ Electron Main Process
 ├── AuthService          — Twitch Device Code Flow, Token-Verwaltung (safeStorage)
 ├── HelixClient          — Twitch Helix REST API + GQL (Kapitel)
 ├── PlaybackService      — Live-/VOD-Orchestrierung
-│   ├── streamlink.ts    — Prozess-Spawning (Streamlink + mpv)
-│   ├── MpvController    — mpv JSON-IPC (Unix-Socket / Named Pipe)
-│   └── hlsTrimmer.ts    — Lokale HLS-Snapshots für Live-VODs + fMP4-Seek-Workaround
+│   └── streamlink.ts    — getStreamUrl() via streamlink --stream-url
 ├── historyRepo          — SQLite VOD-Verlauf (Resume, Completed)
 └── gamepadReader        — Linux /dev/input/js* Joystick-Leser
 
@@ -35,9 +33,12 @@ Preload (contextBridge)
 
 Renderer (React)
 ├── App.tsx              — Auth-Gate: LoginScreen | AppShell
-├── AppShell.tsx         — Tab-Routing, Sidebar/Main-Fokus
+├── AppShell.tsx         — Tab-Routing, Sidebar/Main-Fokus, Globaler Playback-Overlay
 ├── screens/             — FollowingScreen, BrowseScreen, CategoryScreen,
 │                          ChannelScreen (Hauptscreen), StreamListScreen, Settings, Account
+├── components/
+│   ├── VideoPlayer.tsx  — hls.js <video> Wrapper (forwardRef, imperative handle)
+│   └── PlaybackOverlay.tsx — DOM-Overlay über dem Video (z-index: 300)
 ├── input/gamepad.ts     — Browser Gamepad API (Windows, Dev-Mode)
 └── context/SettingsContext.tsx — localStorage-Settings (streamBadgeMode, sidebarWidth, …)
 ```
@@ -46,8 +47,12 @@ Renderer (React)
 
 - **Auth:** LoginScreen → IPC → AuthService → Device Code Flow → Token (safeStorage)
 - **Browsing:** Screen → IPC → HelixClient → Twitch Helix API → Screen
-- **Live-Playback:** ChannelScreen → IPC → PlaybackService → `spawnStreamlink()` (startet mpv intern)
-- **VOD-Playback:** ChannelScreen → IPC → PlaybackService → `getStreamUrl()` → Playlist-Inspektion (`fMP4`, `EVENT`, `ENDLIST`) → optional lokaler Snapshot (`hlsTrimmer.ts`) → `spawnMpv()` + MpvController-IPC
+- **Live-Playback (via ChannelScreen):** ChannelScreen → IPC `playback:start-live` → PlaybackService → `streamlink --stream-url twitch.tv/<login>` → HLS-URL → IPC-Event `playback:hls-url` → Renderer → `VideoPlayer` (hls.js)
+- **Live-Playback (Direkt-Start):** BrowseScreen/StreamListScreen/CategoryScreen → A-Button → `window.t4sd.playback.startLive()` → PlaybackService → HLS-URL → IPC-Event `playback:hls-url` → AppShell-Globaler-Overlay → `VideoPlayer` (hls.js) — **kein ChannelScreen-Routing**
+- **VOD-Playback:** ChannelScreen → IPC `playback:start-vod` → PlaybackService → `streamlink --stream-url twitch.tv/videos/<id>` → HLS-URL → IPC-Event `playback:hls-url` → Renderer → `VideoPlayer` (hls.js, seekTo startPosition)
+- **Overlay:** `PlaybackOverlay` (z-index: 300) liegt als normales DOM-Element über `VideoPlayer` (z-index: 100) — kein Fenster-Layering nötig
+- **Seek/Pause/Stop:** direkt über `videoRef.current` (kein IPC-Roundtrip)
+- **Position-Tracking:** `VideoPlayer` meldet alle 5s via IPC `playback:report-position` → Main → SQLite
 - **Gamepad:** `/dev/input/js*` (Linux/Gaming-Mode) **oder** `navigator.getGamepads()` (Windows/Dev) → synthetische `KeyboardEvent`s → alle Screen-Handler reagieren auf Keys
 
 ---
@@ -57,7 +62,7 @@ Renderer (React)
 ### Voraussetzungen
 - Node.js, npm
 - `.env` mit `MAIN_VITE_TWITCH_CLIENT_ID=<deine-client-id>` (Twitch Application, Public, Device Code Flow)
-- Windows: mpv unter `C:\Program Files\MPV Player\mpv.exe`, Streamlink unter `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
+- Windows: Streamlink unter `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
 
 ### Build-Befehle
 
@@ -74,7 +79,9 @@ Muss aus dem WSL2-Dateisystem (NICHT `/mnt/`) laufen:
 ```bash
 bash flatpak/build-flatpak.sh
 ```
-Das Skript: prüft deps → npm-Build → Python-Deps generieren → mpv/Streamlink-Tarballs hashen → `flatpak-builder` → SCP zum Steam Deck.
+Das Skript: prüft deps → npm-Build → Python-Deps generieren → Streamlink-Tarballs hashen → `flatpak-builder` → SCP zum Steam Deck.
+
+> **Hinweis:** Das Flatpak-Manifest (`flatpak/tv.twitch4steamdeck.App.yml`) enthält noch mpv als Dependency — muss bereinigt werden, sobald der hls.js-Ansatz auf dem Steam Deck getestet und bestätigt ist.
 
 ---
 
@@ -82,7 +89,7 @@ Das Skript: prüft deps → npm-Build → Python-Deps generieren → mpv/Streaml
 
 ```
 src/main/
-  index.ts                    — Electron-Einstiegspunkt, Service-Wiring, Window (Linux: maximiert auf Primärdisplay; Windows: 1280x800)
+  index.ts                    — Electron-Einstiegspunkt, Service-Wiring, Window (Linux: maximiert auf Primärdisplay; Windows: 1280x800), CORS-Handler für Twitch CDN
   env.d.ts                    — Typ für MAIN_VITE_TWITCH_CLIENT_ID
   auth/
     authService.ts            — Auth-Lifecycle, Token-Refresh, Event-Emitter
@@ -91,13 +98,11 @@ src/main/
   input/
     gamepadReader.ts          — /dev/input/js* Leser, Hotplug (3s-Scan), Deduplizierung (40ms)
   ipc/
-    handlers.ts               — Alle ipcMain.handle()-Registrierungen
+    handlers.ts               — Alle ipcMain.handle()-Registrierungen + Event-Forwarding
   playback/
-    playbackService.ts        — Zentraler Orchestrator (startLive, startVod, seek, stop)
-    mpvController.ts          — mpv JSON-IPC-Client (Socket-Verbindung, Property-Observer)
-    streamlink.ts             — Streamlink/mpv Prozess-Spawning, Pfad-Auflösung
-    hlsTrimmer.ts             — HLS-Playlist-Parser, lokaler HTTP-Server für Snapshot-/Trim-Playlists
-    types.ts                  — Quality-Typ, PlaybackEvent
+    playbackService.ts        — Orchestrator: streamlink --stream-url → HLS-URL → playback-hls-url Event
+    streamlink.ts             — getStreamUrl() via streamlink --stream-url (Prozess-Spawning, URL-Extraktion: letzte https://-Zeile)
+    types.ts                  — Quality-Typ, PlaybackEvent, HlsUrlPayload
   store/
     db.ts                     — SQLite-Init, WAL-Modus, Migration (vod_history-Tabelle)
     historyRepo.ts            — upsertVod, updatePosition, markCompleted, getProgressMap
@@ -108,26 +113,31 @@ src/main/
 src/preload/
   index.ts                    — contextBridge: window.t4sd (auth, twitch, history, playback, gamepad)
 
+src/renderer/
+  index.html                  — CSP: default-src 'self'; media-src 'self' blob: (blob: nötig für hls.js MediaSource)
+
 src/renderer/src/
   App.tsx                     — Auth-Gate, Gamepad-Init
   main.tsx                    — React-DOM-Bootstrap, SettingsProvider
   screens/
-    AppShell.tsx              — Tab-Routing, Sidebar/Main-Fokus-Split
+    AppShell.tsx              — Tab-Routing, Sidebar/Main-Fokus-Split, Globaler Playback-Overlay (direkter Stream-Start ohne ChannelScreen)
     LoginScreen.tsx           — Device-Code-Login, QR-Code, Countdown
     FollowingScreen.tsx       — Gefolgte Kanäle (Grid), Live/Offline-Sort
-    BrowseScreen.tsx          — Top-Streams-Shelf + Kategorien-Grid (Infinite Scroll)
-    CategoryScreen.tsx        — Streams einer Kategorie
-    ChannelScreen.tsx         — Channel-Detail, VOD-Shelf, Playback-Controls, Kapitel-Panel
-    StreamListScreen.tsx      — Sprachgefilterte Stream-Liste (DE/EN-Tabs)
-    SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap, mpvLogging
+    BrowseScreen.tsx          — Top-Streams-Shelf (A=Direkt-Play, X=Kanalseite) + Kategorien-Grid (Infinite Scroll)
+    CategoryScreen.tsx        — Streams einer Kategorie (A=Direkt-Play, X=Kanalseite)
+    ChannelScreen.tsx         — Channel-Detail, VOD-Shelf, VideoPlayer + PlaybackOverlay, Kapitel-Panel
+    StreamListScreen.tsx      — Sprachgefilterte Stream-Liste DE/EN (A=Direkt-Play, X=Kanalseite)
+    SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap
     AccountScreen.tsx         — Nutzerinfo, Logout
   components/
+    VideoPlayer.tsx           — hls.js <video> Wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia vor loadSource; play() in MANIFEST_PARSED
+    PlaybackOverlay.tsx       — DOM-Overlay (Seek-Bar, Kanalinfo, Gamepad-Hints, Auto-Hide); playState: 'playing'|'paused'
     FocusableCard.tsx         — Wiederverwendbare Kanal-Karte (Thumbnail, Badge, Progress)
     Sidebar.tsx               — Navigationssidebar (6 Tabs)
     LanguageBadge.tsx         — Sprach-/Flagge-Badge
     Icons.tsx                 — SVG-Icons
   context/
-    SettingsContext.tsx        — localStorage-Settings, CSS-Custom-Properties-Sync
+    SettingsContext.tsx        — localStorage-Settings (streamBadgeMode, sidebarWidth, badgeGap), CSS-Custom-Properties-Sync
   input/
     gamepad.ts                — Browser Gamepad API, rAF-Poll, Achsen-Debounce
   lib/
@@ -137,12 +147,15 @@ src/renderer/src/
   types/
     t4sd.d.ts                 — window.t4sd-Typ-Deklaration
 
+scripts/
+  test-playback-pipeline.mjs  — Standalone-Test: streamlink → HLS-URL → Manifest → Segment (node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>)
+
 flatpak/
-  tv.twitch4steamdeck.App.yml — Flatpak-Manifest (mpv, Streamlink, alle Native-Deps)
+  tv.twitch4steamdeck.App.yml — Flatpak-Manifest (Streamlink, alle Native-Deps; mpv-Einträge noch zu bereinigen)
   build-flatpak.sh            — 6-Schritt Build-Pipeline (WSL2)
   twitch4steamdeck.sh         — Launcher mit zypak-wrapper
   tv.twitch4steamdeck.App.desktop
-  patches/mpv-ffmpeg7-avio-const.patch
+  patches/mpv-ffmpeg7-avio-const.patch  — (obsolet nach mpv-Entfernung)
 ```
 
 ---
@@ -155,43 +168,65 @@ Alle Renderer→Main-Calls gehen über `window.t4sd.*` (definiert in `src/preloa
 2. Bridge-Methode in `src/preload/index.ts`
 3. Typ-Deklaration in `src/renderer/src/types/t4sd.d.ts`
 
+### Zwei Playback-Kontexte
+
+**1. ChannelScreen-Playback** (Live + VOD, X-Button oder „Du folgst"):
+- Nutzer navigiert zur ChannelScreen → drückt „▶ Live ansehen" oder wählt einen VOD
+- ChannelScreen hält eigenen `hlsPayload`-State, eigenen `videoRef`, eigene PlaybackOverlay
+- VOD-Features: Resume, Kapitel-Panel, Position-Tracking
+
+**2. Globaler AppShell-Overlay** (Direkt-Start, A-Button in BrowseScreen/StreamListScreen/CategoryScreen):
+- Nutzer drückt A auf einer Stream-Karte → `onStartLive(ch)` → AppShell ruft `startLive()` direkt auf
+- AppShell hält `liveChannel`, `liveHlsPayload`, `livePlayState`, `liveVideoRef`
+- `isGlobalPlaybackInitiated` Ref verhindert, dass ChannelScreen-IPC-Events den globalen Overlay aktivieren
+- Während Playback: `hasFocus={false}` für alle Browse-Screens → keine Tastenkonflikte
+- AppShell-eigener Keydown-Handler: Escape=Stop, Enter=Pause, Pfeile=Seek
+- Nur Live-Streams (kein VOD, kein Resume, kein Position-Tracking)
+
+### Playback-Architektur (hls.js im Renderer)
+Video läuft als HTML5 `<video>` Element innerhalb des Electron-Fensters — **kein externer mpv-Prozess**.
+
+**VideoPlayer-Initialisierung (kritisch):**
+1. `hls.attachMedia(video)` — zuerst Media-Kontext aufbauen
+2. Im `MEDIA_ATTACHED`-Event: `hls.loadSource(hlsUrl)` — dann erst Source laden
+3. Im `MANIFEST_PARSED`-Event: `video.play()` — jetzt ist MediaSource bereit
+- **Reihenfolge wichtig:** `loadSource` vor `attachMedia` → MANIFEST_PARSED feuert bevor MSE bereit → `play()` wirft `NotSupportedError: The element has no supported sources`
+- **CSP:** `media-src 'self' blob:` in `src/renderer/index.html` — hls.js braucht `blob:` für MediaSource
+
+**Imperative Handle** — ChannelScreen / AppShell halten `videoRef = useRef<VideoPlayerHandle>()`:
+- `videoRef.current.seek(delta)` — relativer Seek (Sekunden)
+- `videoRef.current.seekTo(abs)` — absoluter Seek
+- `videoRef.current.pause()` / `.play()` / `.togglePause()`
+- `videoRef.current.stop()` — zerstört hls.js-Instanz, leert `<video>`
+- `videoRef.current.getCurrentTime()` — aktuell abgespielte Position (synchron)
+
+**Warum dieser Ansatz:** Früherer Ansatz mit externem mpv-Fullscreen-Fenster wurde vom OS-Windowmanager (Gamescope auf Steam Deck) immer über das Electron-Fenster gelegt. CSS `z-index` wirkt nur innerhalb eines Dokuments, nicht auf OS-Fensterebene. Die Lösung: Video und Overlay im selben Rendering-Kontext halten.
+
+### Kapitel-Panel during Playback
+Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), wird das Video **pausiert** (nicht gestoppt). Nach Kapitelwahl: `seekTo(chapter.positionSeconds)` + `play()`. Nach Schließen ohne Auswahl: `play()` (falls vorher playing).
+
 ### Gamepad Dual-Path
 - **Linux/Gaming-Mode:** `src/main/input/gamepadReader.ts` liest `/dev/input/js*` direkt (Chromium Gamepad API funktioniert nicht im Flatpak-Sandbox ohne udev)
 - **Windows/Dev:** `src/renderer/src/input/gamepad.ts` nutzt `navigator.getGamepads()` via rAF-Loop
 - Beide Pfade erzeugen synthetische `KeyboardEvent('keydown')`. Alle UI-Komponenten reagieren nur auf Key-Events — kein Gamepad-Code in Screens.
 - Button-Mapping: A=Enter, B=Escape, X=x, Y=y, LB=l1, RB=r1, LT=l2, RT=r2, DPad=Arrows
 
-### Live-VOD- und fMP4-Snapshot-Logik
-`PlaybackService` unterscheidet vor dem VOD-Start zwischen abgeschlossenen VODs und laufenden Live-VODs:
-- `inspectVodPlaylist()` prüft das HLS-Manifest auf `#EXT-X-MAP`, `#EXT-X-PLAYLIST-TYPE` und `#EXT-X-ENDLIST`
-- **Laufende Live-VODs** kommen von Twitch oft als offene `EVENT`-/DVR-Playlist zurück; diese würde mpv sonst wie einen Live-Stream behandeln und am Live-Rand starten
-- **fMP4-VODs** sind zusätzlich für HLS-Seeks im FFmpeg/mpv-Demuxer unzuverlässig
-
-Workaround in `src/main/playback/hlsTrimmer.ts`:
-- erzeugt aus der aktuellen Twitch-Playlist einen lokalen statischen Snapshot ab Zielsegment
-- setzt immer `#EXT-X-PLAYLIST-TYPE:VOD`
-- setzt immer `#EXT-X-ENDLIST`
-- serviert die Playlist via lokalem HTTP-Server (zufälliger Port auf `127.0.0.1`)
-- mpv lädt neue Snapshots via `loadfile replace`
-
-Wichtig:
-- Warum HTTP statt `file://`: FFmpeg's Protokoll-Whitelist blockiert HTTPS-Subrequests von file://-HLS-Playlists
-- `streamlink --stream-url` liefert bei laufenden VODs nur die rohe Twitch-DVR-URL; erst der lokale Snapshot macht daraus ein statisches VOD
-- `PlaybackService` hält eine **absolute VOD-Zeitachse** über `playbackOffsetSeconds` + `lastKnownAbsolutePositionSeconds`, damit Kapitelwahl, Resume und Folge-Seeks nicht auf die lokale Zeit des Snapshots driften
-- Reload-Races werden über `seekGeneration` / `loadGeneration` abgefedert, damit alte `time-pos`-Events keine falschen Offsets in die History schreiben
-
-### mpv JSON-IPC
-`src/main/playback/mpvController.ts` kommuniziert via Unix-Socket (`/tmp/twitch4sd-mpv.sock`) oder Windows Named Pipe (`\\.\pipe\twitch4sd-mpv`). Wichtig:
-- Verbindung wird mit 12 Retries × 250ms hergestellt (mpv braucht Zeit zum Starten)
-- `observeTimePos()` abonniert `time-pos`-Events; falls in 10s kein Event kommt → Fallback auf `pollTimePos()` (Intervall-Polling)
-- `playback-restart` markiert nach `loadfile` den aktiven Reload als abgeschlossen; bei klassischen TS-VODs triggert es außerdem den initialen Resume-Seek
+### A-Button-Verhalten je Screen
+| Screen | A-Button | X-Button |
+|---|---|---|
+| FollowingScreen | Kanalseite öffnen | — |
+| BrowseScreen (Shelf) | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
+| StreamListScreen | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
+| CategoryScreen | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
+| ChannelScreen | Live-Stream starten / Bestätigen | — |
 
 ### VOD vs. Live Playback
-- **Live:** `streamlink --player mpv --player-args '...'` — Streamlink managed mpv intern. Kein IPC nötig (kein Seeking bei Live).
-- **VOD:** `streamlink --stream-url` liefert eine HLS-URL → mpv wird **direkt** mit `--input-ipc-server` gespawnt. Ermöglicht Seeking + Position-Tracking.
-- **Laufendes Live-VOD:** Die von Streamlink gelieferte URL ist oft eine offene `index-dvr.m3u8` (`EVENT`, ohne `ENDLIST`). Diese darf nicht direkt an mpv gehen, sondern wird zuerst lokal als Snapshot eingefroren.
-- **Geschlossenes fMP4-VOD:** Seeks laufen ueber Snapshot-Reload statt mpv-internem HLS-Seek.
-- Reason: Piped Streams (streamlink mit stdout) sind nicht seekable.
+- **Live:** `streamlink --stream-url twitch.tv/<login> best` → HLS-URL → hls.js spielt Live-Playlist nativ
+- **VOD:** `streamlink --stream-url twitch.tv/videos/<id> best` → HLS-URL → hls.js seeked zu `startPosition` via `video.currentTime`
+- **Resume:** `history.getPosition(vodId)` im Main-Prozess → als `startPosition` im `playback:hls-url` Event → `VideoPlayer` seeked nach MANIFEST_PARSED
+
+### Position-Tracking
+`VideoPlayer` meldet alle 5s via `window.t4sd.playback.reportPosition(vodId, currentTime, durationSeconds)` → Main → `historyRepo.updatePosition()` + `markCompleted()` (bei >95% Fortschritt). Nur für VODs (nicht Live).
 
 ### Twitch API
 - Helix REST API für alle Standard-Daten: `https://api.twitch.tv/helix`
@@ -200,7 +235,7 @@ Wichtig:
 - `getTopGames()` macht 40 parallele `/streams?game_id=<id>&first=100` Calls zur Zuschauerzahl-Schätzung
 
 ### Settings-Persistenz
-- UI-Settings (Badge-Mode, Sidebar-Breite, etc.) → `localStorage` unter Key `t4sd:settings` (kein IPC, kein Flicker beim Start)
+- UI-Settings (Badge-Mode, Sidebar-Breite, Badge-Gap) → `localStorage` unter Key `t4sd:settings` (kein IPC, kein Flicker beim Start)
 - VOD-Verlauf + Resume → SQLite `history.db` in `userData/`
 - Twitch-Tokens → Electron `safeStorage` (OS-Keystore), Datei: `userData/twitch-tokens.bin`
 
@@ -210,13 +245,14 @@ Wichtig:
 
 | Problem | Status | Details |
 |---|---|---|
-| Live-VOD startet am Live-Rand | Workaround aktiv | Offene `EVENT`-/DVR-Playlists werden vor dem Start als lokaler VOD-Snapshot eingefroren (`inspectVodPlaylist()` + `hlsTrimmer.ts`). |
-| fMP4-Seek-Bug | Workaround aktiv | fMP4-Seeks laufen über Snapshot-Reload statt mpv-internem HLS-Seek (`reloadFmp4AtAbsolutePosition()` in `playbackService.ts`). |
-| Streamlink `--twitch-api-header` | Nicht verwendet | Twitch lehnt Device-Code-Token für Streamlinks interne GQL-API ab. Öffentliche Streams funktionieren ohne. |
+| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualität auf 720p reduzieren oder mpv-Fallback evaluieren. |
+| Twitch Live-Stream URL-Expiry | Unkritisch | `streamlink --stream-url` Token in URL kann ablaufen. hls.js handelt Playlist-Refresh automatisch; bei Verbindungsabbruch muss neu gestartet werden. |
 | Ad-Bypass | Nicht implementiert | `--twitch-disable-ads` von Streamlink deprecated. Post-MVP. |
 | Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |
 | Browser Gamepad API in Gaming Mode | Nicht nutzbar | Steam Input + Flatpak-Sandbox blockiert udev-Events für Chromium. Deshalb `/dev/input/js*` direkt. |
 | Bluetooth-Controller-Deduplizierung | Aktiv | Mehrere `/dev/input/js*`-Devices melden gleiche Inputs → 40ms-Deduplizierungsfenster in `gamepadReader.ts` |
+| Flatpak-Manifest mpv-Einträge | Noch nicht bereinigt | `tv.twitch4steamdeck.App.yml` enthält noch mpv-Build-Schritte und den mpv-Patch — nach Steam Deck Test entfernen. |
+| Direkt-Start: kein VOD-Support | By Design | AppShell-Overlay nur für Live-Streams. VODs nur über Kanalseite (ChannelScreen) mit Resume + Kapitel. |
 
 ---
 
@@ -240,17 +276,24 @@ Flatpak-Berechtigungen (aus Manifest): `--share=network`, `--socket=x11`, `--soc
 
 ## Typische Debugging-Workflows
 
-### mpv startet nicht / kein Playback
-1. mpv-Logging aktivieren (SettingsScreen → "mpv-Logging")
-2. Log-Pfad via IPC: `window.t4sd.playback.getLogPath()`
-3. Prüfen: `spawnMpv()` in `src/main/playback/streamlink.ts:77`
-4. Bei VODs prüfen, ob mpv mit einer lokalen `http://127.0.0.1/...m3u8` oder direkt mit einer Twitch-/CloudFront-`index-dvr.m3u8` gestartet wurde
+### Kein Playback / Video startet nicht
+1. In DevTools (Ctrl+Shift+I im Dev-Mode) Console prüfen — `[VideoPlayer]`-Logs zeigen jeden Schritt
+2. `node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>` ausführen — testet streamlink + Manifest + Segment
+3. `streamlink --stream-url <url> best` manuell ausführen: liefert es eine gültige `https://`-URL?
+4. CSP-Fehler? → `src/renderer/index.html` prüfen: `media-src 'self' blob:` muss vorhanden sein
+5. CORS-Fehler? → `session.defaultSession.webRequest` in `index.ts` prüfen
 
-### Live-VOD spielt Livestream statt VOD
-1. `streamlink --stream-url https://www.twitch.tv/videos/<id> best` prüfen: liefert es eine nackte `index-dvr.m3u8`, ist das noch keine statische VOD-Quelle
-2. Manifest prüfen: `#EXT-X-PLAYLIST-TYPE:EVENT` oder fehlendes `#EXT-X-ENDLIST` bedeutet offenes Live-DVR
-3. `inspectVodPlaylist()` und `createTrimmedPlaylist()` in `src/main/playback/playbackService.ts` / `src/main/playback/hlsTrimmer.ts` prüfen
-4. In `mpv.log` muss beim korrekten Pfad die Start-URL auf `127.0.0.1` zeigen; eine direkte CloudFront-`index-dvr.m3u8` bedeutet, dass der Snapshot-Pfad nicht gegriffen hat
+### VideoPlayer-Diagnose (DevTools Console)
+Beim Start erscheinen diese Logs (alle mit `[VideoPlayer]`-Prefix):
+- `Hls.isSupported: true` — hls.js kann MSE nutzen
+- `attachMedia aufgerufen` — MediaSource wird aufgebaut
+- `MEDIA_ATTACHED — lade Source` — MediaSource bereit, Manifest wird geladen
+- `MANIFEST_PARSED — readyState: X networkState: Y` — Manifest geladen, play() wird aufgerufen
+- `play() erfolgreich` — Video läuft
+
+### VOD startet an falscher Position
+1. `startPosition` im `playback:hls-url` Event korrekt? In `PlaybackService.startVod()` prüfen
+2. hls.js seeked in `MANIFEST_PARSED`-Handler: `video.currentTime = startPosition`
 
 ### Gamepad-Eingaben kommen nicht an (Steam Deck)
 1. `gamepadReader.ts` liest `/dev/input/js*` — prüfen ob Device vorhanden

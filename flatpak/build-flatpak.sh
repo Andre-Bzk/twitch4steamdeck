@@ -3,25 +3,33 @@
 # Ausführen in WSL2 Ubuntu:  bash flatpak/build-flatpak.sh
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-cd "$PROJECT_DIR"
-echo "=== Arbeitsverzeichnis: $PROJECT_DIR ==="
+# ─────────────────────────────────────────────────────────────────────────────
+# Schritt 0: Projektdateien vom Windows-Dateisystem in WSL2 synchronisieren
+# ─────────────────────────────────────────────────────────────────────────────
+WIN_PROJECT="/mnt/c/Projekte/twitch4steamdeck"
+WSL_PROJECT="$HOME/twitch4steamdeck"
+
+echo "=== Synchronisiere $WIN_PROJECT → $WSL_PROJECT ==="
+rsync -a --delete \
+  --exclude=node_modules/ \
+  --exclude=out/ \
+  --exclude=dist/ \
+  --exclude=build-dir/ \
+  --exclude='*.flatpak' \
+  "$WIN_PROJECT/" "$WSL_PROJECT/"
+echo "  ✓ Sync abgeschlossen"
+
+cd "$WSL_PROJECT"
+echo "=== Arbeitsverzeichnis: $WSL_PROJECT ==="
 
 # ─────────────────────────────────────────────────────────────────────────────
 # WSL2-Dateisystem-Check: flatpak-builder kann nicht über /mnt/ (Windows 9P) bauen
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ "$PROJECT_DIR" == /mnt/* ]]; then
+if [[ "$WSL_PROJECT" == /mnt/* ]]; then
   echo ""
-  echo "FEHLER: Das Projekt liegt auf dem Windows-Dateisystem ($PROJECT_DIR)."
+  echo "FEHLER: WSL_PROJECT zeigt auf das Windows-Dateisystem ($WSL_PROJECT)."
   echo "  flatpak-builder benötigt FUSE, das auf /mnt/ nicht funktioniert."
-  echo ""
-  echo "  Lösung: Projekt auf das Linux-Dateisystem kopieren und von dort bauen:"
-  echo "    cp -rp /mnt/c/Projekte/twitch4steamdeck ~/twitch4steamdeck"
-  echo "    cd ~/twitch4steamdeck"
-  echo "    bash flatpak/build-flatpak.sh"
-  echo ""
   exit 1
 fi
 
@@ -43,10 +51,42 @@ for cmd in flatpak flatpak-builder node npm python3 rsvg-convert; do
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 2: Flatpak-Runtimes prüfen / installieren
+# Schritt 2: libplacebo-Tarball erzeugen (enthält glad2-Submodul, GitHub-Tarball reicht nicht)
+# ─────────────────────────────────────────────────────────────────────────────
+LIBPLACEBO_VERSION="6.338.2"
+LIBPLACEBO_TARBALL="flatpak/libplacebo-${LIBPLACEBO_VERSION}-full.tar.gz"
+LIBPLACEBO_SHA="7f5da41b872302208f0e10c22d3e108ab9fdb1f253eb47c18651698c65d6b426"
+
+echo ""
+echo "=== [2/7] libplacebo-Tarball ==="
+if [ -f "$LIBPLACEBO_TARBALL" ] && echo "$LIBPLACEBO_SHA  $LIBPLACEBO_TARBALL" | sha256sum -c --quiet 2>/dev/null; then
+  echo "  ✓ libplacebo-${LIBPLACEBO_VERSION}-full.tar.gz bereits vorhanden und korrekt"
+else
+  echo "  → Klone libplacebo v${LIBPLACEBO_VERSION} mit Submodulen ..."
+  TMPDIR_LP=$(mktemp -d)
+  git clone --recurse-submodules --depth 1 --branch "v${LIBPLACEBO_VERSION}" \
+    https://github.com/haasn/libplacebo.git "$TMPDIR_LP/libplacebo"
+  echo "  → Erstelle Tarball ..."
+  tar czf "$LIBPLACEBO_TARBALL" -C "$TMPDIR_LP" libplacebo/
+  rm -rf "$TMPDIR_LP"
+  ACTUAL_SHA=$(sha256sum "$LIBPLACEBO_TARBALL" | awk '{print $1}')
+  if [ "$ACTUAL_SHA" != "$LIBPLACEBO_SHA" ]; then
+    echo "  WARNUNG: SHA256 weicht ab!"
+    echo "    Erwartet: $LIBPLACEBO_SHA"
+    echo "    Erhalten: $ACTUAL_SHA"
+    echo "  → Manifest muss aktualisiert werden. Aktualisiere jetzt ..."
+    sed -i "s|sha256: ${LIBPLACEBO_SHA}|sha256: ${ACTUAL_SHA}|" flatpak/tv.twitch4steamdeck.App.yml
+    echo "  ✓ Manifest-SHA aktualisiert"
+  else
+    echo "  ✓ SHA256 korrekt"
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Schritt 3: Flatpak-Runtimes prüfen / installieren
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [2/6] Prüfe Flatpak-Runtimes ==="
+echo "=== [3/7] Prüfe Flatpak-Runtimes ==="
 RUNTIMES=(
   "org.freedesktop.Platform//24.08"
   "org.freedesktop.Sdk//24.08"
@@ -66,7 +106,7 @@ done
 # Schritt 3: .env prüfen
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [3/6] Prüfe .env (Twitch Client-ID) ==="
+echo "=== [4/7] Prüfe .env (Twitch Client-ID) ==="
 if [ ! -f .env ]; then
   echo "FEHLER: .env nicht gefunden."
   echo "  → Kopiere .env.example nach .env und trage MAIN_VITE_TWITCH_CLIENT_ID ein."
@@ -82,7 +122,7 @@ echo "  ✓ .env gefunden"
 # Schritt 4: npm install (Linux) + better-sqlite3 rebuild + Build
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [4/6] npm install (Linux-Binaries) + Rebuild native Modules ==="
+echo "=== [5/7] npm install (Linux-Binaries) + Rebuild native Modules ==="
 npm install
 echo "  → Rebuilde better-sqlite3 für Linux x64 ..."
 npx @electron/rebuild --module-dir node_modules/better-sqlite3
@@ -107,7 +147,7 @@ fi
 # Die Datei wird von tv.twitch4steamdeck.App.yml per !include eingebunden.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [4b] Python-Deps für streamlink generieren ==="
+echo "=== [5b] Python-Deps für streamlink generieren ==="
 if ! python3 -c "import flatpak_pip_generator" &>/dev/null; then
   echo "  → Installiere flatpak-pip-generator ..."
   # Ubuntu 24.04: externally-managed-environment → --break-system-packages nötig
@@ -122,7 +162,7 @@ echo "  ✓ flatpak/python3-streamlink.json generiert ($(wc -l < flatpak/python3
 # Schritt 5: Manifest-SHA256-Werte füllen (interaktiv)
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [5/6] SHA256-Prüfsummen für Manifest-Sources ==="
+echo "=== [6/7] SHA256-Prüfsummen für Manifest-Sources ==="
 echo ""
 
 MPV_URL="https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"
@@ -151,7 +191,7 @@ echo "  ✓ Manifest aktualisiert"
 # Schritt 6: flatpak-builder — Build + lokale Installation
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [6/6] flatpak-builder ==="
+echo "=== [7/7] flatpak-builder ==="
 flatpak-builder \
   --user \
   --install \

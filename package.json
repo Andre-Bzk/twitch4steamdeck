@@ -1,6 +1,6 @@
 {
   "name": "twitch4steamdeck",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Twitch-Client für das Steam Deck (Live & VOD, Big-Screen-UI)",
   "main": "out/main/index.js",
   "author": "twitch4steamdeck",
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
+    "hls.js": "^1.6.16",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

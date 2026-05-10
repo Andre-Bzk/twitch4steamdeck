@@ -15,7 +15,3 @@ export interface PlaybackEvent {
   durationSeconds?: number
   isLive?: boolean
 }
-
-export interface PlaybackTimeUpdate {
-  positionSeconds: number
-}

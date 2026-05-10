@@ -7,6 +7,7 @@ interface Props {
   hasFocus: boolean
   onRequestSidebar: () => void
   onSelectChannel: (ch: FollowedChannelInfo) => void
+  onStartLive: (ch: FollowedChannelInfo) => void
   onSelectCategory: (game: GameInfo) => void
 }
 
@@ -30,6 +31,7 @@ export default function BrowseScreen({
   hasFocus,
   onRequestSidebar,
   onSelectChannel,
+  onStartLive,
   onSelectCategory
 }: Props): JSX.Element {
   const [topStreams, setTopStreams] = useState<FollowedChannelInfo[]>([])
@@ -40,7 +42,6 @@ export default function BrowseScreen({
   const [gridIndex, setGridIndex] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -82,13 +83,6 @@ export default function BrowseScreen({
     void load()
   }, [load])
 
-  useEffect(() => {
-    return window.t4sd.playback.onEvent((ev) => {
-      if (ev.kind === 'started') setIsPlaying(true)
-      else if (ev.kind === 'stopped' || ev.kind === 'error') setIsPlaying(false)
-    })
-  }, [])
-
   // Nächste Seite automatisch nachladen wenn letztes Element fokussiert wird
   useEffect(() => {
     if (focusRegion !== 'grid' || loadState !== 'ok') return
@@ -108,15 +102,6 @@ export default function BrowseScreen({
     if (!hasFocus) return
 
     const onKey = (e: KeyboardEvent): void => {
-      // Während der Wiedergabe: nur Stop erlauben, Navigation blockieren
-      if (isPlaying) {
-        e.preventDefault()
-        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-          void window.t4sd.playback.stop()
-        }
-        return
-      }
-
       if (e.key === 'y' || e.key === 'Y') {
         void load()
         return
@@ -145,7 +130,7 @@ export default function BrowseScreen({
           case 'Enter': {
             e.preventDefault()
             const ch = topStreams[shelfIndex]
-            if (ch) void window.t4sd.playback.startLive(ch.broadcasterLogin)
+            if (ch) onStartLive(ch)
             break
           }
           case 'x':
@@ -202,7 +187,7 @@ export default function BrowseScreen({
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, loadState, focusRegion, shelfIndex, gridIndex, topStreams, topGames, getGridColumns, onRequestSidebar, onSelectChannel, onSelectCategory, load, isPlaying])
+  }, [hasFocus, loadState, focusRegion, shelfIndex, gridIndex, topStreams, topGames, getGridColumns, onRequestSidebar, onSelectChannel, onStartLive, onSelectCategory, load])
 
   // Grid-Karte in den Viewport scrollen wenn fokussiert
   useEffect(() => {
@@ -271,7 +256,7 @@ export default function BrowseScreen({
                   <button
                     key={ch.broadcasterId}
                     className={`browse-stream-card${focusRegion === 'shelf' && shelfIndex === i ? ' browse-stream-card--focused' : ''}`}
-                    onClick={() => void window.t4sd.playback.startLive(ch.broadcasterLogin)}
+                    onClick={() => onStartLive(ch)}
                     tabIndex={-1}
                   >
                     <div className="browse-stream-card__thumb">

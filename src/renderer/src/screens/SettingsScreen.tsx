@@ -33,22 +33,16 @@ const OPTIONS: Option[] = [
 const SIDEBAR_STEP = 10
 const BADGE_GAP_STEP = 2
 
-/** Total focusable rows: badge options + sidebar slider + badge gap slider + logging toggle */
+/** Total focusable rows: badge options + sidebar slider + badge gap slider */
 const SIDEBAR_SLIDER_ROW = OPTIONS.length
 const BADGE_GAP_SLIDER_ROW = OPTIONS.length + 1
-const LOGGING_TOGGLE_ROW = OPTIONS.length + 2
-const TOTAL_ROWS = OPTIONS.length + 3
+const TOTAL_ROWS = OPTIONS.length + 2
 
 export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): JSX.Element {
-  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setMpvLoggingEnabled } = useSettings()
-  const [logPath, setLogPath] = useState('/home/deck/.var/app/tv.twitch4steamdeck.App/config/Electron/mpv.log')
+  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap } = useSettings()
   const [focusedIndex, setFocusedIndex] = useState(() =>
     Math.max(0, OPTIONS.findIndex((o) => o.mode === settings.streamBadgeMode))
   )
-
-  useEffect(() => {
-    void window.t4sd.playback.getLogPath().then(setLogPath).catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!hasFocus) return
@@ -94,8 +88,6 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
             setSidebarWidth(SIDEBAR_DEFAULT)
           } else if (focusedIndex === BADGE_GAP_SLIDER_ROW) {
             setBadgeGap(BADGE_GAP_DEFAULT)
-          } else if (focusedIndex === LOGGING_TOGGLE_ROW) {
-            setMpvLoggingEnabled(!settings.mpvLoggingEnabled)
           }
           break
         }
@@ -103,7 +95,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.mpvLoggingEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setMpvLoggingEnabled])
+  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap])
 
   const rowRefs = useRef<Array<HTMLElement | null>>([])
 
@@ -115,7 +107,6 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
 
   const sidebarSliderFocused = hasFocus && focusedIndex === SIDEBAR_SLIDER_ROW
   const badgeGapSliderFocused = hasFocus && focusedIndex === BADGE_GAP_SLIDER_ROW
-  const loggingToggleFocused = hasFocus && focusedIndex === LOGGING_TOGGLE_ROW
 
   return (
     <div className="screen settings-screen">
@@ -233,38 +224,6 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           />
           <span className="settings-slider__value">{settings.badgeGap} px</span>
         </div>
-      </div>
-
-      <div className="settings-section">
-        <h3 className="settings-section__title">mpv-Logging</h3>
-        <p className="settings-section__hint">
-          Aktiviert oder deaktiviert die mpv-Logdatei für Diagnosezwecke.
-          Logpfad auf dem Steam Deck: <code>{logPath}</code>
-        </p>
-
-        <button
-          ref={(el) => { rowRefs.current[LOGGING_TOGGLE_ROW] = el }}
-          className={[
-            'settings-option',
-            settings.mpvLoggingEnabled ? 'settings-option--active' : '',
-            loggingToggleFocused ? 'settings-option--focused' : ''
-          ].filter(Boolean).join(' ')}
-          onClick={() => {
-            setFocusedIndex(LOGGING_TOGGLE_ROW)
-            setMpvLoggingEnabled(!settings.mpvLoggingEnabled)
-          }}
-          tabIndex={loggingToggleFocused ? 0 : -1}
-        >
-          <span className="settings-option__radio" aria-hidden="true">
-            {settings.mpvLoggingEnabled ? '●' : '○'}
-          </span>
-          <span className="settings-option__label">
-            {settings.mpvLoggingEnabled ? 'Logging aktiviert' : 'Logging deaktiviert'}
-          </span>
-          <span className="settings-option__preview">
-            {settings.mpvLoggingEnabled ? 'mpv schreibt in mpv.log' : 'keine neue mpv.log wird geschrieben'}
-          </span>
-        </button>
       </div>
 
       {!hasFocus && (

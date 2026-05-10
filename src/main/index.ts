@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, screen } from 'electron'
+import { app, BrowserWindow, shell, screen, session } from 'electron'
 import { join } from 'node:path'
 import { AuthService } from './auth/authService'
 import { HelixClient } from './twitch/helixClient'
@@ -7,6 +7,10 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { startGamepadReader } from './input/gamepadReader'
 
 const isDev = !app.isPackaged
+
+// Erlaubt video.play() ohne vorangehende User-Geste (nötig, weil play() in hls.js-Callbacks
+// aufgerufen wird, die asynchron weit nach dem ursprünglichen Click-Event stattfinden).
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 function createWindow(): BrowserWindow {
   const isLinux = process.platform === 'linux'
@@ -49,7 +53,45 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+/**
+ * CORS-Bypass für Twitch CDN und HLS-Streams.
+ * hls.js im Renderer sendet Requests von localhost/file:// — Twitch CDN erwartet
+ * Origin: https://www.twitch.tv. Wir setzen Origin + Referer auf ausgehenden Requests
+ * und ergänzen CORS-Response-Header, damit Chromium die Antworten akzeptiert.
+ */
+function setupTwitchCors(): void {
+  const isTwitchCdn = (url: string): boolean =>
+    url.includes('twitchsvc.net') ||
+    url.includes('cloudfront.net') ||
+    url.includes('twitch.tv') ||
+    url.includes('twitch.amazon.com')
+
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (isTwitchCdn(details.url)) {
+      details.requestHeaders['Origin'] = 'https://www.twitch.tv'
+      details.requestHeaders['Referer'] = 'https://www.twitch.tv/'
+    }
+    callback({ requestHeaders: details.requestHeaders })
+  })
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (isTwitchCdn(details.url)) {
+      const headers: Record<string, string[]> = {}
+      for (const [k, v] of Object.entries(details.responseHeaders ?? {})) {
+        headers[k.toLowerCase()] = Array.isArray(v) ? v : [v]
+      }
+      headers['access-control-allow-origin'] = ['*']
+      headers['access-control-allow-headers'] = ['*']
+      headers['access-control-allow-methods'] = ['GET, HEAD, OPTIONS']
+      callback({ responseHeaders: headers })
+    } else {
+      callback({})
+    }
+  })
+}
+
 app.whenReady().then(async () => {
+  setupTwitchCors()
   const clientId = import.meta.env.MAIN_VITE_TWITCH_CLIENT_ID ?? ''
   const auth = new AuthService(clientId)
   await auth.init()
@@ -66,7 +108,7 @@ app.whenReady().then(async () => {
 
   app.on('before-quit', () => {
     stopGamepad()
-    playback.stopAll()
+    playback.stop()
   })
 
   if (!clientId) {

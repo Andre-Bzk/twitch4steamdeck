@@ -20,16 +20,10 @@ const IPC = {
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
-  playbackSeek: 'playback:seek',
-  playbackTogglePause: 'playback:toggle-pause',
   playbackPause: 'playback:pause',
-  playbackResume: 'playback:resume',
-  playbackSeekTo: 'playback:seek-to',
-  playbackGetCurrentPosition: 'playback:get-current-position',
-  playbackSetLoggingEnabled: 'playback:set-logging-enabled',
-  playbackGetLogPath: 'playback:get-log-path',
+  playbackReportPosition: 'playback:report-position',
   playbackEvent: 'playback:event',
-  playbackTimeUpdate: 'playback:time-update',
+  playbackHlsUrl: 'playback:hls-url',
 
   gamepadInput: 'gamepad-input'
 } as const
@@ -77,6 +71,14 @@ export interface PlaybackEvent {
   message?: string
   durationSeconds?: number
   isLive?: boolean
+}
+
+export interface HlsUrlPayload {
+  url: string
+  isLive: boolean
+  startPosition: number
+  durationSeconds: number
+  vodId?: string
 }
 
 export interface GameInfo {
@@ -154,23 +156,18 @@ const api = {
     startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number): Promise<void> =>
       ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds, startSeconds),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
-    seek: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeek, seconds),
-    togglePause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackTogglePause),
     pause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackPause),
-    resume: (): Promise<void> => ipcRenderer.invoke(IPC.playbackResume),
-    seekTo: (seconds: number): Promise<void> => ipcRenderer.invoke(IPC.playbackSeekTo, seconds),
-    getCurrentPosition: (): Promise<number | null> => ipcRenderer.invoke(IPC.playbackGetCurrentPosition),
-    setLoggingEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.playbackSetLoggingEnabled, enabled),
-    getLogPath: (): Promise<string> => ipcRenderer.invoke(IPC.playbackGetLogPath),
+    reportPosition: (vodId: string, positionSeconds: number, durationSeconds: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.playbackReportPosition, vodId, positionSeconds, durationSeconds),
     onEvent: (cb: (event: PlaybackEvent) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, event: PlaybackEvent): void => cb(event)
       ipcRenderer.on(IPC.playbackEvent, listener)
       return () => ipcRenderer.removeListener(IPC.playbackEvent, listener)
     },
-    onTimeUpdate: (cb: (data: { positionSeconds: number }) => void): (() => void) => {
-      const listener = (_e: IpcRendererEvent, data: { positionSeconds: number }): void => cb(data)
-      ipcRenderer.on(IPC.playbackTimeUpdate, listener)
-      return () => ipcRenderer.removeListener(IPC.playbackTimeUpdate, listener)
+    onHlsUrl: (cb: (payload: HlsUrlPayload) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, payload: HlsUrlPayload): void => cb(payload)
+      ipcRenderer.on(IPC.playbackHlsUrl, listener)
+      return () => ipcRenderer.removeListener(IPC.playbackHlsUrl, listener)
     }
   },
   gamepad: {

@@ -9,6 +9,7 @@ interface Props {
   language: string
   onRequestSidebar: () => void
   onSelectChannel: (ch: FollowedChannelInfo) => void
+  onStartLive: (ch: FollowedChannelInfo) => void
 }
 
 type LoadState = 'loading' | 'ok' | 'error'
@@ -18,14 +19,14 @@ export default function StreamListScreen({
   title,
   language,
   onRequestSidebar,
-  onSelectChannel
+  onSelectChannel,
+  onStartLive
 }: Props): JSX.Element {
   const [streams, setStreams] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -62,13 +63,6 @@ export default function StreamListScreen({
   }, [load])
 
   useEffect(() => {
-    return window.t4sd.playback.onEvent((ev) => {
-      if (ev.kind === 'started') setIsPlaying(true)
-      else if (ev.kind === 'stopped' || ev.kind === 'error') setIsPlaying(false)
-    })
-  }, [])
-
-  useEffect(() => {
     if (loadState !== 'ok' || focusedIndex !== streams.length - 1 || !nextCursor || isLoadingMore) return
     void loadMore()
   }, [focusedIndex, streams.length, nextCursor, isLoadingMore, loadMore, loadState])
@@ -84,14 +78,6 @@ export default function StreamListScreen({
     if (!hasFocus) return
 
     const onKey = (e: KeyboardEvent): void => {
-      if (isPlaying) {
-        e.preventDefault()
-        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-          void window.t4sd.playback.stop()
-        }
-        return
-      }
-
       if (e.key === 'y' || e.key === 'Y') {
         void load()
         return
@@ -134,7 +120,7 @@ export default function StreamListScreen({
         case 'Enter': {
           e.preventDefault()
           const ch = streams[focusedIndex]
-          if (ch) void window.t4sd.playback.startLive(ch.broadcasterLogin)
+          if (ch) onStartLive(ch)
           break
         }
         case 'x':
@@ -153,7 +139,7 @@ export default function StreamListScreen({
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, isPlaying, load, loadState, streams, focusedIndex, getColumns, onRequestSidebar, onSelectChannel])
+  }, [hasFocus, load, loadState, streams, focusedIndex, getColumns, onRequestSidebar, onSelectChannel, onStartLive])
 
   return (
     <div className="screen screen--stream-list">
@@ -200,7 +186,7 @@ export default function StreamListScreen({
               channel={ch}
               focused={hasFocus && i === focusedIndex}
               onFocus={() => setFocusedIndex(i)}
-              onSelect={() => void window.t4sd.playback.startLive(ch.broadcasterLogin)}
+              onSelect={() => onStartLive(ch)}
             />
           ))}
           {isLoadingMore && (

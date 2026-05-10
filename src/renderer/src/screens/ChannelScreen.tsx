@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { PlaybackOverlay } from '../components/PlaybackOverlay'
-import type { FollowedChannelInfo, PlaybackEvent, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
+import { VideoPlayer, type VideoPlayerHandle } from '../components/VideoPlayer'
+import type { FollowedChannelInfo, HlsUrlPayload, PlaybackEvent, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -77,8 +78,12 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [currentPosition, setCurrentPosition] = useState(0)
   const [vodDuration, setVodDuration] = useState(0)
   const [isLivePlayback, setIsLivePlayback] = useState(false)
+  // HLS-Player state
+  const [hlsPayload, setHlsPayload] = useState<HlsUrlPayload | null>(null)
+
   const watchBtnRef = useRef<HTMLButtonElement>(null)
   const chapterListRef = useRef<HTMLUListElement>(null)
+  const videoRef = useRef<VideoPlayerHandle>(null)
 
   useEffect(() => {
     window.t4sd.twitch
@@ -105,7 +110,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             setChapterPanelVod(null)
             setFocusRegion('hero')
             if (wasPlayingBeforeChapters) {
-              void window.t4sd.playback.resume()
+              videoRef.current?.play()
               setPlayState('playing')
             }
           } else {
@@ -125,12 +130,12 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           const chapter = chapters[chapterIndex]
           if (duringPlayback) {
             if (chapter) {
-              void window.t4sd.playback.seekTo(chapter.positionSeconds)
-              void window.t4sd.playback.resume()
+              videoRef.current?.seekTo(chapter.positionSeconds)
+              videoRef.current?.play()
               setPlayState('playing')
             } else {
               if (wasPlayingBeforeChapters) {
-                void window.t4sd.playback.resume()
+                videoRef.current?.play()
                 setPlayState('playing')
               }
             }
@@ -153,34 +158,35 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         switch (e.key) {
           case 'l2':
             e.preventDefault()
-            void window.t4sd.playback.seek(-300)
+            videoRef.current?.seek(-300)
             break
           case 'r2':
             e.preventDefault()
-            void window.t4sd.playback.seek(300)
+            videoRef.current?.seek(300)
             break
           case 'ArrowLeft':
             e.preventDefault()
-            void window.t4sd.playback.seek(-30)
+            videoRef.current?.seek(-30)
             break
           case 'ArrowRight':
             e.preventDefault()
-            void window.t4sd.playback.seek(30)
+            videoRef.current?.seek(30)
             break
           case 'Enter':
           case ' ':
             e.preventDefault()
             if (playState === 'playing') {
-              void window.t4sd.playback.togglePause()
+              void window.t4sd.playback.pause()
+              videoRef.current?.pause()
               setPlayState('paused')
             } else if (playState === 'paused') {
-              void window.t4sd.playback.togglePause()
+              videoRef.current?.play()
               setPlayState('playing')
             }
             break
           case 'Escape':
             e.preventDefault()
-            void window.t4sd.playback.stop()
+            void handleStop()
             break
           case 'y': {
             e.preventDefault()
@@ -246,6 +252,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [focusRegion, playState, vods, shelfIndex, onBack, chapters, chapterIndex, chapterPanelVod, wasPlayingBeforeChapters, currentVod])
 
+  // playback:event — verarbeitet started / stopped / error
   useEffect(() => {
     const unsub = window.t4sd.playback.onEvent((ev: PlaybackEvent) => {
       if (ev.kind === 'started') {
@@ -256,6 +263,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
       } else if (ev.kind === 'stopped') {
         const nextChapterVod = pendingChapterVod
         setPlayState('idle')
+        setHlsPayload(null)
         setChapterPanelVod(null)
         setCurrentVod(null)
         // Progress nach Stop neu laden
@@ -273,6 +281,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         }
       } else if (ev.kind === 'error') {
         setPlayState('error')
+        setHlsPayload(null)
         setChapterPanelVod(null)
         setCurrentVod(null)
         setPendingChapterVod(null)
@@ -282,18 +291,18 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     return unsub
   }, [pendingChapterVod, vods])
 
-  // Subscribe to ~1 Hz position updates from main process for the overlay seek bar
+  // playback:hls-url — HLS-URL vom Main-Prozess empfangen und an VideoPlayer weiterleiten
   useEffect(() => {
-    if (playState !== 'playing' && playState !== 'paused') return
-    const unsub = window.t4sd.playback.onTimeUpdate(({ positionSeconds }) => {
-      setCurrentPosition(positionSeconds)
+    const unsub = window.t4sd.playback.onHlsUrl((payload: HlsUrlPayload) => {
+      setHlsPayload(payload)
     })
     return unsub
-  }, [playState])
+  }, [])
 
   useEffect(() => {
     watchBtnRef.current?.focus()
   }, [])
+
 
   useEffect(() => {
     if (!chapterListRef.current) return
@@ -321,19 +330,17 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const jumpChapter = async (direction: 1 | -1): Promise<void> => {
     if (!currentVod) return
 
-    const [loadedChapters, currentPosition] = await Promise.all([
-      loadChapters(currentVod.id),
-      window.t4sd.playback.getCurrentPosition()
-    ])
-    if (loadedChapters.length === 0 || currentPosition === null) return
+    const currentTime = videoRef.current?.getCurrentTime() ?? 0
+    const loadedChapters = await loadChapters(currentVod.id)
+    if (loadedChapters.length === 0) return
 
     const epsilon = 1
     const target = direction > 0
-      ? loadedChapters.find((chapter) => chapter.positionSeconds > currentPosition + epsilon)
-      : [...loadedChapters].reverse().find((chapter) => chapter.positionSeconds < currentPosition - epsilon)
+      ? loadedChapters.find((chapter) => chapter.positionSeconds > currentTime + epsilon)
+      : [...loadedChapters].reverse().find((chapter) => chapter.positionSeconds < currentTime - epsilon)
 
     if (target) {
-      await window.t4sd.playback.seekTo(target.positionSeconds)
+      videoRef.current?.seekTo(target.positionSeconds)
     }
   }
 
@@ -371,8 +378,18 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
   const openChapterPanel = (vod: VodInfo, duringPlayback: boolean): void => {
     if (duringPlayback) {
-      setPendingChapterVod(vod)
-      void window.t4sd.playback.stop()
+      videoRef.current?.pause()
+      setWasPlayingBeforeChapters(playState === 'playing')
+      setPlayState('paused')
+      setChapterPanelVod(vod)
+      setChapters([])
+      setChapterIndex(0)
+      setChaptersLoading(true)
+      setFocusRegion('chapters')
+      void loadChapters(vod.id)
+        .then((loaded) => setChapters(loaded))
+        .catch(() => {})
+        .finally(() => setChaptersLoading(false))
       return
     }
     showChapterPanel(vod)
@@ -401,11 +418,13 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   }
 
   const handleStop = async (): Promise<void> => {
+    videoRef.current?.stop()
     await window.t4sd.playback.stop()
   }
 
   const thumb = resolveThumbnail(channel.thumbnailUrl)
   const trackOffset = shelfIndex * (CARD_W + CARD_GAP)
+  const isActivePlayback = playState === 'playing' || playState === 'paused'
 
   return (
     <div className="channel-screen">
@@ -475,7 +494,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
               </button>
             )}
 
-            {(playState === 'playing' || playState === 'paused') && (
+            {isActivePlayback && (
               <span className="channel-screen__playing-hint">
                 ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''}
               </span>
@@ -591,7 +610,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             {!chaptersLoading && chapters.length === 0 && (
               <p className="chapter-overlay__msg">
                 Keine Kapitel gefunden.{' '}
-                {(playState === 'playing' || playState === 'paused') ? (
+                {isActivePlayback ? (
                   <span className="gamepad-inline-action">
                     <GamepadPrompt prompt="a" />
                     <span>zum Fortsetzen.</span>
@@ -622,8 +641,29 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         </div>
       )}
 
+      {/* HTML5 Video Player — rendert innerhalb des Electron-Fensters */}
+      {hlsPayload && (
+        <VideoPlayer
+          ref={videoRef}
+          hlsUrl={hlsPayload.url}
+          startPosition={hlsPayload.startPosition}
+          isLive={hlsPayload.isLive}
+          vodId={hlsPayload.vodId}
+          durationSeconds={hlsPayload.durationSeconds}
+          onTimeUpdate={(s) => setCurrentPosition(s)}
+          onPlaying={() => setPlayState('playing')}
+          onPaused={() => setPlayState('paused')}
+          onEnded={() => void handleStop()}
+          onError={(msg) => {
+            setPlayState('error')
+            setErrorMsg(msg)
+            setHlsPayload(null)
+          }}
+        />
+      )}
+
       {/* Player overlay – shown during VOD/Live playback */}
-      {(playState === 'playing' || playState === 'paused') && (
+      {isActivePlayback && (
         <PlaybackOverlay
           playState={playState}
           durationSeconds={vodDuration}
@@ -635,14 +675,15 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           onTogglePause={() => {
             if (playState === 'playing') {
               void window.t4sd.playback.pause()
+              videoRef.current?.pause()
               setPlayState('paused')
             } else {
-              void window.t4sd.playback.resume()
+              videoRef.current?.play()
               setPlayState('playing')
             }
           }}
-          onSeek={(s) => void window.t4sd.playback.seek(s)}
-          onSeekTo={(s) => void window.t4sd.playback.seekTo(s)}
+          onSeek={(s) => videoRef.current?.seek(s)}
+          onSeekTo={(s) => videoRef.current?.seekTo(s)}
           onStop={() => void handleStop()}
         />
       )}

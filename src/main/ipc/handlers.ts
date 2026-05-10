@@ -1,8 +1,11 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { appendFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { AuthEvent, AuthService } from '../auth/authService'
 import type { HelixClient } from '../twitch/helixClient'
 import type { PlaybackService } from '../playback/playbackService'
-import type { PlaybackEvent, PlaybackTimeUpdate } from '../playback/types'
+import type { HlsUrlPayload } from '../playback/playbackService'
+import type { PlaybackEvent } from '../playback/types'
 import { getProgressMap } from '../store/historyRepo'
 
 export const IPC = {
@@ -26,18 +29,12 @@ export const IPC = {
   playbackStartLive: 'playback:start-live',
   playbackStartVod: 'playback:start-vod',
   playbackStop: 'playback:stop',
-  playbackSeek: 'playback:seek',
-  playbackTogglePause: 'playback:toggle-pause',
   playbackPause: 'playback:pause',
-  playbackResume: 'playback:resume',
-  playbackSeekTo: 'playback:seek-to',
-  playbackGetCurrentPosition: 'playback:get-current-position',
-  playbackSetLoggingEnabled: 'playback:set-logging-enabled',
-  playbackGetLogPath: 'playback:get-log-path',
+  playbackReportPosition: 'playback:report-position',
   /** main → renderer */
   playbackEvent: 'playback:event',
-  /** main → renderer: ~1 Hz position updates during VOD playback */
-  playbackTimeUpdate: 'playback:time-update'
+  /** main → renderer: HLS-URL + Metadaten für den Renderer-seitigen Video-Player */
+  playbackHlsUrl: 'playback:hls-url'
 } as const
 
 export function registerIpcHandlers(
@@ -102,32 +99,30 @@ export function registerIpcHandlers(
       playback.startVod(vodId, channelLogin, title, durationSeconds, startSeconds)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
-  ipcMain.handle(IPC.playbackSeek, (_e, seconds: number) => playback.seek(seconds))
-  ipcMain.handle(IPC.playbackTogglePause, () => playback.togglePause())
-  ipcMain.handle(IPC.playbackSeekTo, (_e, seconds: number) => playback.seekTo(seconds))
-  ipcMain.handle(IPC.playbackResume, () => playback.resume())
-  ipcMain.handle(IPC.playbackGetCurrentPosition, () => playback.getCurrentPosition())
-  ipcMain.handle(IPC.playbackSetLoggingEnabled, (_e, enabled: boolean) => playback.setLoggingEnabled(enabled))
-  ipcMain.handle(IPC.playbackGetLogPath, () => playback.getLogPath())
   ipcMain.handle(IPC.playbackPause, () => {
-    playback.pause()
+    // Fokus auf Electron-Fenster zurückholen (Windows: Win Gamepad API braucht Fokus)
     for (const win of BrowserWindow.getAllWindows()) win.focus()
   })
+  ipcMain.handle(
+    IPC.playbackReportPosition,
+    (_e, vodId: string, positionSeconds: number, durationSeconds: number) => {
+      playback.updateVodPosition(vodId, positionSeconds, durationSeconds)
+    }
+  )
 
   playback.on('playback-event', (event: PlaybackEvent) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.playbackEvent, event)
-      // Auf Windows stiehlt mpv den OS-Fokus → Electron refokussieren,
-      // damit navigator.getGamepads() weiter Daten liefert.
-      if (process.platform === 'win32' && event.kind === 'started') {
-        win.focus()
-      }
     }
   })
 
-  playback.on('playback-time-update', (data: PlaybackTimeUpdate) => {
+  playback.on('playback-hls-url', (payload: HlsUrlPayload) => {
+    try {
+      const logPath = join(app.getPath('userData'), 'debug-playback.log')
+      appendFileSync(logPath, `[${new Date().toISOString()}] HLS URL (isLive=${payload.isLive}): ${payload.url}\n`)
+    } catch { /* ignore log errors */ }
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(IPC.playbackTimeUpdate, data)
+      win.webContents.send(IPC.playbackHlsUrl, payload)
     }
   })
 }
