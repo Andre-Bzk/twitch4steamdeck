@@ -22,6 +22,7 @@ const IPC = {
   playbackStop: 'playback:stop',
   playbackPause: 'playback:pause',
   playbackReportPosition: 'playback:report-position',
+  playbackGetQualities: 'playback:get-qualities',
   playbackEvent: 'playback:event',
   playbackHlsUrl: 'playback:hls-url',
 
@@ -153,8 +154,10 @@ const api = {
   playback: {
     startLive: (channelLogin: string, quality?: string): Promise<void> =>
       ipcRenderer.invoke(IPC.playbackStartLive, channelLogin, quality),
-    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number): Promise<void> =>
-      ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds, startSeconds),
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number, quality?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.playbackStartVod, vodId, channelLogin, title, durationSeconds, startSeconds, quality),
+    getQualities: (twitchUrl: string): Promise<string[]> =>
+      ipcRenderer.invoke(IPC.playbackGetQualities, twitchUrl),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC.playbackStop),
     pause: (): Promise<void> => ipcRenderer.invoke(IPC.playbackPause),
     reportPosition: (vodId: string, positionSeconds: number, durationSeconds: number): Promise<void> =>

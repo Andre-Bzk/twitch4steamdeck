@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from './GamepadPrompt'
-import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, StopIcon } from './Icons'
+import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, QualityIcon, StopIcon } from './Icons'
 
 interface PlaybackOverlayProps {
   playState: 'playing' | 'paused'
@@ -13,10 +13,19 @@ interface PlaybackOverlayProps {
   viewerCount?: number
   viewCount?: number
   gameName?: string
+  currentChapterIndex?: number
+  totalChapters?: number
+  availableQualities?: string[]
+  currentQuality?: string
+  qualityPanelOpen?: boolean
+  qualityFocusedIndex?: number
+  onOpenQuality?: () => void
+  onChangeQuality?: (q: string) => void
   onTogglePause: () => void
   onSeek: (seconds: number) => void
   onSeekTo: (seconds: number) => void
   onStop: () => void
+  onOpenChapters?: () => void
 }
 
 function formatCount(n: number): string {
@@ -48,10 +57,19 @@ export function PlaybackOverlay({
   viewerCount,
   viewCount,
   gameName,
+  currentChapterIndex,
+  totalChapters,
+  availableQualities,
+  currentQuality,
+  qualityPanelOpen,
+  qualityFocusedIndex,
+  onOpenQuality,
+  onChangeQuality,
   onTogglePause,
   onSeek,
   onSeekTo,
-  onStop
+  onStop,
+  onOpenChapters
 }: PlaybackOverlayProps): JSX.Element {
   const [visible, setVisible] = useState(true)
   const [isScrubbing, setIsScrubbing] = useState(false)
@@ -219,6 +237,8 @@ export function PlaybackOverlay({
         <span className="playback-overlay__hint-sep">·</span>
         <GamepadHintItem prompt="y">Kapitelmenü</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
+        <GamepadHintItem prompt="x">Qualität</GamepadHintItem>
+        <span className="playback-overlay__hint-sep">·</span>
         <GamepadHintItem prompt="b">Stop</GamepadHintItem>
       </div>
 
@@ -302,6 +322,13 @@ export function PlaybackOverlay({
                 <span className="playback-overlay__meta-chip">
                   <GamepadIcon width={14} height={14} />
                   {gameName}
+                  {currentChapterIndex !== undefined &&
+                    totalChapters !== undefined &&
+                    totalChapters > 1 && (
+                      <span className="playback-overlay__chapter-badge">
+                        {currentChapterIndex}/{totalChapters}
+                      </span>
+                    )}
                 </span>
               )}
             </div>
@@ -333,15 +360,67 @@ export function PlaybackOverlay({
           </>
         ) : null}
 
-        {/* Stop button */}
-        <button
-          className="playback-overlay__stop-btn"
-          onClick={() => { onStop(); showOverlay() }}
-          aria-label="Stop"
-        >
-          <StopIcon width={18} height={18} />
-          <span>Stop</span>
-        </button>
+        {/* Action buttons row */}
+        <div className="playback-overlay__action-row">
+          {!isLive && totalChapters !== undefined && totalChapters > 0 && onOpenChapters && (
+            <div className="playback-overlay__chapter-btn-wrap">
+              <button
+                className="playback-overlay__chapter-btn"
+                onClick={() => { onOpenChapters(); showOverlay() }}
+                aria-label="Kapitel öffnen"
+              >
+                <ClapperboardIcon width={18} height={18} />
+                <span>Kapitel</span>
+              </button>
+              {totalChapters > 1 && (
+                <span className="playback-overlay__chapter-ios-badge">
+                  {totalChapters}
+                </span>
+              )}
+            </div>
+          )}
+          {onOpenQuality && availableQualities !== undefined && availableQualities.length > 0 && (
+            <div className="playback-overlay__quality-wrap">
+              <button
+                className="playback-overlay__quality-btn"
+                onClick={() => { onOpenQuality(); showOverlay() }}
+                aria-label="Qualität ändern"
+              >
+                <QualityIcon width={18} height={18} />
+                <span>{currentQuality ?? 'best'}</span>
+              </button>
+              {qualityPanelOpen && (
+                <div className="playback-overlay__quality-panel">
+                  <div className="playback-overlay__quality-panel-title">Qualität</div>
+                  <ul className="playback-overlay__quality-list">
+                    {availableQualities.map((q, i) => (
+                      <li
+                        key={q}
+                        className={[
+                          'playback-overlay__quality-item',
+                          i === qualityFocusedIndex ? 'playback-overlay__quality-item--focused' : '',
+                          q === currentQuality ? 'playback-overlay__quality-item--active' : ''
+                        ].join(' ').trim()}
+                        onClick={() => { onChangeQuality?.(q); showOverlay() }}
+                      >
+                        <span>{q}</span>
+                        {q === currentQuality && <span className="playback-overlay__quality-check">✓</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            className="playback-overlay__stop-btn"
+            onClick={() => { onStop(); showOverlay() }}
+            aria-label="Stop"
+          >
+            <StopIcon width={18} height={18} />
+            <span>Stop</span>
+          </button>
+        </div>
       </div>
 
       {/* Bottom gradient scrim */}

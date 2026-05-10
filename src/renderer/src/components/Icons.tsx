@@ -122,3 +122,14 @@ export function ClapperboardIcon(props: IconProps): JSX.Element {
     </svg>
   )
 }
+
+export function QualityIcon(props: IconProps): JSX.Element {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2" y="17" width="4" height="4" rx="0.5" />
+      <rect x="8" y="13" width="4" height="8" rx="0.5" />
+      <rect x="14" y="9" width="4" height="12" rx="0.5" />
+      <rect x="20" y="4" width="2" height="17" rx="0.5" />
+    </svg>
+  )
+}

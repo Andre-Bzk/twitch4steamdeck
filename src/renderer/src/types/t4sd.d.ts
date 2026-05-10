@@ -113,7 +113,8 @@ export interface T4sdApi {
   }
   playback: {
     startLive: (channelLogin: string, quality?: string) => Promise<void>
-    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number) => Promise<void>
+    startVod: (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number, quality?: string) => Promise<void>
+    getQualities: (twitchUrl: string) => Promise<string[]>
     stop: () => Promise<void>
     pause: () => Promise<void>
     reportPosition: (vodId: string, positionSeconds: number, durationSeconds: number) => Promise<void>

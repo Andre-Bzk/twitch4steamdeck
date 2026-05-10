@@ -16,7 +16,7 @@ const BADGE_GAP_MIN = 0
 const BADGE_GAP_MAX = 20
 const BADGE_GAP_DEFAULT = 6
 const DEFAULTS: AppSettings = {
-  streamBadgeMode: 'language',
+  streamBadgeMode: 'both',
   sidebarWidth: SIDEBAR_DEFAULT,
   badgeGap: BADGE_GAP_DEFAULT
 }

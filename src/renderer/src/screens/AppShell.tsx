@@ -37,6 +37,11 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const liveVideoRef = useRef<VideoPlayerHandle>(null)
   // Verhindert dass ChannelScreen-Events den globalen Overlay aktivieren
   const isGlobalPlaybackInitiated = useRef(false)
+  // Quality state für globalen Overlay
+  const [liveAvailableQualities, setLiveAvailableQualities] = useState<string[] | undefined>(undefined)
+  const [liveCurrentQuality, setLiveCurrentQuality] = useState('best')
+  const [liveQualityPanelOpen, setLiveQualityPanelOpen] = useState(false)
+  const [liveQualityFocusedIndex, setLiveQualityFocusedIndex] = useState(0)
 
   const isGlobalPlaying = livePlayState !== 'idle'
 
@@ -57,6 +62,9 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         setLivePlayState('idle')
         setLiveChannel(null)
         setLivePosition(0)
+        setLiveAvailableQualities(undefined)
+        setLiveCurrentQuality('best')
+        setLiveQualityPanelOpen(false)
       }
     })
     return () => { unsubHls(); unsubEvent() }
@@ -95,12 +103,36 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     isGlobalPlaybackInitiated.current = true
     setLiveChannel(ch)
     setLivePlayState('starting')
-    void window.t4sd.playback.startLive(ch.broadcasterLogin)
+    setLiveAvailableQualities(undefined)
+    setLiveCurrentQuality('best')
+    setLiveQualityPanelOpen(false)
+    void window.t4sd.playback.startLive(ch.broadcasterLogin).then(() => {
+      window.t4sd.playback.getQualities(`twitch.tv/${ch.broadcasterLogin}`)
+        .then((qs) => setLiveAvailableQualities(qs.length > 0 ? qs : []))
+        .catch(() => setLiveAvailableQualities([]))
+    })
   }, [])
 
   const handleStopLive = useCallback(() => {
     liveVideoRef.current?.stop()
+    setLiveAvailableQualities(undefined)
+    setLiveCurrentQuality('best')
+    setLiveQualityPanelOpen(false)
     void window.t4sd.playback.stop()
+  }, [])
+
+  const handleLiveQualityChange = useCallback((quality: string, channelLogin: string) => {
+    setLiveQualityPanelOpen(false)
+    setLiveCurrentQuality(quality)
+    setLiveAvailableQualities(undefined)
+    liveVideoRef.current?.stop()
+    setLiveHlsPayload(null)
+    setLivePlayState('starting')
+    void window.t4sd.playback.startLive(channelLogin, quality).then(() => {
+      window.t4sd.playback.getQualities(`twitch.tv/${channelLogin}`)
+        .then((qs) => setLiveAvailableQualities(qs.length > 0 ? qs : []))
+        .catch(() => setLiveAvailableQualities([]))
+    })
   }, [])
 
   const handleBack = useCallback(() => {
@@ -115,6 +147,25 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   useEffect(() => {
     if (!isGlobalPlaying) return
     const onKey = (e: KeyboardEvent): void => {
+      // Quality-Panel hat Vorrang wenn geöffnet
+      if (liveQualityPanelOpen) {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setLiveQualityFocusedIndex((i) => Math.max(0, i - 1))
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setLiveQualityFocusedIndex((i) => Math.min((liveAvailableQualities?.length ?? 1) - 1, i + 1))
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          const q = liveAvailableQualities?.[liveQualityFocusedIndex]
+          if (q && liveChannel) handleLiveQualityChange(q, liveChannel.broadcasterLogin)
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          setLiveQualityPanelOpen(false)
+        }
+        return
+      }
+
       switch (e.key) {
         case 'Escape':
           e.preventDefault()
@@ -147,11 +198,19 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
           e.preventDefault()
           liveVideoRef.current?.seek(300)
           break
+        case 'x':
+          e.preventDefault()
+          if (liveAvailableQualities && liveAvailableQualities.length > 0) {
+            const idx = liveAvailableQualities.indexOf(liveCurrentQuality)
+            setLiveQualityFocusedIndex(idx >= 0 ? idx : 0)
+            setLiveQualityPanelOpen(true)
+          }
+          break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isGlobalPlaying, livePlayState, handleStopLive])
+  }, [isGlobalPlaying, livePlayState, handleStopLive, liveQualityPanelOpen, liveAvailableQualities, liveQualityFocusedIndex, liveCurrentQuality, liveChannel, handleLiveQualityChange])
 
   // Key-Handler für die Sidebar (wenn sie den Fokus hat)
   useEffect(() => {
@@ -323,6 +382,16 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                   title={liveChannel?.streamTitle ?? ''}
                   viewerCount={liveChannel?.viewerCount ?? undefined}
                   gameName={liveChannel?.gameName ?? undefined}
+                  availableQualities={liveAvailableQualities}
+                  currentQuality={liveCurrentQuality}
+                  qualityPanelOpen={liveQualityPanelOpen}
+                  qualityFocusedIndex={liveQualityFocusedIndex}
+                  onOpenQuality={() => {
+                    const idx = liveAvailableQualities?.indexOf(liveCurrentQuality) ?? 0
+                    setLiveQualityFocusedIndex(idx >= 0 ? idx : 0)
+                    setLiveQualityPanelOpen(true)
+                  }}
+                  onChangeQuality={(q) => liveChannel && handleLiveQualityChange(q, liveChannel.broadcasterLogin)}
                   onTogglePause={() => {
                     if (livePlayState === 'playing') {
                       liveVideoRef.current?.pause()

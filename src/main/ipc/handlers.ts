@@ -31,6 +31,7 @@ export const IPC = {
   playbackStop: 'playback:stop',
   playbackPause: 'playback:pause',
   playbackReportPosition: 'playback:report-position',
+  playbackGetQualities: 'playback:get-qualities',
   /** main → renderer */
   playbackEvent: 'playback:event',
   /** main → renderer: HLS-URL + Metadaten für den Renderer-seitigen Video-Player */
@@ -95,8 +96,12 @@ export function registerIpcHandlers(
   )
   ipcMain.handle(
     IPC.playbackStartVod,
-    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number) =>
-      playback.startVod(vodId, channelLogin, title, durationSeconds, startSeconds)
+    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number, quality?: string) =>
+      playback.startVod(vodId, channelLogin, title, durationSeconds, startSeconds, quality)
+  )
+  ipcMain.handle(
+    IPC.playbackGetQualities,
+    (_e, twitchUrl: string) => playback.getAvailableQualities(twitchUrl)
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
   ipcMain.handle(IPC.playbackPause, () => {

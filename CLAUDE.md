@@ -1,6 +1,6 @@
 # Twitch4SteamDeck — CLAUDE.md
 
-Ad-freier Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Screen-UI (auf Linux/Steam Deck: Fenster maximiert auf Primärdisplay; im Windows-Dev: 1280x800). Unterstützt Live-Streams und VODs mit Resume und Kapitelwahl. Deployment als Flatpak auf dem Steam Deck.
+Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Screen-UI (auf Linux/Steam Deck: Fenster maximiert auf Primärdisplay; im Windows-Dev: 1280x800). Unterstützt Live-Streams und VODs mit Resume und Kapitelwahl. Deployment als Flatpak auf dem Steam Deck.
 
 ---
 
@@ -24,7 +24,7 @@ Electron Main Process
 ├── AuthService          — Twitch Device Code Flow, Token-Verwaltung (safeStorage)
 ├── HelixClient          — Twitch Helix REST API + GQL (Kapitel)
 ├── PlaybackService      — Live-/VOD-Orchestrierung
-│   └── streamlink.ts    — getStreamUrl() via streamlink --stream-url
+│   └── streamlink.ts    — getStreamUrl() + getAvailableQualities() via streamlink
 ├── historyRepo          — SQLite VOD-Verlauf (Resume, Completed)
 └── gamepadReader        — Linux /dev/input/js* Joystick-Leser
 
@@ -52,6 +52,8 @@ Renderer (React)
 - **VOD-Playback:** ChannelScreen → IPC `playback:start-vod` → PlaybackService → `streamlink --stream-url twitch.tv/videos/<id>` → HLS-URL → IPC-Event `playback:hls-url` → Renderer → `VideoPlayer` (hls.js, seekTo startPosition)
 - **Overlay:** `PlaybackOverlay` (z-index: 300) liegt als normales DOM-Element über `VideoPlayer` (z-index: 100) — kein Fenster-Layering nötig
 - **Seek/Pause/Stop:** direkt über `videoRef.current` (kein IPC-Roundtrip)
+- **Qualitätswechsel:** `videoRef.current.stop()` → `startLive/startVod(quality)` → neuer `playback:hls-url` Event — streamlink-Neustart nötig, da Single-Bitrate-HLS (kein hls.js Level-Switch möglich)
+- **Qualitätsliste:** `IPC playback:get-qualities` → `streamlink --json <url>` → `Object.keys(streams)` sortiert nach fixem Order-Array
 - **Position-Tracking:** `VideoPlayer` meldet alle 5s via IPC `playback:report-position` → Main → SQLite
 - **Gamepad:** `/dev/input/js*` (Linux/Gaming-Mode) **oder** `navigator.getGamepads()` (Windows/Dev) → synthetische `KeyboardEvent`s → alle Screen-Handler reagieren auf Keys
 
@@ -100,8 +102,8 @@ src/main/
   ipc/
     handlers.ts               — Alle ipcMain.handle()-Registrierungen + Event-Forwarding
   playback/
-    playbackService.ts        — Orchestrator: streamlink --stream-url → HLS-URL → playback-hls-url Event
-    streamlink.ts             — getStreamUrl() via streamlink --stream-url (Prozess-Spawning, URL-Extraktion: letzte https://-Zeile)
+    playbackService.ts        — Orchestrator: streamlink --stream-url → HLS-URL → playback-hls-url Event; startVod(quality?); getAvailableQualities()
+    streamlink.ts             — getStreamUrl() + getAvailableQualities() via streamlink (--stream-url für URL, --json für Qualitätsliste)
     types.ts                  — Quality-Typ, PlaybackEvent, HlsUrlPayload
   store/
     db.ts                     — SQLite-Init, WAL-Modus, Migration (vod_history-Tabelle)
@@ -120,18 +122,18 @@ src/renderer/src/
   App.tsx                     — Auth-Gate, Gamepad-Init
   main.tsx                    — React-DOM-Bootstrap, SettingsProvider
   screens/
-    AppShell.tsx              — Tab-Routing, Sidebar/Main-Fokus-Split, Globaler Playback-Overlay (direkter Stream-Start ohne ChannelScreen)
+    AppShell.tsx              — Tab-Routing, Sidebar/Main-Fokus-Split, Globaler Playback-Overlay (direkter Stream-Start ohne ChannelScreen), Qualitätswahl für Live
     LoginScreen.tsx           — Device-Code-Login, QR-Code, Countdown
     FollowingScreen.tsx       — Gefolgte Kanäle (Grid), Live/Offline-Sort
     BrowseScreen.tsx          — Top-Streams-Shelf (A=Direkt-Play, X=Kanalseite) + Kategorien-Grid (Infinite Scroll)
     CategoryScreen.tsx        — Streams einer Kategorie (A=Direkt-Play, X=Kanalseite)
-    ChannelScreen.tsx         — Channel-Detail, VOD-Shelf, VideoPlayer + PlaybackOverlay, Kapitel-Panel
+    ChannelScreen.tsx         — Channel-Detail, VOD-Shelf, VideoPlayer + PlaybackOverlay, Kapitel-Panel, Qualitätswahl
     StreamListScreen.tsx      — Sprachgefilterte Stream-Liste DE/EN (A=Direkt-Play, X=Kanalseite)
     SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap
     AccountScreen.tsx         — Nutzerinfo, Logout
   components/
     VideoPlayer.tsx           — hls.js <video> Wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia vor loadSource; play() in MANIFEST_PARSED
-    PlaybackOverlay.tsx       — DOM-Overlay (Seek-Bar, Kanalinfo, Gamepad-Hints, Auto-Hide); playState: 'playing'|'paused'
+    PlaybackOverlay.tsx       — DOM-Overlay (Seek-Bar, Kanalinfo, Gamepad-Hints, Auto-Hide, Qualitäts-Button + Panel); playState: 'playing'|'paused'
     FocusableCard.tsx         — Wiederverwendbare Kanal-Karte (Thumbnail, Badge, Progress)
     Sidebar.tsx               — Navigationssidebar (6 Tabs)
     LanguageBadge.tsx         — Sprach-/Flagge-Badge
@@ -202,8 +204,17 @@ Video läuft als HTML5 `<video>` Element innerhalb des Electron-Fensters — **k
 
 **Warum dieser Ansatz:** Früherer Ansatz mit externem mpv-Fullscreen-Fenster wurde vom OS-Windowmanager (Gamescope auf Steam Deck) immer über das Electron-Fenster gelegt. CSS `z-index` wirkt nur innerhalb eines Dokuments, nicht auf OS-Fensterebene. Die Lösung: Video und Overlay im selben Rendering-Kontext halten.
 
+### Qualitätswahl während Wiedergabe
+- **Qualitätswechsel = streamlink-Neustart**: streamlink liefert Single-Bitrate-HLS → hls.js-Level-Switch nicht nutzbar. Wechsel: `videoRef.stop()` → `startLive/startVod(quality)` → neuer `hls-url` Event.
+- **VOD mit Resume**: `getCurrentTime()` vor Stop → als `startSeconds` an neues `startVod()`.
+- **Qualitätsliste**: asynchron nach Stream-Start via `playback:get-qualities` IPC → `streamlink --json <url>` → `Object.keys(json.streams)`, sortiert: `['best', '1080p60', '720p60', '480p', '360p', '160p', 'audio_only', 'worst']`
+- **Session-only**: kein Persistieren in Settings/localStorage.
+- **Panel-State im Parent**: `qualityPanelOpen`, `qualityFocusedIndex` in ChannelScreen/AppShell — PlaybackOverlay bekommt Props + Callbacks.
+- **Key-Handler Priorität**: `qualityPanelOpen`-Block wird VOR allen anderen Keys geprüft und gibt `return` — verhindert Seek/Pause-Konflikte während das Panel offen ist.
+- **X-Taste** öffnet Quality-Panel (Gamepad Button X → `x`-KeyboardEvent).
+
 ### Kapitel-Panel during Playback
-Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), wird das Video **pausiert** (nicht gestoppt). Nach Kapitelwahl: `seekTo(chapter.positionSeconds)` + `play()`. Nach Schließen ohne Auswahl: `play()` (falls vorher playing).
+Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuft das Video **weiter** (nicht pausiert). `PlaybackOverlay` wird per conditional render (`!chapterPanelVod`) ausgeblendet, sodass das Kapitel-Panel sauber über dem Video erscheint. Nach Kapitelwahl: `seekTo(chapter.positionSeconds)` — kein `play()` nötig, da Video bereits läuft. Nach Schließen ohne Auswahl: Panel weg, Video läuft unverändert weiter. Bei leerer Kapitelliste: X-Taste seeked zu `0` (Videoanfang).
 
 ### Gamepad Dual-Path
 - **Linux/Gaming-Mode:** `src/main/input/gamepadReader.ts` liest `/dev/input/js*` direkt (Chromium Gamepad API funktioniert nicht im Flatpak-Sandbox ohne udev)
@@ -221,8 +232,9 @@ Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), wird 
 | ChannelScreen | Live-Stream starten / Bestätigen | — |
 
 ### VOD vs. Live Playback
-- **Live:** `streamlink --stream-url twitch.tv/<login> best` → HLS-URL → hls.js spielt Live-Playlist nativ
-- **VOD:** `streamlink --stream-url twitch.tv/videos/<id> best` → HLS-URL → hls.js seeked zu `startPosition` via `video.currentTime`
+- **Live:** `streamlink --stream-url twitch.tv/<login> <quality>` → HLS-URL → hls.js spielt Live-Playlist nativ
+- **VOD:** `streamlink --stream-url twitch.tv/videos/<id> <quality>` → HLS-URL → hls.js seeked zu `startPosition` via `video.currentTime`
+- **Quality-Default:** `'best'` — kein Persistieren, nur Session-State
 - **Resume:** `history.getPosition(vodId)` im Main-Prozess → als `startPosition` im `playback:hls-url` Event → `VideoPlayer` seeked nach MANIFEST_PARSED
 
 ### Position-Tracking
@@ -245,7 +257,7 @@ Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), wird 
 
 | Problem | Status | Details |
 |---|---|---|
-| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualität auf 720p reduzieren oder mpv-Fallback evaluieren. |
+| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualitäts-Button im Overlay nutzen (720p60 wählen) oder mpv-Fallback evaluieren. |
 | Twitch Live-Stream URL-Expiry | Unkritisch | `streamlink --stream-url` Token in URL kann ablaufen. hls.js handelt Playlist-Refresh automatisch; bei Verbindungsabbruch muss neu gestartet werden. |
 | Ad-Bypass | Nicht implementiert | `--twitch-disable-ads` von Streamlink deprecated. Post-MVP. |
 | Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |

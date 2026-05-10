@@ -18,6 +18,43 @@ function resolveStreamlinkBin(): string {
 
 const STREAMLINK_BIN = resolveStreamlinkBin()
 
+const QUALITY_ORDER = ['best', '1080p60', '1080p', '720p60', '720p', '480p', '360p', '160p', 'audio_only', 'worst']
+
+function sortQualities(qualities: string[]): string[] {
+  return [...qualities].sort((a, b) => {
+    const ai = QUALITY_ORDER.indexOf(a)
+    const bi = QUALITY_ORDER.indexOf(b)
+    if (ai === -1 && bi === -1) return a.localeCompare(b)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
+
+/**
+ * Fragt streamlink nach allen verfügbaren Qualitätsstufen für eine URL (--json).
+ * Gibt eine sortierte Liste zurück; bei Fehler leeres Array.
+ */
+export function getAvailableQualities(url: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const proc = spawn(STREAMLINK_BIN, ['--json', url], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    let out = ''
+    proc.stdout?.on('data', (d: Buffer) => { out += d.toString() })
+    proc.on('error', () => resolve([]))
+    proc.on('exit', () => {
+      try {
+        const json = JSON.parse(out) as { streams?: Record<string, unknown> }
+        const keys = Object.keys(json.streams ?? {})
+        resolve(sortQualities(keys))
+      } catch {
+        resolve([])
+      }
+    })
+  })
+}
+
 /**
  * Fragt streamlink nach der direkten HLS-URL für einen Stream oder VOD.
  * Wird für Live-Streams (twitch.tv/<login>) und VODs (twitch.tv/videos/<id>) verwendet.

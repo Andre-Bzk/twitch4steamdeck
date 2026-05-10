@@ -5,13 +5,16 @@
 <a name="english"></a>
 # Twitch4SteamDeck
 
-Ad-free Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and VOD playback with resume.
+> **Disclaimer:** This app was vibe coded with Claude Code— architecture and structure were planned together with AI, and all implementation was done through prompts. Not a single line was written by hand.
+
+Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and VOD playback with resume.
 
 ## Features
 
 - **Live Streams** — Ad-free playback via Streamlink + hls.js (HTML5 video, no external player)
 - **VOD Playback** — Watch recordings with automatic resume at last position
-- **VOD Chapters** — Browse and jump to chapters within VODs
+- **VOD Chapters** — Browse and jump to chapters within VODs; view count displayed on VOD cards
+- **Video Quality Selection** — Change stream quality on-the-fly during playback (Live and VOD); available qualities fetched dynamically via Streamlink; session-only, defaults to `best`
 - **Direct Stream Start** — Press A on any stream card in Browse/Top Streams/Category to start immediately without leaving the browse view
 - **Gamepad Control** — Full control via Steam Deck controller or Xbox gamepad, including Gaming Mode (reads `/dev/input/js*` directly, bypasses Chromium sandbox limitations)
 - **Big-Screen UI** — 10-foot interface optimized for TV/deck; fills the screen on Steam Deck and on external TVs when docked (React + Electron)
@@ -137,6 +140,8 @@ The script handles automatically:
 | A | Following | Open channel page |
 | A | Channel page | Play live stream / confirm |
 | A | During playback | Pause / Resume |
+| X | During playback | Open quality selection panel |
+| Y | During playback (VOD) | Open chapter menu |
 | B | During playback | Stop |
 | ← / → (D-Pad) | During playback | Seek ±30s |
 | LT / RT | During playback (VOD) | Seek ±5min |
@@ -172,13 +177,16 @@ The script handles automatically:
 <a name="deutsch"></a>
 # Twitch4SteamDeck
 
-Werbefreier Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-Steuerung und VOD-Wiedergabe mit Resume.
+> **Hinweis:** Diese App wurde mit Claude vibe coded — Architektur und Struktur wurden gemeinsam mit KI geplant, die gesamte Implementierung erfolgte per Prompt. Keine einzige Zeile wurde von Hand geschrieben.
+
+ Twitch-Client fuer das Steam Deck mit Big-Screen-UI, voller Gamepad-Steuerung und VOD-Wiedergabe mit Resume.
 
 ## Features
 
 - **Live-Streams** — Werbefreie Wiedergabe ueber Streamlink + hls.js (HTML5-Video, kein externer Player)
 - **VOD-Wiedergabe** — Aufnahmen ansehen mit automatischem Resume an der letzten Position
-- **VOD-Kapitel** — Kapitel in VODs durchsuchen und direkt anspringen
+- **VOD-Kapitel** — Kapitel in VODs durchsuchen und direkt anspringen; Aufrufzahl auf VOD-Karten
+- **Video-Qualitaetswahl** — Stream-Qualitaet waehrend der Wiedergabe aendern (Live und VOD); verfuegbare Qualitaeten werden dynamisch ueber Streamlink ermittelt; nur Session-State, Standard ist `best`
 - **Direkter Stream-Start** — A-Button auf einer Stream-Karte in Durchsuchen/Top-Streams/Kategorie startet den Stream sofort als Vollbild-Overlay, ohne die Browse-Ansicht zu verlassen
 - **Gamepad-Steuerung** — Volle Bedienung per Steam Deck Controller oder Xbox-Gamepad, auch im Gaming Mode (liest `/dev/input/js*` direkt, umgeht Chromium-Sandbox-Limitierungen)
 - **Big-Screen-UI** — 10-Foot-Interface optimiert fuer TV/Deck; bildschirmfuellend auf dem Steam Deck und auf externen TVs im Docking-Betrieb (React + Electron)
@@ -304,6 +312,8 @@ Das Script erledigt automatisch:
 | A | Du folgst | Kanalseite oeffnen |
 | A | Kanalseite | Live-Stream starten / Bestaetigen |
 | A | Waehrend Wiedergabe | Pause / Fortsetzen |
+| X | Waehrend Wiedergabe | Qualitaetspanel oeffnen |
+| Y | Waehrend Wiedergabe (VOD) | Kapitelmenü oeffnen |
 | B | Waehrend Wiedergabe | Stop |
 | ← / → (D-Pad) | Waehrend Wiedergabe | ±30s springen |
 | LT / RT | Waehrend Wiedergabe (VOD) | ±5min springen |

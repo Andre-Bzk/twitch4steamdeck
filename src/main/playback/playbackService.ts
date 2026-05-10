@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { getStreamUrl } from './streamlink'
+import { getAvailableQualities, getStreamUrl } from './streamlink'
 import type { PlaybackEvent } from './types'
 import * as history from '../store/historyRepo'
 
@@ -32,12 +32,17 @@ export class PlaybackService extends EventEmitter {
     this.emit('playback-event', { kind: 'started', isLive: true } satisfies PlaybackEvent)
   }
 
+  getAvailableQualities(twitchUrl: string): Promise<string[]> {
+    return getAvailableQualities(twitchUrl)
+  }
+
   async startVod(
     vodId: string,
     channelLogin: string,
     title: string,
     durationSeconds: number,
-    startSeconds?: number
+    startSeconds?: number,
+    quality = 'best'
   ): Promise<void> {
     const resumePos = history.getPosition(vodId)
     history.upsertVod({
@@ -50,7 +55,7 @@ export class PlaybackService extends EventEmitter {
 
     let hlsUrl: string
     try {
-      hlsUrl = await getStreamUrl(`https://www.twitch.tv/videos/${vodId}`, 'best')
+      hlsUrl = await getStreamUrl(`https://www.twitch.tv/videos/${vodId}`, quality)
     } catch (e) {
       this.emit('playback-event', {
         kind: 'error',
