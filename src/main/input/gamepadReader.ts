@@ -1,43 +1,84 @@
 /**
- * Liest Gamepad-Events direkt von /dev/input/js* (Linux joystick API).
- * Umgeht Chromiums Gamepad API, die in Flatpak/Gaming Mode nicht funktioniert,
- * weil Steam Input den Controller virtualisiert und udev-Events nicht
- * in die Sandbox propagieren.
+ * Liest Gamepad-Events via Linux evdev (/dev/input/event*).
+ *
+ * Erkennt Controller über /dev/input/js* und öffnet deren zugehöriges
+ * event*-Interface. Das evdev-Interface liefert standardisierte, benannte
+ * Button-Codes (BTN_SOUTH, BTN_NORTH, …) die über alle Controller-Typen
+ * (Xbox, PlayStation, Nintendo) und Verbindungsarten (USB, Bluetooth)
+ * konsistent sind – unabhängig davon, welchen Treiber der Kernel nutzt.
+ *
+ * Damit entfällt das alte Problem mit der button-Nummerierung im Joystick-API,
+ * bei dem Xbox-One-Controller via Bluetooth (Share-Button verschiebt die
+ * Nummerierung) X-Button als Nummer 3 statt 2 lieferten.
  *
  * Unterstützt mehrere Gamepads gleichzeitig (Steam Deck + Bluetooth Xbox).
  * Hotplug wird durch periodisches Scannen von /dev/input/ abgedeckt.
  *
- * Xbox 360 / Steam Virtual Controller Joystick-Mapping:
- *   Buttons: 0=A, 1=B, 2=X, 3=Y, 4=LB, 5=RB, 6=Back, 7=Start
- *   Axes:    0=LStickX, 1=LStickY, 2=LTrigger, 3=RStickX, 4=RStickY, 5=RTrigger, 6=DPadX, 7=DPadY
+ * BTN_*-Codes sind konsistent für alle Controller:
+ *   BTN_SOUTH (0x130) = A / Cross
+ *   BTN_EAST  (0x131) = B / Circle
+ *   BTN_NORTH (0x133) = X / Square
+ *   BTN_WEST  (0x134) = Y / Triangle
+ *   BTN_TL    (0x136) = LB / L1
+ *   BTN_TR    (0x137) = RB / R1
+ *   BTN_TL2   (0x138) = LT / L2 (als Button bei manchen Controllern)
+ *   BTN_TR2   (0x139) = RT / R2 (als Button bei manchen Controllern)
+ *   ABS_HAT0X (16)    = D-Pad X-Achse
+ *   ABS_HAT0Y (17)    = D-Pad Y-Achse
+ *   ABS_X/Y   (0/1)   = Linker Stick
+ *   ABS_Z/RZ  (2/5)   = LT/RT als Analog-Achse
  */
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { BrowserWindow } from 'electron'
 
-// js_event: { u32 time, s16 value, u8 type, u8 number } = 8 bytes
-const JS_EVENT_BUTTON = 0x01
-const JS_EVENT_AXIS = 0x02
-const JS_EVENT_INIT = 0x80
+// evdev input_event auf 64-bit Linux:
+// { u64 tv_sec (8 Bytes), u64 tv_usec (8 Bytes), u16 type (2), u16 code (2), s32 value (4) } = 24 Bytes
+const INPUT_EVENT_SIZE = 24
+
+const EV_KEY = 0x01
+const EV_ABS = 0x03
+
+// Button-Codes (BTN_GAMEPAD-Bereich) – konsistent über alle Controller und Treiber
+const BTN_SOUTH = 0x130
+const BTN_EAST  = 0x131
+const BTN_NORTH = 0x133
+const BTN_WEST  = 0x134
+const BTN_TL    = 0x136
+const BTN_TR    = 0x137
+const BTN_TL2   = 0x138
+const BTN_TR2   = 0x139
+
+// ABS-Achsen-Codes
+const ABS_X     = 0
+const ABS_Y     = 1
+const ABS_Z     = 2   // LT / L2
+const ABS_RZ    = 5   // RT / R2
+const ABS_HAT0X = 16  // D-Pad X
+const ABS_HAT0Y = 17  // D-Pad Y
 
 const BUTTON_MAP: Record<number, string> = {
-  0: 'Enter',   // A
-  1: 'Escape',  // B
-  2: 'x',       // X
-  3: 'y',       // Y
-  4: 'l1',      // LB / L1
-  5: 'r1'       // RB / R1
+  [BTN_SOUTH]: 'Enter',
+  [BTN_EAST]:  'Escape',
+  [BTN_NORTH]: 'x',
+  [BTN_WEST]:  'y',
+  [BTN_TL]:    'l1',
+  [BTN_TR]:    'r1',
+  [BTN_TL2]:   'l2',
+  [BTN_TR2]:   'r2',
 }
 
-const STICK_THRESHOLD = 16384 // ~50% von 32767
+const STICK_THRESHOLD = 16384  // ~50% von 32767
+// Trigger-Schwellwert: Achsenwert > 0 (nicht gedrückt) bis ~255–1023 je Controller
+const TRIGGER_THRESHOLD = 8
 const REPEAT_INITIAL_MS = 400
 const REPEAT_INTERVAL_MS = 150
-// L2/R2 Trigger: kein Auto-Repeat, da 300s-Spruenge nicht wiederholt werden sollen.
-const NO_REPEAT_AXES = new Set([2, 5])
+// Trigger-Achsen sollen kein Auto-Repeat auslösen (300s-Sprünge nicht wiederholen)
+const NO_REPEAT_ABS_CODES = new Set([ABS_Z, ABS_RZ])
 const SCAN_INTERVAL_MS = 3000
-// Bluetooth-/Steam-Setups liefern dieselbe Eingabe teils über mehrere js*-Devices.
-// Nahezu zeitgleiche identische Events werden deshalb global entdoppelt.
+// Bluetooth-/Steam-Setups können dieselbe Eingabe über mehrere Devices liefern.
+// Nahezu zeitgleiche identische Events werden global entdoppelt.
 const DUPLICATE_EVENT_WINDOW_MS = 40
 
 interface AxisState {
@@ -46,26 +87,45 @@ interface AxisState {
   interval: ReturnType<typeof setInterval> | null
 }
 
-class JoystickReader {
+/**
+ * Sucht das zugehörige evdev-Device (/dev/input/eventN) für ein
+ * Joystick-Device (/dev/input/jsN) über den /sys-Dateisystem-Pfad.
+ */
+function findEventDevice(jsDevicePath: string): string | null {
+  try {
+    const jsName = path.basename(jsDevicePath)             // 'js0'
+    const sysLink = `/sys/class/input/${jsName}`
+    const realPath = fs.realpathSync(sysLink)              // .../input/input7/js0
+    const inputDir = path.dirname(realPath)                 // .../input/input7
+    const entries = fs.readdirSync(inputDir)
+    const eventEntry = entries.find((e) => /^event\d+$/.test(e))
+    if (eventEntry) return `/dev/input/${eventEntry}`
+  } catch {
+    // Kein /sys-Zugriff oder Device verschwunden
+  }
+  return null
+}
+
+class EvdevReader {
   private stream: fs.ReadStream | null = null
   private buf = Buffer.alloc(0)
   private axes = new Map<number, AxisState>()
   private alive = true
 
   constructor(
-    readonly devicePath: string,
+    readonly eventPath: string,
     private onKey: (key: string) => void
   ) {}
 
   start(): boolean {
     try {
-      this.stream = fs.createReadStream(this.devicePath)
+      this.stream = fs.createReadStream(this.eventPath)
       this.stream.on('data', (chunk) => {
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
         this.buf = Buffer.concat([this.buf, buf])
-        while (this.buf.length >= 8) {
-          this.processEvent(this.buf.subarray(0, 8))
-          this.buf = this.buf.subarray(8)
+        while (this.buf.length >= INPUT_EVENT_SIZE) {
+          this.processEvent(this.buf.subarray(0, INPUT_EVENT_SIZE))
+          this.buf = this.buf.subarray(INPUT_EVENT_SIZE)
         }
       })
       this.stream.on('error', () => {
@@ -97,66 +157,60 @@ class JoystickReader {
   }
 
   private processEvent(raw: Buffer): void {
-    const value = raw.readInt16LE(4)
-    const rawType = raw.readUInt8(6)
-    const number = raw.readUInt8(7)
-    const isInit = (rawType & JS_EVENT_INIT) !== 0
-    const type = rawType & ~JS_EVENT_INIT
+    // Offsets in 24-Byte input_event: type @ 16, code @ 18, value @ 20
+    const type  = raw.readUInt16LE(16)
+    const code  = raw.readUInt16LE(18)
+    const value = raw.readInt32LE(20)
 
-    if (type === JS_EVENT_BUTTON && !isInit) {
+    if (type === EV_KEY) {
       if (value === 1) {
-        const key = BUTTON_MAP[number]
+        const key = BUTTON_MAP[code]
         if (key) this.onKey(key)
       }
-    } else if (type === JS_EVENT_AXIS) {
-      this.processAxis(number, value, isInit)
+    } else if (type === EV_ABS) {
+      this.processAxis(code, value)
     }
   }
 
-  private processAxis(axis: number, value: number, isInit: boolean): void {
+  private processAxis(code: number, value: number): void {
     let key: string | null = null
 
-    // D-Pad (Axes 6/7): binäre Werte (-32767, 0, 32767)
-    if (axis === 6) {
-      if (value < 0) key = 'ArrowLeft'
+    if (code === ABS_HAT0X) {
+      if (value < 0)      key = 'ArrowLeft'
       else if (value > 0) key = 'ArrowRight'
-    } else if (axis === 7) {
-      if (value < 0) key = 'ArrowUp'
+    } else if (code === ABS_HAT0Y) {
+      if (value < 0)      key = 'ArrowUp'
       else if (value > 0) key = 'ArrowDown'
-    }
-    // Left Stick (Axes 0/1): analoge Werte mit Deadzone
-    else if (axis === 0) {
-      if (value < -STICK_THRESHOLD) key = 'ArrowLeft'
+    } else if (code === ABS_X) {
+      if (value < -STICK_THRESHOLD)     key = 'ArrowLeft'
       else if (value > STICK_THRESHOLD) key = 'ArrowRight'
-    } else if (axis === 1) {
-      if (value < -STICK_THRESHOLD) key = 'ArrowUp'
+    } else if (code === ABS_Y) {
+      if (value < -STICK_THRESHOLD)     key = 'ArrowUp'
       else if (value > STICK_THRESHOLD) key = 'ArrowDown'
-    }
-    // Trigger (Axes 2/5): -32767 = nicht gedrückt, +32767 = voll gedrückt
-    else if (axis === 2) {
-      if (value > 0) key = 'l2'
-    } else if (axis === 5) {
-      if (value > 0) key = 'r2'
+    } else if (code === ABS_Z) {
+      if (value > TRIGGER_THRESHOLD) key = 'l2'
+    } else if (code === ABS_RZ) {
+      if (value > TRIGGER_THRESHOLD) key = 'r2'
     } else {
       return
     }
 
-    let state = this.axes.get(axis)
+    let state = this.axes.get(code)
     if (!state) {
       state = { key: null, timer: null, interval: null }
-      this.axes.set(axis, state)
+      this.axes.set(code, state)
     }
 
     if (key !== state.key) {
-      if (state.timer) clearTimeout(state.timer)
+      if (state.timer)    clearTimeout(state.timer)
       if (state.interval) clearInterval(state.interval)
-      state.timer = null
+      state.timer    = null
       state.interval = null
-      state.key = key
+      state.key      = key
 
-      if (key && !isInit) {
+      if (key) {
         this.onKey(key)
-        if (!NO_REPEAT_AXES.has(axis)) {
+        if (!NO_REPEAT_ABS_CODES.has(code)) {
           const k = key
           state.timer = setTimeout(() => {
             if (state!.key === k) {
@@ -173,13 +227,141 @@ class JoystickReader {
 }
 
 /**
- * Startet das Lesen aller /dev/input/js* Devices.
+ * Fallback-Reader für den Fall, dass kein evdev-Device gefunden wird.
+ * Nutzt das alte Joystick-API (8-Byte-Events, Joystick-Nummern-Mapping).
+ * Deckt Controller ab, die kein /sys-Event-Device-Mapping haben.
+ */
+class JoystickFallbackReader {
+  private stream: fs.ReadStream | null = null
+  private buf = Buffer.alloc(0)
+  private axes = new Map<number, AxisState>()
+  private alive = true
+
+  private static readonly BUTTON_MAP: Record<number, string> = {
+    0: 'Enter',
+    1: 'Escape',
+    2: 'x',
+    3: 'y',
+    4: 'l1',
+    5: 'r1',
+  }
+
+  constructor(
+    readonly devicePath: string,
+    private onKey: (key: string) => void
+  ) {}
+
+  start(): boolean {
+    try {
+      this.stream = fs.createReadStream(this.devicePath)
+      this.stream.on('data', (chunk) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+        this.buf = Buffer.concat([this.buf, buf])
+        while (this.buf.length >= 8) {
+          this.processEvent(this.buf.subarray(0, 8))
+          this.buf = this.buf.subarray(8)
+        }
+      })
+      this.stream.on('error', () => { this.alive = false; this.stop() })
+      this.stream.on('close', () => { this.alive = false })
+      return true
+    } catch {
+      this.alive = false
+      return false
+    }
+  }
+
+  stop(): void {
+    this.stream?.destroy()
+    this.stream = null
+    for (const state of this.axes.values()) {
+      if (state.timer) clearTimeout(state.timer)
+      if (state.interval) clearInterval(state.interval)
+    }
+    this.axes.clear()
+  }
+
+  isAlive(): boolean { return this.alive }
+
+  private processEvent(raw: Buffer): void {
+    const value   = raw.readInt16LE(4)
+    const rawType = raw.readUInt8(6)
+    const number  = raw.readUInt8(7)
+    const isInit  = (rawType & 0x80) !== 0
+    const type    = rawType & ~0x80
+
+    if (type === 0x01 && !isInit) {
+      if (value === 1) {
+        const key = JoystickFallbackReader.BUTTON_MAP[number]
+        if (key) this.onKey(key)
+      }
+    } else if (type === 0x02) {
+      this.processAxis(number, value, isInit)
+    }
+  }
+
+  private processAxis(axis: number, value: number, isInit: boolean): void {
+    let key: string | null = null
+    if (axis === 6) {
+      if (value < 0) key = 'ArrowLeft'
+      else if (value > 0) key = 'ArrowRight'
+    } else if (axis === 7) {
+      if (value < 0) key = 'ArrowUp'
+      else if (value > 0) key = 'ArrowDown'
+    } else if (axis === 0) {
+      if (value < -STICK_THRESHOLD)     key = 'ArrowLeft'
+      else if (value > STICK_THRESHOLD) key = 'ArrowRight'
+    } else if (axis === 1) {
+      if (value < -STICK_THRESHOLD)     key = 'ArrowUp'
+      else if (value > STICK_THRESHOLD) key = 'ArrowDown'
+    } else if (axis === 2) {
+      if (value > 0) key = 'l2'
+    } else if (axis === 5) {
+      if (value > 0) key = 'r2'
+    } else {
+      return
+    }
+
+    let state = this.axes.get(axis)
+    if (!state) {
+      state = { key: null, timer: null, interval: null }
+      this.axes.set(axis, state)
+    }
+
+    if (key !== state.key) {
+      if (state.timer)    clearTimeout(state.timer)
+      if (state.interval) clearInterval(state.interval)
+      state.timer    = null
+      state.interval = null
+      state.key      = key
+
+      if (key && !isInit) {
+        this.onKey(key)
+        if (axis !== 2 && axis !== 5) {
+          const k = key
+          state.timer = setTimeout(() => {
+            if (state!.key === k) {
+              this.onKey(k)
+              state!.interval = setInterval(() => {
+                if (state!.key === k) this.onKey(k)
+              }, REPEAT_INTERVAL_MS)
+            }
+          }, REPEAT_INITIAL_MS)
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Startet das Lesen aller /dev/input/js* Devices (evdev-Interface bevorzugt).
  * Gibt eine Cleanup-Funktion zurück.
  */
 export function startGamepadReader(getWindow: () => BrowserWindow | null): () => void {
   if (process.platform !== 'linux') return () => {}
 
-  const readers = new Map<string, JoystickReader>()
+  // Keyed by js-Device-Pfad
+  const readers = new Map<string, EvdevReader | JoystickFallbackReader>()
   const lastKeyAt = new Map<string, number>()
 
   const onKey = (key: string): void => {
@@ -201,31 +383,42 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
 
       for (const entry of entries) {
         if (!entry.startsWith('js')) continue
-        const devPath = path.join(inputDir, entry)
-        seen.add(devPath)
+        const jsPath = path.join(inputDir, entry)
+        seen.add(jsPath)
 
-        if (readers.has(devPath)) {
-          if (!readers.get(devPath)!.isAlive()) {
-            readers.get(devPath)!.stop()
-            readers.delete(devPath)
+        if (readers.has(jsPath)) {
+          if (!readers.get(jsPath)!.isAlive()) {
+            readers.get(jsPath)!.stop()
+            readers.delete(jsPath)
           } else {
             continue
           }
         }
 
-        const reader = new JoystickReader(devPath, onKey)
-        if (reader.start()) {
-          readers.set(devPath, reader)
-          console.log(`[gamepad] geöffnet: ${devPath}`)
+        const eventPath = findEventDevice(jsPath)
+        let reader: EvdevReader | JoystickFallbackReader
+
+        if (eventPath) {
+          reader = new EvdevReader(eventPath, onKey)
+          if (reader.start()) {
+            readers.set(jsPath, reader)
+            console.log(`[gamepad] geöffnet (evdev): ${jsPath} → ${eventPath}`)
+          }
+        } else {
+          // Fallback auf altes Joystick-API wenn kein /sys-Mapping gefunden
+          reader = new JoystickFallbackReader(jsPath, onKey)
+          if (reader.start()) {
+            readers.set(jsPath, reader)
+            console.log(`[gamepad] geöffnet (js-fallback): ${jsPath}`)
+          }
         }
       }
 
-      // Entfernte Devices aufräumen
-      for (const [devPath, reader] of readers) {
-        if (!seen.has(devPath)) {
-          console.log(`[gamepad] getrennt: ${devPath}`)
+      for (const [jsPath, reader] of readers) {
+        if (!seen.has(jsPath)) {
+          console.log(`[gamepad] getrennt: ${jsPath}`)
           reader.stop()
-          readers.delete(devPath)
+          readers.delete(jsPath)
         }
       }
     } catch {

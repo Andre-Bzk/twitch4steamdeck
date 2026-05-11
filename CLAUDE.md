@@ -10,6 +10,7 @@ Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Sc
 |---|---|
 | Framework | Electron 33, electron-vite, React 18, TypeScript 5.5 |
 | Playback | hls.js 1.6 (HTML5 `<video>` im Renderer), Streamlink 6.11.0 im Flatpak-Build / 8.2.1 im Windows-Dev (nur für `--stream-url`) |
+| Gamepad (Linux) | evdev `/dev/input/event*` mit BTN_*-Codes (Xbox, PlayStation, Nintendo; USB + Bluetooth) |
 | DB | better-sqlite3 (VOD-Verlauf + Resume-Positionen) |
 | Packaging | Flatpak (freedesktop SDK 24.08, Electron2 BaseApp) |
 | Build-Host | Windows, Flatpak-Build läuft in WSL2 |
@@ -26,7 +27,7 @@ Electron Main Process
 ├── PlaybackService      — Live-/VOD-Orchestrierung
 │   └── streamlink.ts    — getStreamUrl() + getAvailableQualities() via streamlink
 ├── historyRepo          — SQLite VOD-Verlauf (Resume, Completed)
-└── gamepadReader        — Linux /dev/input/js* Joystick-Leser
+└── gamepadReader        — Linux evdev /dev/input/event* (via js*-Discovery, BTN_*-Codes)
 
 Preload (contextBridge)
 └── window.t4sd          — Typisierte IPC-Bridge (auth, twitch, history, playback, gamepad)
@@ -55,7 +56,7 @@ Renderer (React)
 - **Qualitätswechsel:** `videoRef.current.stop()` → `startLive/startVod(quality)` → neuer `playback:hls-url` Event — streamlink-Neustart nötig, da Single-Bitrate-HLS (kein hls.js Level-Switch möglich)
 - **Qualitätsliste:** `IPC playback:get-qualities` → `streamlink --json <url>` → `Object.keys(streams)` sortiert nach fixem Order-Array
 - **Position-Tracking:** `VideoPlayer` meldet alle 5s via IPC `playback:report-position` → Main → SQLite
-- **Gamepad:** `/dev/input/js*` (Linux/Gaming-Mode) **oder** `navigator.getGamepads()` (Windows/Dev) → synthetische `KeyboardEvent`s → alle Screen-Handler reagieren auf Keys
+- **Gamepad:** evdev `/dev/input/event*` via js*-Discovery (Linux/Gaming-Mode) **oder** `navigator.getGamepads()` (Windows/Dev) → synthetische `KeyboardEvent`s → alle Screen-Handler reagieren auf Keys
 
 ---
 
@@ -98,7 +99,7 @@ src/main/
     deviceCodeFlow.ts         — OAuth Device Code + Polling (https://id.twitch.tv/oauth2/)
     tokenStore.ts             — safeStorage-Verschlüsselung, Fallback auf plaintext
   input/
-    gamepadReader.ts          — /dev/input/js* Leser, Hotplug (3s-Scan), Deduplizierung (40ms)
+    gamepadReader.ts          — evdev /dev/input/event* Leser (via js*-Discovery), Hotplug (3s-Scan), Deduplizierung (40ms); BTN_*-Codes für controller-unabhängiges Mapping
   ipc/
     handlers.ts               — Alle ipcMain.handle()-Registrierungen + Event-Forwarding
   playback/
@@ -217,10 +218,11 @@ Video läuft als HTML5 `<video>` Element innerhalb des Electron-Fensters — **k
 Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuft das Video **weiter** (nicht pausiert). `PlaybackOverlay` wird per conditional render (`!chapterPanelVod`) ausgeblendet, sodass das Kapitel-Panel sauber über dem Video erscheint. Nach Kapitelwahl: `seekTo(chapter.positionSeconds)` — kein `play()` nötig, da Video bereits läuft. Nach Schließen ohne Auswahl: Panel weg, Video läuft unverändert weiter. Bei leerer Kapitelliste: X-Taste seeked zu `0` (Videoanfang).
 
 ### Gamepad Dual-Path
-- **Linux/Gaming-Mode:** `src/main/input/gamepadReader.ts` liest `/dev/input/js*` direkt (Chromium Gamepad API funktioniert nicht im Flatpak-Sandbox ohne udev)
+- **Linux/Gaming-Mode:** `src/main/input/gamepadReader.ts` nutzt Linux evdev (`/dev/input/event*`). Erkennung läuft über `/dev/input/js*`-Scan; für jedes js*-Device wird via `/sys/class/input/jsN` das zugehörige `event*`-Device ermittelt und geöffnet. Dadurch werden standardisierte `BTN_*`-Codes gelesen (BTN_NORTH=X, BTN_SOUTH=A usw.) — funktioniert treiber- und controller-unabhängig für Xbox, PlayStation, Nintendo und beliebige USB/Bluetooth-Gamepads.
 - **Windows/Dev:** `src/renderer/src/input/gamepad.ts` nutzt `navigator.getGamepads()` via rAF-Loop
 - Beide Pfade erzeugen synthetische `KeyboardEvent('keydown')`. Alle UI-Komponenten reagieren nur auf Key-Events — kein Gamepad-Code in Screens.
 - Button-Mapping: A=Enter, B=Escape, X=x, Y=y, LB=l1, RB=r1, LT=l2, RT=r2, DPad=Arrows
+- Fallback: Falls `/sys`-Lookup fehlschlägt, öffnet `JoystickFallbackReader` das js*-Device direkt (altes Joystick-API mit festem Button-Nummern-Mapping)
 
 ### A-Button-Verhalten je Screen
 | Screen | A-Button | X-Button |
@@ -261,8 +263,8 @@ Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuf
 | Twitch Live-Stream URL-Expiry | Unkritisch | `streamlink --stream-url` Token in URL kann ablaufen. hls.js handelt Playlist-Refresh automatisch; bei Verbindungsabbruch muss neu gestartet werden. |
 | Ad-Bypass | Nicht implementiert | `--twitch-disable-ads` von Streamlink deprecated. Post-MVP. |
 | Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |
-| Browser Gamepad API in Gaming Mode | Nicht nutzbar | Steam Input + Flatpak-Sandbox blockiert udev-Events für Chromium. Deshalb `/dev/input/js*` direkt. |
-| Bluetooth-Controller-Deduplizierung | Aktiv | Mehrere `/dev/input/js*`-Devices melden gleiche Inputs → 40ms-Deduplizierungsfenster in `gamepadReader.ts` |
+| Browser Gamepad API in Gaming Mode | Nicht nutzbar | Steam Input + Flatpak-Sandbox blockiert udev-Events für Chromium. Deshalb evdev direkt im Main-Process. |
+| Bluetooth-Controller-Deduplizierung | Aktiv | Mehrere `/dev/input/js*`-Devices (z.B. Raw-Device + Steam-Virtual-Device) → 40ms-Deduplizierungsfenster in `gamepadReader.ts` |
 | Flatpak-Manifest mpv-Einträge | Noch nicht bereinigt | `tv.twitch4steamdeck.App.yml` enthält noch mpv-Build-Schritte und den mpv-Patch — nach Steam Deck Test entfernen. |
 | Direkt-Start: kein VOD-Support | By Design | AppShell-Overlay nur für Live-Streams. VODs nur über Kanalseite (ChannelScreen) mit Resume + Kapitel. |
 
@@ -308,9 +310,10 @@ Beim Start erscheinen diese Logs (alle mit `[VideoPlayer]`-Prefix):
 2. hls.js seeked in `MANIFEST_PARSED`-Handler: `video.currentTime = startPosition`
 
 ### Gamepad-Eingaben kommen nicht an (Steam Deck)
-1. `gamepadReader.ts` liest `/dev/input/js*` — prüfen ob Device vorhanden
-2. Deduplizierungs-Fenster: 40ms — bei Doppel-Inputs erhöhen
-3. Axis-Mapping: DPad ist Axis 6/7 (binary), Stick ist 0/1 (threshold 16384)
+1. `gamepadReader.ts` scannt `/dev/input/js*` — prüfen ob js-Device vorhanden (`ls /dev/input/js*`)
+2. Für jedes js-Device wird via `/sys/class/input/jsN` ein evdev-Device (`event*`) gesucht — Log `[gamepad] geöffnet (evdev): /dev/input/js0 → /dev/input/event4` zeigt ob das funktioniert
+3. Deduplizierungs-Fenster: 40ms — bei Doppel-Inputs `DUPLICATE_EVENT_WINDOW_MS` erhöhen
+4. Axis-Mapping: DPad ist ABS_HAT0X/Y (code 16/17), Stick ist ABS_X/Y (code 0/1, threshold 16384)
 
 ### IPC-Channel fehlt / unbekannt
 Prüfen: `handlers.ts` (Main), `preload/index.ts` (Bridge), `t4sd.d.ts` (Renderer-Typen) — alle drei müssen übereinstimmen.

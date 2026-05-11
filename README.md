@@ -9,6 +9,20 @@
 
 Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and VOD playback with resume.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/browse.jpg" width="49%" alt="Browse screen" />
+  <img src="screenshots/follow.jpg" width="49%" alt="Following screen" />
+</p>
+<p align="center">
+  <img src="screenshots/channelscreen.jpg" width="49%" alt="Channel screen" />
+  <img src="screenshots/player_overlay.jpg" width="49%" alt="Playback overlay" />
+</p>
+<p align="center">
+  <img src="screenshots/chapter.jpg" width="49%" alt="Chapter panel" />
+</p>
+
 ## Features
 
 - **Live Streams** — Ad-free playback via Streamlink + hls.js (HTML5 video, no external player)
@@ -16,7 +30,7 @@ Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and V
 - **VOD Chapters** — Browse and jump to chapters within VODs; view count displayed on VOD cards
 - **Video Quality Selection** — Change stream quality on-the-fly during playback (Live and VOD); available qualities fetched dynamically via Streamlink; session-only, defaults to `best`
 - **Direct Stream Start** — Press A on any stream card in Browse/Top Streams/Category to start immediately without leaving the browse view
-- **Gamepad Control** — Full control via Steam Deck controller or Xbox gamepad, including Gaming Mode (reads `/dev/input/js*` directly, bypasses Chromium sandbox limitations)
+- **Gamepad Control** — Full control via Steam Deck controller, Xbox, or PlayStation gamepad (USB and Bluetooth), including Gaming Mode (reads Linux evdev `/dev/input/event*` directly with standardized BTN_* codes — works with any controller regardless of driver)
 - **Big-Screen UI** — 10-foot interface optimized for TV/deck; fills the screen on Steam Deck and on external TVs when docked (React + Electron)
 - **Twitch Login** — Device Code Flow with QR code (no browser required)
 - **Following** — Live status and overview of followed streamers
@@ -34,7 +48,7 @@ Electron (Main Process)
   ├── Auth          -- Twitch Device Code Flow + token management (Electron safeStorage)
   ├── Helix Client  -- Twitch API (followed channels, streams, VODs, categories, chapters via GQL)
   ├── Playback      -- Streamlink --stream-url → HLS URL → IPC event to renderer
-  ├── Gamepad       -- Linux joystick API (/dev/input/js*)
+  ├── Gamepad       -- Linux evdev (/dev/input/event*), discovered via js*, BTN_* codes
   └── History       -- SQLite (better-sqlite3) for VOD history + resume
 
 Electron (Renderer)
@@ -166,7 +180,7 @@ The script handles automatically:
 | Video | hls.js 1.6 (HTML5 `<video>` in Renderer) |
 | Stream URL | Streamlink 8.2.1 (Windows dev) / 6.11.0 (Flatpak) via `--stream-url` |
 | Database | better-sqlite3 |
-| Gamepad | Linux joystick API (`/dev/input/js*`) |
+| Gamepad | Linux evdev (`/dev/input/event*`), Xbox / PS / any BT or USB controller |
 | Packaging | Flatpak / electron-builder (AppImage) |
 | HW Decoding | Chromium VA-API (automatic on Steam Deck) |
 
@@ -183,12 +197,12 @@ The script handles automatically:
 
 ## Features
 
-- **Live-Streams** — Werbefreie Wiedergabe ueber Streamlink + hls.js (HTML5-Video, kein externer Player)
+- **Live-Streams** — Wiedergabe ueber Streamlink + hls.js (HTML5-Video, kein externer Player)
 - **VOD-Wiedergabe** — Aufnahmen ansehen mit automatischem Resume an der letzten Position
 - **VOD-Kapitel** — Kapitel in VODs durchsuchen und direkt anspringen; Aufrufzahl auf VOD-Karten
 - **Video-Qualitaetswahl** — Stream-Qualitaet waehrend der Wiedergabe aendern (Live und VOD); verfuegbare Qualitaeten werden dynamisch ueber Streamlink ermittelt; nur Session-State, Standard ist `best`
 - **Direkter Stream-Start** — A-Button auf einer Stream-Karte in Durchsuchen/Top-Streams/Kategorie startet den Stream sofort als Vollbild-Overlay, ohne die Browse-Ansicht zu verlassen
-- **Gamepad-Steuerung** — Volle Bedienung per Steam Deck Controller oder Xbox-Gamepad, auch im Gaming Mode (liest `/dev/input/js*` direkt, umgeht Chromium-Sandbox-Limitierungen)
+- **Gamepad-Steuerung** — Volle Bedienung per Steam Deck Controller, Xbox- oder PlayStation-Gamepad (USB und Bluetooth), auch im Gaming Mode (liest Linux evdev `/dev/input/event*` direkt mit standardisierten BTN_*-Codes — funktioniert mit jedem Controller unabhängig vom Treiber)
 - **Big-Screen-UI** — 10-Foot-Interface optimiert fuer TV/Deck; bildschirmfuellend auf dem Steam Deck und auf externen TVs im Docking-Betrieb (React + Electron)
 - **Twitch-Login** — Device Code Flow mit QR-Code (kein Browser noetig)
 - **Gefolgte Kanaele** — Live-Status und Uebersicht der gefolgten Streamer
@@ -206,7 +220,7 @@ Electron (Main Process)
   ├── Auth          -- Twitch Device Code Flow + Token-Verwaltung (Electron safeStorage)
   ├── Helix Client  -- Twitch API (gefolgte Kanaele, Streams, VODs, Kategorien, Kapitel via GQL)
   ├── Playback      -- Streamlink --stream-url → HLS-URL → IPC-Event an Renderer
-  ├── Gamepad       -- Linux joystick API (/dev/input/js*)
+  ├── Gamepad       -- Linux evdev (/dev/input/event*), via js* erkannt, BTN_*-Codes
   └── History       -- SQLite (better-sqlite3) fuer VOD-Verlauf + Resume
 
 Electron (Renderer)
@@ -338,7 +352,7 @@ Das Script erledigt automatisch:
 | Video | hls.js 1.6 (HTML5 `<video>` im Renderer) |
 | Stream-URL | Streamlink 8.2.1 (Windows-Dev) / 6.11.0 (Flatpak) via `--stream-url` |
 | Datenbank | better-sqlite3 |
-| Gamepad | Linux joystick API (`/dev/input/js*`) |
+| Gamepad | Linux evdev (`/dev/input/event*`), Xbox / PS / beliebiger BT- oder USB-Controller |
 | Packaging | Flatpak / electron-builder (AppImage) |
 | HW-Decoding | Chromium VA-API (automatisch auf Steam Deck) |
 
