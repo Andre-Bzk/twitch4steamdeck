@@ -5,6 +5,7 @@ import { HelixClient } from './twitch/helixClient'
 import { PlaybackService } from './playback/playbackService'
 import { registerIpcHandlers } from './ipc/handlers'
 import { startGamepadReader } from './input/gamepadReader'
+import { getHlsCacheEnabled } from './prefs/hlsCachePref'
 
 const isDev = !app.isPackaged
 
@@ -53,11 +54,18 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function isHlsStreamContent(url: string): boolean {
+  const pathEnd = url.indexOf('?')
+  const path = pathEnd === -1 ? url : url.slice(0, pathEnd)
+  return /\.(m3u8|ts|m4s|aac)$/i.test(path)
+}
+
 /**
  * CORS-Bypass für Twitch CDN und HLS-Streams.
  * hls.js im Renderer sendet Requests von localhost/file:// — Twitch CDN erwartet
  * Origin: https://www.twitch.tv. Wir setzen Origin + Referer auf ausgehenden Requests
  * und ergänzen CORS-Response-Header, damit Chromium die Antworten akzeptiert.
+ * Zusätzlich: cache-control: no-store für HLS-Inhalte wenn hlsCacheEnabled=false.
  */
 function setupTwitchCors(): void {
   const isTwitchCdn = (url: string): boolean =>
@@ -75,18 +83,24 @@ function setupTwitchCors(): void {
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    if (isTwitchCdn(details.url)) {
-      const headers: Record<string, string[]> = {}
-      for (const [k, v] of Object.entries(details.responseHeaders ?? {})) {
-        headers[k.toLowerCase()] = Array.isArray(v) ? v : [v]
-      }
+    const isCdn = isTwitchCdn(details.url)
+    const applyNoStore = isHlsStreamContent(details.url) && !getHlsCacheEnabled()
+
+    if (!isCdn && !applyNoStore) { callback({}); return }
+
+    const headers: Record<string, string[]> = {}
+    for (const [k, v] of Object.entries(details.responseHeaders ?? {})) {
+      headers[k.toLowerCase()] = Array.isArray(v) ? v : [v]
+    }
+    if (isCdn) {
       headers['access-control-allow-origin'] = ['*']
       headers['access-control-allow-headers'] = ['*']
       headers['access-control-allow-methods'] = ['GET, HEAD, OPTIONS']
-      callback({ responseHeaders: headers })
-    } else {
-      callback({})
     }
+    if (applyNoStore) {
+      headers['cache-control'] = ['no-store']
+    }
+    callback({ responseHeaders: headers })
   })
 }
 

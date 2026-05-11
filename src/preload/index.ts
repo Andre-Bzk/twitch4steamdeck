@@ -26,6 +26,10 @@ const IPC = {
   playbackEvent: 'playback:event',
   playbackHlsUrl: 'playback:hls-url',
 
+  appGetCacheSize: 'app:get-cache-size',
+  appClearCache: 'app:clear-cache',
+  appSetHlsCacheEnabled: 'app:set-hls-cache-enabled',
+
   gamepadInput: 'gamepad-input'
 } as const
 
@@ -119,7 +123,10 @@ export interface TopStreamsResult {
 const api = {
   appVersion: process.env.APP_VERSION ?? process.env.npm_package_version ?? '0.0.0-dev',
   app: {
-    quit: (): Promise<void> => ipcRenderer.invoke(IPC.appQuit)
+    quit: (): Promise<void> => ipcRenderer.invoke(IPC.appQuit),
+    getCacheSize: (): Promise<number> => ipcRenderer.invoke(IPC.appGetCacheSize),
+    clearCache: (): Promise<void> => ipcRenderer.invoke(IPC.appClearCache),
+    setHlsCacheEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.appSetHlsCacheEnabled, enabled)
   },
   auth: {
     isConfigured: (): Promise<boolean> => ipcRenderer.invoke(IPC.authConfigured),

@@ -1306,6 +1306,80 @@ body,
   white-space: nowrap;
 }
 
+/* ── Settings Cache ──────────────────────────────── */
+.settings-cache {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--color-bg-elev);
+  border: 2px solid transparent;
+  color: var(--color-fg);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  margin-top: 8px;
+  transition: background 0.1s, border-color 0.1s, opacity 0.1s;
+}
+
+.settings-cache:hover:not(:disabled) {
+  background: var(--color-bg-elev2);
+}
+
+.settings-cache:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.settings-cache--focused {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 2px rgba(191, 148, 255, 0.25);
+}
+
+.settings-cache__info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-cache__size {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-fg);
+  min-width: 90px;
+}
+
+.settings-cache__pill {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+.settings-cache__pill--normal {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-fg-dim);
+}
+
+.settings-cache__pill--unusual {
+  background: rgba(255, 184, 60, 0.18);
+  color: #ffc56b;
+}
+
+.settings-cache__pill--high {
+  background: rgba(255, 95, 95, 0.18);
+  color: #ff8585;
+}
+
+.settings-cache__action {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
 .settings-screen {
   overflow-y: auto;
 }

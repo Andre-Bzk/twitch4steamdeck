@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { setHlsCacheEnabled } from '../prefs/hlsCachePref'
 import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AuthEvent, AuthService } from '../auth/authService'
@@ -35,7 +36,11 @@ export const IPC = {
   /** main → renderer */
   playbackEvent: 'playback:event',
   /** main → renderer: HLS-URL + Metadaten für den Renderer-seitigen Video-Player */
-  playbackHlsUrl: 'playback:hls-url'
+  playbackHlsUrl: 'playback:hls-url',
+
+  appGetCacheSize: 'app:get-cache-size',
+  appClearCache: 'app:clear-cache',
+  appSetHlsCacheEnabled: 'app:set-hls-cache-enabled'
 } as const
 
 export function registerIpcHandlers(
@@ -45,6 +50,12 @@ export function registerIpcHandlers(
 ): void {
   ipcMain.handle(IPC.appQuit, () => {
     app.quit()
+  })
+
+  ipcMain.handle(IPC.appGetCacheSize, () => session.defaultSession.getCacheSize())
+  ipcMain.handle(IPC.appClearCache, () => session.defaultSession.clearCache())
+  ipcMain.handle(IPC.appSetHlsCacheEnabled, (_e, enabled: boolean) => {
+    setHlsCacheEnabled(Boolean(enabled))
   })
 
   ipcMain.handle(IPC.authStatus, () => auth.getStatus())

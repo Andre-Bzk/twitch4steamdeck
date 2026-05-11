@@ -91,6 +91,9 @@ export interface T4sdApi {
   appVersion: string
   app: {
     quit: () => Promise<void>
+    getCacheSize: () => Promise<number>
+    clearCache: () => Promise<void>
+    setHlsCacheEnabled: (enabled: boolean) => Promise<void>
   }
   auth: {
     isConfigured: () => Promise<boolean>

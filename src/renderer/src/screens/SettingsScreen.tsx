@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { SettingsIcon } from '../components/Icons'
 import {
@@ -9,7 +9,7 @@ import {
   SIDEBAR_DEFAULT,
   BADGE_GAP_MIN,
   BADGE_GAP_MAX,
-  BADGE_GAP_DEFAULT
+  BADGE_GAP_DEFAULT,
 } from '../context/SettingsContext'
 
 interface Props {
@@ -33,16 +33,64 @@ const OPTIONS: Option[] = [
 const SIDEBAR_STEP = 10
 const BADGE_GAP_STEP = 2
 
-/** Total focusable rows: badge options + sidebar slider + badge gap slider */
+const MB = 1024 * 1024
+const CACHE_THRESHOLD_UNUSUAL = 500 * MB
+const CACHE_THRESHOLD_HIGH = 1024 * MB
+
+type CacheStatus = 'normal' | 'unusual' | 'high'
+
+function formatCacheSize(bytes: number): string {
+  if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`
+  const mb = bytes / MB
+  if (mb < 1000) return `${mb.toFixed(0)} MB`
+  return `${(mb / 1024).toFixed(2)} GB`
+}
+
+function classifyCache(bytes: number): { status: CacheStatus; label: string } {
+  if (bytes >= CACHE_THRESHOLD_HIGH) return { status: 'high', label: 'Leeren empfohlen' }
+  if (bytes >= CACHE_THRESHOLD_UNUSUAL) return { status: 'unusual', label: 'Ungewöhnlich groß' }
+  return { status: 'normal', label: 'Normal' }
+}
+
+/** Total focusable rows: badge options + sidebar slider + badge gap slider + hls toggle + cache action */
 const SIDEBAR_SLIDER_ROW = OPTIONS.length
 const BADGE_GAP_SLIDER_ROW = OPTIONS.length + 1
-const TOTAL_ROWS = OPTIONS.length + 2
+const HLS_CACHE_TOGGLE_ROW = OPTIONS.length + 2
+const CACHE_ACTION_ROW = OPTIONS.length + 3
+const TOTAL_ROWS = OPTIONS.length + 4
 
 export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): JSX.Element {
-  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap } = useSettings()
+  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled } = useSettings()
   const [focusedIndex, setFocusedIndex] = useState(() =>
     Math.max(0, OPTIONS.findIndex((o) => o.mode === settings.streamBadgeMode))
   )
+
+  const [cacheSize, setCacheSize] = useState<number | null>(null)
+  const [clearing, setClearing] = useState(false)
+
+  const refreshCacheSize = useCallback(async (): Promise<void> => {
+    try {
+      const size = await window.t4sd.app.getCacheSize()
+      setCacheSize(size)
+    } catch {
+      setCacheSize(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshCacheSize()
+  }, [refreshCacheSize])
+
+  const handleClearCache = useCallback(async (): Promise<void> => {
+    if (clearing) return
+    setClearing(true)
+    try {
+      await window.t4sd.app.clearCache()
+      await refreshCacheSize()
+    } finally {
+      setClearing(false)
+    }
+  }, [clearing, refreshCacheSize])
 
   useEffect(() => {
     if (!hasFocus) return
@@ -88,6 +136,10 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
             setSidebarWidth(SIDEBAR_DEFAULT)
           } else if (focusedIndex === BADGE_GAP_SLIDER_ROW) {
             setBadgeGap(BADGE_GAP_DEFAULT)
+          } else if (focusedIndex === HLS_CACHE_TOGGLE_ROW) {
+            setHlsCacheEnabled(!settings.hlsCacheEnabled)
+          } else if (focusedIndex === CACHE_ACTION_ROW) {
+            void handleClearCache()
           }
           break
         }
@@ -95,7 +147,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap])
+  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.hlsCacheEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, handleClearCache])
 
   const rowRefs = useRef<Array<HTMLElement | null>>([])
 
@@ -107,6 +159,10 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
 
   const sidebarSliderFocused = hasFocus && focusedIndex === SIDEBAR_SLIDER_ROW
   const badgeGapSliderFocused = hasFocus && focusedIndex === BADGE_GAP_SLIDER_ROW
+  const hlsCacheToggleFocused = hasFocus && focusedIndex === HLS_CACHE_TOGGLE_ROW
+  const cacheActionFocused = hasFocus && focusedIndex === CACHE_ACTION_ROW
+
+  const cacheClassification = cacheSize !== null ? classifyCache(cacheSize) : null
 
   return (
     <div className="screen settings-screen">
@@ -224,6 +280,68 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           />
           <span className="settings-slider__value">{settings.badgeGap} px</span>
         </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section__title">Speicher</h3>
+        <p className="settings-section__hint">
+          HLS-Segmente (Live &amp; VODs) sind Single-Use — sie werden nach dem Abspielen nie
+          wieder abgerufen. Caching erzeugt auf dem Steam Deck unnötiges Disk-Wachstum und
+          Akku-Belastung. Thumbnails und API-Antworten bleiben immer gecacht.
+          Cache-Größe: Normal unter 500 MB · ungewöhnlich ab 500 MB · Leeren empfohlen ab 1 GB.
+        </p>
+
+        <button
+          ref={(el) => { rowRefs.current[HLS_CACHE_TOGGLE_ROW] = el }}
+          className={[
+            'settings-option',
+            settings.hlsCacheEnabled ? 'settings-option--active' : '',
+            hlsCacheToggleFocused ? 'settings-option--focused' : ''
+          ].filter(Boolean).join(' ')}
+          onClick={() => {
+            setFocusedIndex(HLS_CACHE_TOGGLE_ROW)
+            setHlsCacheEnabled(!settings.hlsCacheEnabled)
+          }}
+          tabIndex={hlsCacheToggleFocused ? 0 : -1}
+        >
+          <span className="settings-option__radio" aria-hidden="true">
+            {settings.hlsCacheEnabled ? '●' : '○'}
+          </span>
+          <span className="settings-option__label">HLS-Cache (Live &amp; VODs)</span>
+          <span className="settings-option__preview">
+            {settings.hlsCacheEnabled
+              ? 'Aktiv — Segmente werden gecacht'
+              : 'Inaktiv — kein Disk-Wachstum (empfohlen)'}
+          </span>
+        </button>
+
+        <button
+          ref={(el) => { rowRefs.current[CACHE_ACTION_ROW] = el }}
+          className={[
+            'settings-cache',
+            cacheActionFocused ? 'settings-cache--focused' : ''
+          ].filter(Boolean).join(' ')}
+          onClick={() => {
+            setFocusedIndex(CACHE_ACTION_ROW)
+            void handleClearCache()
+          }}
+          disabled={clearing}
+          tabIndex={cacheActionFocused ? 0 : -1}
+        >
+          <span className="settings-cache__info">
+            <span className="settings-cache__size">
+              {cacheSize === null ? '…' : formatCacheSize(cacheSize)}
+            </span>
+            {cacheClassification && (
+              <span className={`settings-cache__pill settings-cache__pill--${cacheClassification.status}`}>
+                {cacheClassification.label}
+              </span>
+            )}
+          </span>
+          <span className="settings-cache__action">
+            {clearing ? 'Wird geleert …' : 'Cache leeren'}
+          </span>
+        </button>
       </div>
 
       {!hasFocus && (
