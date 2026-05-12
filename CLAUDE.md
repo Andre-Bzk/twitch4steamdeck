@@ -84,8 +84,6 @@ bash flatpak/build-flatpak.sh
 ```
 Das Skript: prüft deps → npm-Build → Python-Deps generieren → Streamlink-Tarballs hashen → `flatpak-builder` → SCP zum Steam Deck.
 
-> **Hinweis:** Das Flatpak-Manifest (`flatpak/tv.twitch4steamdeck.App.yml`) enthält noch mpv als Dependency — muss bereinigt werden, sobald der hls.js-Ansatz auf dem Steam Deck getestet und bestätigt ist.
-
 ---
 
 ## Codebase-Struktur
@@ -154,11 +152,10 @@ scripts/
   test-playback-pipeline.mjs  — Standalone-Test: streamlink → HLS-URL → Manifest → Segment (node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>)
 
 flatpak/
-  tv.twitch4steamdeck.App.yml — Flatpak-Manifest (Streamlink, alle Native-Deps; mpv-Einträge noch zu bereinigen)
+  tv.twitch4steamdeck.App.yml — Flatpak-Manifest (Streamlink, alle Native-Deps)
   build-flatpak.sh            — 6-Schritt Build-Pipeline (WSL2)
   twitch4steamdeck.sh         — Launcher mit zypak-wrapper
   tv.twitch4steamdeck.App.desktop
-  patches/mpv-ffmpeg7-avio-const.patch  — (obsolet nach mpv-Entfernung)
 ```
 
 ---
@@ -259,7 +256,7 @@ Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuf
 
 | Problem | Status | Details |
 |---|---|---|
-| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualitäts-Button im Overlay nutzen (720p60 wählen) oder mpv-Fallback evaluieren. |
+| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualitäts-Button im Overlay nutzen (720p60 wählen). |
 | Twitch Live-Stream URL-Expiry | Unkritisch | `streamlink --stream-url` Token in URL kann ablaufen. hls.js handelt Playlist-Refresh automatisch; bei Verbindungsabbruch muss neu gestartet werden. |
 | Ad-Bypass | Nicht implementiert | `--twitch-disable-ads` von Streamlink deprecated. Post-MVP. |
 | Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |
