@@ -34,22 +34,12 @@ const SIDEBAR_STEP = 10
 const BADGE_GAP_STEP = 2
 
 const MB = 1024 * 1024
-const CACHE_THRESHOLD_UNUSUAL = 500 * MB
-const CACHE_THRESHOLD_HIGH = 1024 * MB
-
-type CacheStatus = 'normal' | 'unusual' | 'high'
 
 function formatCacheSize(bytes: number): string {
   if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`
   const mb = bytes / MB
   if (mb < 1000) return `${mb.toFixed(0)} MB`
   return `${(mb / 1024).toFixed(2)} GB`
-}
-
-function classifyCache(bytes: number): { status: CacheStatus; label: string } {
-  if (bytes >= CACHE_THRESHOLD_HIGH) return { status: 'high', label: 'Leeren empfohlen' }
-  if (bytes >= CACHE_THRESHOLD_UNUSUAL) return { status: 'unusual', label: 'Ungewöhnlich groß' }
-  return { status: 'normal', label: 'Normal' }
 }
 
 /** Total focusable rows: badge options + sidebar slider + badge gap slider + hls toggle + cache action */
@@ -161,8 +151,6 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
   const badgeGapSliderFocused = hasFocus && focusedIndex === BADGE_GAP_SLIDER_ROW
   const hlsCacheToggleFocused = hasFocus && focusedIndex === HLS_CACHE_TOGGLE_ROW
   const cacheActionFocused = hasFocus && focusedIndex === CACHE_ACTION_ROW
-
-  const cacheClassification = cacheSize !== null ? classifyCache(cacheSize) : null
 
   return (
     <div className="screen settings-screen">
@@ -288,7 +276,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           HLS-Segmente (Live &amp; VODs) sind Single-Use — sie werden nach dem Abspielen nie
           wieder abgerufen. Caching erzeugt auf dem Steam Deck unnötiges Disk-Wachstum und
           Akku-Belastung. Thumbnails und API-Antworten bleiben immer gecacht.
-          Cache-Größe: Normal unter 500 MB · ungewöhnlich ab 500 MB · Leeren empfohlen ab 1 GB.
+          Maximale Cache-Größe: 500 MB.
         </p>
 
         <button
@@ -332,11 +320,6 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
             <span className="settings-cache__size">
               {cacheSize === null ? '…' : formatCacheSize(cacheSize)}
             </span>
-            {cacheClassification && (
-              <span className={`settings-cache__pill settings-cache__pill--${cacheClassification.status}`}>
-                {cacheClassification.label}
-              </span>
-            )}
           </span>
           <span className="settings-cache__action">
             {clearing ? 'Wird geleert …' : 'Cache leeren'}

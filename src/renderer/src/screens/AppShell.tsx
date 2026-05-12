@@ -14,7 +14,7 @@ import type { FollowedChannelInfo, GameInfo, HlsUrlPayload } from '../types/t4sd
 
 type Region = 'sidebar' | 'main'
 type QuitChoice = 'yes' | 'no'
-type GlobalPlayState = 'idle' | 'starting' | 'playing' | 'paused'
+type GlobalPlayState = 'idle' | 'starting' | 'playing' | 'paused' | 'error'
 
 interface Props {
   onLogout: () => void
@@ -42,6 +42,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [liveCurrentQuality, setLiveCurrentQuality] = useState('best')
   const [liveQualityPanelOpen, setLiveQualityPanelOpen] = useState(false)
   const [liveQualityFocusedIndex, setLiveQualityFocusedIndex] = useState(0)
+  const [liveErrorMsg, setLiveErrorMsg] = useState('')
 
   const isGlobalPlaying = livePlayState !== 'idle'
 
@@ -56,7 +57,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       if (!isGlobalPlaybackInitiated.current) return
       if (ev.kind === 'started') {
         setLivePlayState('playing')
-      } else if (ev.kind === 'stopped' || ev.kind === 'error') {
+      } else if (ev.kind === 'stopped') {
         isGlobalPlaybackInitiated.current = false
         setLiveHlsPayload(null)
         setLivePlayState('idle')
@@ -64,6 +65,14 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         setLivePosition(0)
         setLiveAvailableQualities(undefined)
         setLiveCurrentQuality('best')
+        setLiveQualityPanelOpen(false)
+        setLiveErrorMsg('')
+      } else if (ev.kind === 'error') {
+        isGlobalPlaybackInitiated.current = false
+        setLiveHlsPayload(null)
+        setLivePlayState('error')
+        setLiveErrorMsg(ev.message ?? 'Stream konnte nicht gestartet werden.')
+        setLiveAvailableQualities(undefined)
         setLiveQualityPanelOpen(false)
       }
     })
@@ -106,6 +115,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     setLiveAvailableQualities(undefined)
     setLiveCurrentQuality('best')
     setLiveQualityPanelOpen(false)
+    setLiveErrorMsg('')
     void window.t4sd.playback.startLive(ch.broadcasterLogin).then(() => {
       window.t4sd.playback.getQualities(`twitch.tv/${ch.broadcasterLogin}`)
         .then((qs) => setLiveAvailableQualities(qs.length > 0 ? qs : []))
@@ -114,10 +124,15 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   }, [])
 
   const handleStopLive = useCallback(() => {
+    isGlobalPlaybackInitiated.current = false
     liveVideoRef.current?.stop()
+    setLiveHlsPayload(null)
+    setLivePlayState('idle')
+    setLiveChannel(null)
     setLiveAvailableQualities(undefined)
     setLiveCurrentQuality('best')
     setLiveQualityPanelOpen(false)
+    setLiveErrorMsg('')
     void window.t4sd.playback.stop()
   }, [])
 
@@ -352,6 +367,21 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
               Starte Wiedergabe…
             </div>
           )}
+          {/* Fehler-Overlay */}
+          {livePlayState === 'error' && (
+            <div style={{
+              position: 'fixed', inset: 0, zIndex: 100,
+              background: '#000', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: '1rem'
+            }}>
+              <p style={{ color: '#ff6868', fontSize: '1.1rem', maxWidth: '60ch', textAlign: 'center', margin: 0 }}>
+                {liveErrorMsg}
+              </p>
+              <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
+                B / Esc — Schließen
+              </p>
+            </div>
+          )}
           {/* VideoPlayer + Overlay sobald HLS-URL da ist */}
           {liveHlsPayload && (
             <>
@@ -366,8 +396,8 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 onError={() => {
                   isGlobalPlaybackInitiated.current = false
                   setLiveHlsPayload(null)
-                  setLivePlayState('idle')
-                  setLiveChannel(null)
+                  setLivePlayState('error')
+                  setLiveErrorMsg('Wiedergabefehler — Stream konnte nicht geladen werden.')
                 }}
                 onTimeUpdate={(s) => setLivePosition(s)}
               />

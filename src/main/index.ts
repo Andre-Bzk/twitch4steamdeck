@@ -12,6 +12,9 @@ const isDev = !app.isPackaged
 // Erlaubt video.play() ohne vorangehende User-Geste (nötig, weil play() in hls.js-Callbacks
 // aufgerufen wird, die asynchron weit nach dem ursprünglichen Click-Event stattfinden).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+// Explizite Cache-Größe verhindert Chromiums dynamische Größenberechnung, die bei
+// wechselndem freiem Speicherplatz zu "Invalid cache (current) size"-Fehlern führt.
+app.commandLine.appendSwitch('disk-cache-size', String(500 * 1024 * 1024))
 
 function createWindow(): BrowserWindow {
   const isLinux = process.platform === 'linux'
