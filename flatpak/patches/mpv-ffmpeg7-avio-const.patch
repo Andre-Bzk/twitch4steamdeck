@@ -1,8 +1,0 @@
---- a/audio/decode/ad_spdif.c
-+++ b/audio/decode/ad_spdif.c
-@@ -165,7 +165,7 @@ static int init_filter(struct dec_audio *da, AVCodec *codec)
-
--static int write_packet(void *opaque, uint8_t *buf, int buf_size)
-+static int write_packet(void *opaque, const uint8_t *buf, int buf_size)
- {
-     struct spdif_filter *sf = opaque;

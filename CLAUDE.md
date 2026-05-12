@@ -265,7 +265,6 @@ Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuf
 | Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |
 | Browser Gamepad API in Gaming Mode | Nicht nutzbar | Steam Input + Flatpak-Sandbox blockiert udev-Events für Chromium. Deshalb evdev direkt im Main-Process. |
 | Bluetooth-Controller-Deduplizierung | Aktiv | Mehrere `/dev/input/js*`-Devices (z.B. Raw-Device + Steam-Virtual-Device) → 40ms-Deduplizierungsfenster in `gamepadReader.ts` |
-| Flatpak-Manifest mpv-Einträge | Noch nicht bereinigt | `tv.twitch4steamdeck.App.yml` enthält noch mpv-Build-Schritte und den mpv-Patch — nach Steam Deck Test entfernen. |
 | Direkt-Start: kein VOD-Support | By Design | AppShell-Overlay nur für Live-Streams. VODs nur über Kanalseite (ChannelScreen) mit Resume + Kapitel. |
 
 ---
