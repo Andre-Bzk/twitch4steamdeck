@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { PlaybackOverlay } from '../components/PlaybackOverlay'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import Sidebar, { SIDEBAR_ITEMS, type TabKey } from '../components/Sidebar'
-import { VideoPlayer, type VideoPlayerHandle } from '../components/VideoPlayer'
+import { VideoPlayer } from '../components/VideoPlayer'
 import AccountScreen from './AccountScreen'
 import BrowseScreen from './BrowseScreen'
 import CategoryScreen from './CategoryScreen'
@@ -10,11 +10,11 @@ import ChannelScreen from './ChannelScreen'
 import FollowingScreen from './FollowingScreen'
 import SettingsScreen from './SettingsScreen'
 import StreamListScreen from './StreamListScreen'
-import type { FollowedChannelInfo, GameInfo, HlsUrlPayload } from '../types/t4sd'
+import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
+import { usePlaybackSession } from '../hooks/usePlaybackSession'
 
 type Region = 'sidebar' | 'main'
 type QuitChoice = 'yes' | 'no'
-type GlobalPlayState = 'idle' | 'starting' | 'playing' | 'paused' | 'error'
 
 interface Props {
   onLogout: () => void
@@ -29,47 +29,32 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [quitDialogOpen, setQuitDialogOpen] = useState(false)
   const [quitDialogChoice, setQuitDialogChoice] = useState<QuitChoice>('no')
 
-  // Globaler Playback-State — für Direkt-Start aus BrowseScreen/StreamListScreen/CategoryScreen
+  // Kanal-Info für den globalen Overlay — AppShell-spezifisch, kein Playback-State
   const [liveChannel, setLiveChannel] = useState<FollowedChannelInfo | null>(null)
-  const [liveHlsPayload, setLiveHlsPayload] = useState<HlsUrlPayload | null>(null)
-  const [livePlayState, setLivePlayState] = useState<GlobalPlayState>('idle')
   const [livePosition, setLivePosition] = useState(0)
-  const liveVideoRef = useRef<VideoPlayerHandle>(null)
-  // Quality state für globalen Overlay
-  const [liveAvailableQualities, setLiveAvailableQualities] = useState<string[] | undefined>(undefined)
-  const [liveCurrentQuality, setLiveCurrentQuality] = useState('best')
-  const [liveQualityPanelOpen, setLiveQualityPanelOpen] = useState(false)
-  const [liveQualityFocusedIndex, setLiveQualityFocusedIndex] = useState(0)
-  const [liveErrorMsg, setLiveErrorMsg] = useState('')
 
-  const isGlobalPlaying = livePlayState !== 'idle'
-
-  // IPC-Listener für globalen Playback — nur aktiv wenn kein ChannelScreen offen ist
-  useEffect(() => {
-    if (selectedChannel) return
-    const unsubHls = window.t4sd.playback.onHlsUrl(setLiveHlsPayload)
-    const unsubEvent = window.t4sd.playback.onEvent((ev) => {
-      if (ev.kind === 'started') {
-        setLivePlayState('playing')
-      } else if (ev.kind === 'stopped') {
-        setLiveHlsPayload(null)
-        setLivePlayState('idle')
-        setLiveChannel(null)
-        setLivePosition(0)
-        setLiveAvailableQualities(undefined)
-        setLiveCurrentQuality('best')
-        setLiveQualityPanelOpen(false)
-        setLiveErrorMsg('')
-      } else if (ev.kind === 'error') {
-        setLiveHlsPayload(null)
-        setLivePlayState('error')
-        setLiveErrorMsg(ev.message ?? 'Stream konnte nicht gestartet werden.')
-        setLiveAvailableQualities(undefined)
-        setLiveQualityPanelOpen(false)
-      }
-    })
-    return () => { unsubHls(); unsubEvent() }
-  }, [!!selectedChannel])
+  // Globale Playback-Session — aktiv wenn kein ChannelScreen offen ist
+  const globalSession = usePlaybackSession({
+    active: !selectedChannel,
+    onStopped: () => { setLiveChannel(null); setLivePosition(0) },
+  })
+  const {
+    hlsPayload: liveHlsPayload,
+    playState: livePlayState,
+    videoRef: liveVideoRef,
+    availableQualities: liveAvailableQualities,
+    currentQuality: liveCurrentQuality,
+    qualityPanelOpen: liveQualityPanelOpen,
+    qualityFocusedIndex: liveQualityFocusedIndex,
+    errorMsg: liveErrorMsg,
+    isActive: isGlobalPlaying,
+    setPlayState: setLivePlayState,
+    setQualityPanelOpen: setLiveQualityPanelOpen,
+    setQualityFocusedIndex: setLiveQualityFocusedIndex,
+    startLive: startGlobalLive,
+    stop: stopGlobal,
+    handleVideoError: handleLiveVideoError,
+  } = globalSession
 
   const requestSidebar = useCallback(() => {
     const idx = SIDEBAR_ITEMS.findIndex((t) => t.key === tab)
@@ -102,43 +87,18 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   // Direkt-Start: kein ChannelScreen — globaler Overlay startet sofort
   const handleStartLive = useCallback((ch: FollowedChannelInfo) => {
     setLiveChannel(ch)
-    setLivePlayState('starting')
-    setLiveAvailableQualities(undefined)
-    setLiveCurrentQuality('best')
-    setLiveQualityPanelOpen(false)
-    setLiveErrorMsg('')
-    void window.t4sd.playback.startLive(ch.broadcasterLogin).then(() => {
-      window.t4sd.playback.getQualities(`twitch.tv/${ch.broadcasterLogin}`)
-        .then((qs) => setLiveAvailableQualities(qs.length > 0 ? qs : []))
-        .catch(() => setLiveAvailableQualities([]))
-    })
-  }, [])
+    void startGlobalLive(ch.broadcasterLogin)
+  }, [startGlobalLive])
 
   const handleStopLive = useCallback(() => {
-    liveVideoRef.current?.stop()
-    setLiveHlsPayload(null)
-    setLivePlayState('idle')
     setLiveChannel(null)
-    setLiveAvailableQualities(undefined)
-    setLiveCurrentQuality('best')
-    setLiveQualityPanelOpen(false)
-    setLiveErrorMsg('')
-    void window.t4sd.playback.stop()
-  }, [])
+    setLivePosition(0)
+    stopGlobal()
+  }, [stopGlobal])
 
   const handleLiveQualityChange = useCallback((quality: string, channelLogin: string) => {
-    setLiveQualityPanelOpen(false)
-    setLiveCurrentQuality(quality)
-    setLiveAvailableQualities(undefined)
-    liveVideoRef.current?.stop()
-    setLiveHlsPayload(null)
-    setLivePlayState('starting')
-    void window.t4sd.playback.startLive(channelLogin, quality).then(() => {
-      window.t4sd.playback.getQualities(`twitch.tv/${channelLogin}`)
-        .then((qs) => setLiveAvailableQualities(qs.length > 0 ? qs : []))
-        .catch(() => setLiveAvailableQualities([]))
-    })
-  }, [])
+    void startGlobalLive(channelLogin, quality)
+  }, [startGlobalLive])
 
   const handleBack = useCallback(() => {
     setSelectedChannel(null)
@@ -383,11 +343,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 onPlaying={() => setLivePlayState('playing')}
                 onPaused={() => setLivePlayState('paused')}
                 onEnded={handleStopLive}
-                onError={() => {
-                  setLiveHlsPayload(null)
-                  setLivePlayState('error')
-                  setLiveErrorMsg('Wiedergabefehler — Stream konnte nicht geladen werden.')
-                }}
+                onError={handleLiveVideoError}
                 onTimeUpdate={(s) => setLivePosition(s)}
               />
               {(livePlayState === 'playing' || livePlayState === 'paused') && (

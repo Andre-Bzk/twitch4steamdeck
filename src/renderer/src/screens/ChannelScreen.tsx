@@ -2,15 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { EyeIcon } from '../components/Icons'
 import { PlaybackOverlay } from '../components/PlaybackOverlay'
-import { VideoPlayer, type VideoPlayerHandle } from '../components/VideoPlayer'
-import type { FollowedChannelInfo, HlsUrlPayload, PlaybackEvent, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
+import { VideoPlayer } from '../components/VideoPlayer'
+import type { FollowedChannelInfo, VodChapter, VodInfo, VodProgress } from '../types/t4sd'
+import { usePlaybackSession } from '../hooks/usePlaybackSession'
 
 interface Props {
   channel: FollowedChannelInfo
   onBack: () => void
 }
 
-type PlayState = 'idle' | 'starting' | 'playing' | 'paused' | 'error'
 type FocusRegion = 'hero' | 'shelf' | 'chapters'
 
 const CARD_W = 260
@@ -67,8 +67,6 @@ function formatTimestamp(s: number): string {
 }
 
 export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
-  const [playState, setPlayState] = useState<PlayState>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
   const [vods, setVods] = useState<VodInfo[]>([])
   const [vodsLoading, setVodsLoading] = useState(true)
   const [progressMap, setProgressMap] = useState<Record<string, VodProgress>>({})
@@ -81,17 +79,66 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const [chapterIndex, setChapterIndex] = useState(0)
   const [currentVod, setCurrentVod] = useState<VodInfo | null>(null)
   const [pendingChapterVod, setPendingChapterVod] = useState<VodInfo | null>(null)
-  // Overlay state
   const [currentPosition, setCurrentPosition] = useState(0)
   const [vodDuration, setVodDuration] = useState(0)
   const [isLivePlayback, setIsLivePlayback] = useState(false)
-  // HLS-Player state
-  const [hlsPayload, setHlsPayload] = useState<HlsUrlPayload | null>(null)
-  // Quality state
-  const [availableQualities, setAvailableQualities] = useState<string[] | undefined>(undefined)
-  const [currentQuality, setCurrentQuality] = useState('best')
-  const [qualityPanelOpen, setQualityPanelOpen] = useState(false)
-  const [qualityFocusedIndex, setQualityFocusedIndex] = useState(0)
+
+  const watchBtnRef = useRef<HTMLButtonElement>(null)
+  const chapterListRef = useRef<HTMLUListElement>(null)
+
+  const loadChapters = async (vodId: string): Promise<VodChapter[]> => {
+    return window.t4sd.twitch.getVodChapters(vodId)
+  }
+
+  const showChapterPanel = (vod: VodInfo): void => {
+    setChapterPanelVod(vod)
+    setChapters([])
+    setChapterIndex(0)
+    setChaptersLoading(true)
+    setFocusRegion('chapters')
+    void loadChapters(vod.id)
+      .then((loaded) => setChapters(loaded))
+      .catch(() => {})
+      .finally(() => setChaptersLoading(false))
+  }
+
+  // Playback-Session — ChannelScreen ist immer der aktive Eigentümer wenn gemountet
+  const session = usePlaybackSession({
+    active: true,
+    onStarted: (ev) => {
+      setVodDuration(ev.durationSeconds ?? 0)
+      setIsLivePlayback(ev.isLive ?? false)
+      setCurrentPosition(0)
+    },
+    onStopped: () => {
+      setChapterPanelVod(null)
+      setCurrentVod(null)
+      if (vods.length > 0) {
+        void window.t4sd.history
+          .getProgress(vods.map((v) => v.id))
+          .then(setProgressMap)
+          .catch(() => {})
+      }
+      if (pendingChapterVod) {
+        setPendingChapterVod(null)
+        showChapterPanel(pendingChapterVod)
+      } else {
+        setFocusRegion('shelf')
+      }
+    },
+    onError: () => {
+      setChapterPanelVod(null)
+      setCurrentVod(null)
+      setPendingChapterVod(null)
+    },
+  })
+  const {
+    hlsPayload, playState, videoRef,
+    availableQualities, currentQuality, qualityPanelOpen, qualityFocusedIndex,
+    errorMsg,
+    setPlayState, setQualityPanelOpen, setQualityFocusedIndex,
+    startLive, startVod, stop, handleVideoError,
+  } = session
 
   // Derive active chapter name from chapters list + current playback position.
   // Three states: loading → undefined (chip hidden), loaded+empty → 'Unbekannt', loaded+chapters → active chapter.
@@ -110,10 +157,6 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     }
     return 1
   }, [chapters, vodChaptersLoaded, currentPosition, isLivePlayback])
-
-  const watchBtnRef = useRef<HTMLButtonElement>(null)
-  const chapterListRef = useRef<HTMLUListElement>(null)
-  const videoRef = useRef<VideoPlayerHandle>(null)
 
   useEffect(() => {
     window.t4sd.twitch
@@ -224,7 +267,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
             break
           case 'Escape':
             e.preventDefault()
-            void handleStop()
+            stop()
             break
           case 'y': {
             e.preventDefault()
@@ -298,85 +341,15 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [focusRegion, playState, vods, shelfIndex, onBack, chapters, chapterIndex, chapterPanelVod, currentVod, qualityPanelOpen, availableQualities, qualityFocusedIndex, currentQuality])
 
-  // playback:event — verarbeitet started / stopped / error
-  useEffect(() => {
-    const unsub = window.t4sd.playback.onEvent((ev: PlaybackEvent) => {
-      if (ev.kind === 'started') {
-        setPlayState('playing')
-        setVodDuration(ev.durationSeconds ?? 0)
-        setIsLivePlayback(ev.isLive ?? false)
-        setCurrentPosition(0)
-      } else if (ev.kind === 'stopped') {
-        const nextChapterVod = pendingChapterVod
-        setPlayState('idle')
-        setHlsPayload(null)
-        setChapterPanelVod(null)
-        setCurrentVod(null)
-        setAvailableQualities(undefined)
-        setCurrentQuality('best')
-        setQualityPanelOpen(false)
-        // Progress nach Stop neu laden
-        if (vods.length > 0) {
-          void window.t4sd.history
-            .getProgress(vods.map((v) => v.id))
-            .then(setProgressMap)
-            .catch(() => {})
-        }
-        if (nextChapterVod) {
-          setPendingChapterVod(null)
-          showChapterPanel(nextChapterVod)
-        } else {
-          setFocusRegion('shelf')
-        }
-      } else if (ev.kind === 'error') {
-        setPlayState('error')
-        setHlsPayload(null)
-        setChapterPanelVod(null)
-        setCurrentVod(null)
-        setPendingChapterVod(null)
-        setAvailableQualities(undefined)
-        setCurrentQuality('best')
-        setQualityPanelOpen(false)
-        setErrorMsg(ev.message ?? 'Unbekannter Fehler')
-      }
-    })
-    return unsub
-  }, [pendingChapterVod, vods])
-
-  // playback:hls-url — HLS-URL vom Main-Prozess empfangen und an VideoPlayer weiterleiten
-  useEffect(() => {
-    const unsub = window.t4sd.playback.onHlsUrl((payload: HlsUrlPayload) => {
-      setHlsPayload(payload)
-    })
-    return unsub
-  }, [])
-
   useEffect(() => {
     watchBtnRef.current?.focus()
   }, [])
-
 
   useEffect(() => {
     if (!chapterListRef.current) return
     const item = chapterListRef.current.children[chapterIndex] as HTMLElement | undefined
     item?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [chapterIndex])
-
-  const loadChapters = async (vodId: string): Promise<VodChapter[]> => {
-    return window.t4sd.twitch.getVodChapters(vodId)
-  }
-
-  const showChapterPanel = (vod: VodInfo): void => {
-    setChapterPanelVod(vod)
-    setChapters([])
-    setChapterIndex(0)
-    setChaptersLoading(true)
-    setFocusRegion('chapters')
-    void loadChapters(vod.id)
-      .then((loaded) => setChapters(loaded))
-      .catch(() => {})
-      .finally(() => setChaptersLoading(false))
-  }
 
   const jumpChapter = async (direction: 1 | -1): Promise<void> => {
     if (!currentVod) return
@@ -396,93 +369,27 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   }
 
   const handleWatch = async (): Promise<void> => {
-    setPlayState('starting')
-    setErrorMsg('')
-    setAvailableQualities(undefined)
-    setCurrentQuality('best')
-    setQualityPanelOpen(false)
-    try {
-      await window.t4sd.playback.startLive(channel.broadcasterLogin)
-    } catch (e) {
-      setPlayState('error')
-      setErrorMsg(String(e))
-      return
-    }
-    window.t4sd.playback.getQualities(`twitch.tv/${channel.broadcasterLogin}`)
-      .then((qs) => setAvailableQualities(qs.length > 0 ? qs : []))
-      .catch(() => setAvailableQualities([]))
+    await startLive(channel.broadcasterLogin)
   }
 
   const handleWatchVod = async (vod: VodInfo, startSeconds?: number): Promise<void> => {
-    setPlayState('starting')
-    setErrorMsg('')
     setFocusRegion('hero')
     setChapterPanelVod(null)
     setCurrentVod(vod)
     setPendingChapterVod(null)
     setVodChaptersLoaded(false)
-    setAvailableQualities(undefined)
-    setCurrentQuality('best')
-    setQualityPanelOpen(false)
     void loadChapters(vod.id)
       .then((loaded) => { setChapters(loaded); setVodChaptersLoaded(true) })
       .catch(() => { setVodChaptersLoaded(true) })
-    try {
-      await window.t4sd.playback.startVod(
-        vod.id,
-        channel.broadcasterLogin,
-        vod.title,
-        vod.durationSeconds,
-        startSeconds
-      )
-    } catch (e) {
-      setPlayState('error')
-      setErrorMsg(String(e))
-      return
-    }
-    window.t4sd.playback.getQualities(`twitch.tv/videos/${vod.id}`)
-      .then((qs) => setAvailableQualities(qs.length > 0 ? qs : []))
-      .catch(() => setAvailableQualities([]))
-  }
-
-  const handleStop = async (): Promise<void> => {
-    videoRef.current?.stop()
-    setAvailableQualities(undefined)
-    setCurrentQuality('best')
-    setQualityPanelOpen(false)
-    await window.t4sd.playback.stop()
+    await startVod(vod.id, channel.broadcasterLogin, vod.title, vod.durationSeconds, startSeconds)
   }
 
   const handleQualityChange = async (quality: string): Promise<void> => {
-    setQualityPanelOpen(false)
-    setCurrentQuality(quality)
-    setAvailableQualities(undefined)
     const currentPos = videoRef.current?.getCurrentTime() ?? 0
-    videoRef.current?.stop()
-    setHlsPayload(null)
-    setPlayState('starting')
-    try {
-      if (isLivePlayback) {
-        await window.t4sd.playback.startLive(channel.broadcasterLogin, quality)
-        window.t4sd.playback.getQualities(`twitch.tv/${channel.broadcasterLogin}`)
-          .then((qs) => setAvailableQualities(qs.length > 0 ? qs : []))
-          .catch(() => setAvailableQualities([]))
-      } else if (currentVod) {
-        await window.t4sd.playback.startVod(
-          currentVod.id,
-          channel.broadcasterLogin,
-          currentVod.title,
-          currentVod.durationSeconds,
-          currentPos,
-          quality
-        )
-        window.t4sd.playback.getQualities(`twitch.tv/videos/${currentVod.id}`)
-          .then((qs) => setAvailableQualities(qs.length > 0 ? qs : []))
-          .catch(() => setAvailableQualities([]))
-      }
-    } catch (e) {
-      setPlayState('error')
-      setErrorMsg(String(e))
+    if (isLivePlayback) {
+      await startLive(channel.broadcasterLogin, quality)
+    } else if (currentVod) {
+      await startVod(currentVod.id, channel.broadcasterLogin, currentVod.title, currentVod.durationSeconds, currentPos, quality)
     }
   }
 
@@ -733,12 +640,8 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           onTimeUpdate={(s) => setCurrentPosition(s)}
           onPlaying={() => setPlayState('playing')}
           onPaused={() => setPlayState('paused')}
-          onEnded={() => void handleStop()}
-          onError={(msg) => {
-            setPlayState('error')
-            setErrorMsg(msg)
-            setHlsPayload(null)
-          }}
+          onEnded={stop}
+          onError={handleVideoError}
         />
       )}
 
@@ -782,7 +685,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           }}
           onSeek={(s) => videoRef.current?.seek(s)}
           onSeekTo={(s) => videoRef.current?.seekTo(s)}
-          onStop={() => void handleStop()}
+          onStop={stop}
         />
       )}
     </div>
