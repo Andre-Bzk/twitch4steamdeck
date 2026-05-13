@@ -35,8 +35,6 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [livePlayState, setLivePlayState] = useState<GlobalPlayState>('idle')
   const [livePosition, setLivePosition] = useState(0)
   const liveVideoRef = useRef<VideoPlayerHandle>(null)
-  // Verhindert dass ChannelScreen-Events den globalen Overlay aktivieren
-  const isGlobalPlaybackInitiated = useRef(false)
   // Quality state für globalen Overlay
   const [liveAvailableQualities, setLiveAvailableQualities] = useState<string[] | undefined>(undefined)
   const [liveCurrentQuality, setLiveCurrentQuality] = useState('best')
@@ -46,19 +44,14 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
 
   const isGlobalPlaying = livePlayState !== 'idle'
 
-  // IPC-Listener für globalen Playback (nur wenn kein ChannelScreen aktiv)
+  // IPC-Listener für globalen Playback — nur aktiv wenn kein ChannelScreen offen ist
   useEffect(() => {
-    const unsubHls = window.t4sd.playback.onHlsUrl((payload: HlsUrlPayload) => {
-      if (isGlobalPlaybackInitiated.current) {
-        setLiveHlsPayload(payload)
-      }
-    })
+    if (selectedChannel) return
+    const unsubHls = window.t4sd.playback.onHlsUrl(setLiveHlsPayload)
     const unsubEvent = window.t4sd.playback.onEvent((ev) => {
-      if (!isGlobalPlaybackInitiated.current) return
       if (ev.kind === 'started') {
         setLivePlayState('playing')
       } else if (ev.kind === 'stopped') {
-        isGlobalPlaybackInitiated.current = false
         setLiveHlsPayload(null)
         setLivePlayState('idle')
         setLiveChannel(null)
@@ -68,7 +61,6 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
         setLiveQualityPanelOpen(false)
         setLiveErrorMsg('')
       } else if (ev.kind === 'error') {
-        isGlobalPlaybackInitiated.current = false
         setLiveHlsPayload(null)
         setLivePlayState('error')
         setLiveErrorMsg(ev.message ?? 'Stream konnte nicht gestartet werden.')
@@ -77,7 +69,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       }
     })
     return () => { unsubHls(); unsubEvent() }
-  }, [])
+  }, [!!selectedChannel])
 
   const requestSidebar = useCallback(() => {
     const idx = SIDEBAR_ITEMS.findIndex((t) => t.key === tab)
@@ -109,7 +101,6 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
 
   // Direkt-Start: kein ChannelScreen — globaler Overlay startet sofort
   const handleStartLive = useCallback((ch: FollowedChannelInfo) => {
-    isGlobalPlaybackInitiated.current = true
     setLiveChannel(ch)
     setLivePlayState('starting')
     setLiveAvailableQualities(undefined)
@@ -124,7 +115,6 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   }, [])
 
   const handleStopLive = useCallback(() => {
-    isGlobalPlaybackInitiated.current = false
     liveVideoRef.current?.stop()
     setLiveHlsPayload(null)
     setLivePlayState('idle')
@@ -394,7 +384,6 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 onPaused={() => setLivePlayState('paused')}
                 onEnded={handleStopLive}
                 onError={() => {
-                  isGlobalPlaybackInitiated.current = false
                   setLiveHlsPayload(null)
                   setLivePlayState('error')
                   setLiveErrorMsg('Wiedergabefehler — Stream konnte nicht geladen werden.')
