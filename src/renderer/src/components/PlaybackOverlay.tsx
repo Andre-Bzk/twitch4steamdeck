@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from './GamepadPrompt'
 import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, QualityIcon, StopIcon } from './Icons'
 import { formatCount, formatTimestamp } from '../lib/formatting'
+import { DOUBLE_TAP_MS, OVERLAY_HIDE_DELAY_MS } from '../constants/playback'
 
 interface PlaybackOverlayProps {
   playState: 'playing' | 'paused'
@@ -29,9 +30,6 @@ interface PlaybackOverlayProps {
   onOpenChapters?: () => void
 }
 
-
-const HIDE_DELAY_MS = 5_000
-const DOUBLE_TAP_MS = 300
 
 export function PlaybackOverlay({
   playState,
@@ -81,7 +79,7 @@ export function PlaybackOverlay({
 
   const scheduleHide = useCallback(() => {
     clearHideTimer()
-    hideTimerRef.current = setTimeout(() => setVisible(false), HIDE_DELAY_MS)
+    hideTimerRef.current = setTimeout(() => setVisible(false), OVERLAY_HIDE_DELAY_MS)
   }, [clearHideTimer])
 
   /** Call on any user interaction to show overlay and reset auto-hide timer. */

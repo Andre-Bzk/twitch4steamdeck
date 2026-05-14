@@ -1,5 +1,6 @@
 import Hls from 'hls.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { POSITION_REPORT_INTERVAL_MS } from '../constants/playback'
 
 export interface VideoPlayerHandle {
   seek(delta: number): void
@@ -23,8 +24,6 @@ interface Props {
   onError?: (msg: string) => void
   onTimeUpdate?: (seconds: number) => void
 }
-
-const POSITION_REPORT_INTERVAL_MS = 5_000
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
   ({ hlsUrl, startPosition, isLive, vodId, durationSeconds, onPlaying, onPaused, onEnded, onError, onTimeUpdate }, ref) => {

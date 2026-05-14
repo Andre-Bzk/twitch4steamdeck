@@ -20,6 +20,8 @@
  *   Axis  0 (left stick X) → Left/Right
  */
 
+import { AXIS_THRESHOLD, REPEAT_INITIAL_MS, REPEAT_INTERVAL_MS } from '../constants/input'
+
 const BUTTON_MAP: Record<number, string> = {
   0: 'Enter',   // A
   1: 'Escape',  // B
@@ -34,10 +36,6 @@ const BUTTON_MAP: Record<number, string> = {
   14: 'ArrowLeft',
   15: 'ArrowRight'
 }
-
-const AXIS_THRESHOLD = 0.5
-const REPEAT_INITIAL_MS = 400
-const REPEAT_INTERVAL_MS = 150
 
 interface AxisRepeat {
   key: string | null

@@ -1,0 +1,3 @@
+export const OVERLAY_HIDE_DELAY_MS = 5_000
+export const DOUBLE_TAP_MS = 300
+export const POSITION_REPORT_INTERVAL_MS = 5_000

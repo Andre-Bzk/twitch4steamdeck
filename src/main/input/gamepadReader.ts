@@ -32,6 +32,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { BrowserWindow } from 'electron'
+import { DEDUP_WINDOW_MS, HOTPLUG_SCAN_INTERVAL_MS, TRIGGER_THRESHOLD } from '../constants/input'
 
 // evdev input_event auf 64-bit Linux:
 // { u64 tv_sec (8 Bytes), u64 tv_usec (8 Bytes), u16 type (2), u16 code (2), s32 value (4) } = 24 Bytes
@@ -70,16 +71,10 @@ const BUTTON_MAP: Record<number, string> = {
 }
 
 const STICK_THRESHOLD = 16384  // ~50% von 32767
-// Trigger-Schwellwert: Achsenwert > 0 (nicht gedrückt) bis ~255–1023 je Controller
-const TRIGGER_THRESHOLD = 8
 const REPEAT_INITIAL_MS = 400
 const REPEAT_INTERVAL_MS = 150
 // Trigger-Achsen sollen kein Auto-Repeat auslösen (300s-Sprünge nicht wiederholen)
 const NO_REPEAT_ABS_CODES = new Set([ABS_Z, ABS_RZ])
-const SCAN_INTERVAL_MS = 3000
-// Bluetooth-/Steam-Setups können dieselbe Eingabe über mehrere Devices liefern.
-// Nahezu zeitgleiche identische Events werden global entdoppelt.
-const DUPLICATE_EVENT_WINDOW_MS = 40
 
 interface AxisState {
   key: string | null
@@ -367,7 +362,7 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
   const onKey = (key: string): void => {
     const now = Date.now()
     const lastAt = lastKeyAt.get(key) ?? 0
-    if (now - lastAt < DUPLICATE_EVENT_WINDOW_MS) return
+    if (now - lastAt < DEDUP_WINDOW_MS) return
     lastKeyAt.set(key, now)
 
     const win = getWindow()
@@ -427,7 +422,7 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
   }
 
   scanDevices()
-  const timer = setInterval(scanDevices, SCAN_INTERVAL_MS)
+  const timer = setInterval(scanDevices, HOTPLUG_SCAN_INTERVAL_MS)
 
   return () => {
     clearInterval(timer)

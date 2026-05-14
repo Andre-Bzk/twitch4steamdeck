@@ -13,6 +13,7 @@ import {
   formatViewers,
   formatWatchedAt
 } from '../lib/formatting'
+import { CARD_GAP, CARD_W } from '../constants/ui'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -20,9 +21,6 @@ interface Props {
 }
 
 type FocusRegion = 'hero' | 'shelf' | 'chapters'
-
-const CARD_W = 260
-const CARD_GAP = 16
 
 function resolveThumbnail(url: string | undefined, w = 1280, h = 720): string | undefined {
   return url?.replace('{width}', String(w)).replace('{height}', String(h))
