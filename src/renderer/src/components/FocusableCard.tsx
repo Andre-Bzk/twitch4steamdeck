@@ -1,18 +1,13 @@
 import { useEffect, useRef } from 'react'
 import type { FollowedChannelInfo } from '../types/t4sd'
 import LanguageBadge from './LanguageBadge'
+import { formatViewers } from '../lib/formatting'
 
 interface Props {
   channel: FollowedChannelInfo
   focused: boolean
   onFocus: () => void
   onSelect: () => void
-}
-
-function formatViewers(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} Mio.`
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-  return String(n)
 }
 
 export default function FocusableCard({ channel, focused, onFocus, onSelect }: Props): JSX.Element {

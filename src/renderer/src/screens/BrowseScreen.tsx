@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import LanguageBadge from '../components/LanguageBadge'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
+import { formatViewers, formatViewersFull } from '../lib/formatting'
 
 interface Props {
   hasFocus: boolean
@@ -16,16 +17,6 @@ type FocusRegion = 'shelf' | 'grid'
 
 const STREAM_W = 220
 const STREAM_GAP = 14
-
-function formatViewers(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} Mio.`
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-  return String(n)
-}
-
-function formatViewersFull(n: number): string {
-  return n.toLocaleString('de-DE')
-}
 
 export default function BrowseScreen({
   hasFocus,

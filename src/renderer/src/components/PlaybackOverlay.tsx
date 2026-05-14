@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from './GamepadPrompt'
 import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, QualityIcon, StopIcon } from './Icons'
+import { formatCount, formatTimestamp } from '../lib/formatting'
 
 interface PlaybackOverlayProps {
   playState: 'playing' | 'paused'
@@ -28,20 +29,6 @@ interface PlaybackOverlayProps {
   onOpenChapters?: () => void
 }
 
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
-
-/** Formats seconds as HH:MM:SS */
-function fmt(s: number): string {
-  const total = Math.max(0, Math.floor(s))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const sec = total % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-}
 
 const HIDE_DELAY_MS = 5_000
 const DOUBLE_TAP_MS = 300
@@ -333,7 +320,7 @@ export function PlaybackOverlay({
               )}
             </div>
             <div className="playback-overlay__progress-row">
-              <span className="playback-overlay__time">{fmt(displayPosition)}</span>
+              <span className="playback-overlay__time">{formatTimestamp(displayPosition)}</span>
 
               <div
                 ref={seekBarRef}
@@ -355,7 +342,7 @@ export function PlaybackOverlay({
                 </div>
               </div>
 
-              <span className="playback-overlay__time">{fmt(durationSeconds)}</span>
+              <span className="playback-overlay__time">{formatTimestamp(durationSeconds)}</span>
             </div>
           </>
         ) : null}
