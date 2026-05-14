@@ -50,6 +50,8 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         onRequestSidebar()
+      } else if (e.key === 'Enter') {
+        void handleLogout()
       }
     }
     window.addEventListener('keydown', onKey)

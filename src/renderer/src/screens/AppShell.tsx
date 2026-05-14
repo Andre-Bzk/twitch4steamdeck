@@ -307,7 +307,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       {isGlobalPlaying && !selectedChannel && (
         <>
           {/* Lade-Overlay während streamlink läuft */}
-          {livePlayState === 'starting' && !liveHlsPayload && (
+          {!liveHlsPayload && livePlayState !== 'error' && (
             <div style={{
               position: 'fixed', inset: 0, zIndex: 100,
               background: '#000', display: 'flex',

@@ -39,7 +39,10 @@ Renderer (React)
 │                          ChannelScreen (Hauptscreen), StreamListScreen, Settings, Account
 ├── components/
 │   ├── VideoPlayer.tsx  — hls.js <video> Wrapper (forwardRef, imperative handle)
-│   └── PlaybackOverlay.tsx — DOM-Overlay über dem Video (z-index: 300)
+│   ├── PlaybackOverlay.tsx — DOM-Overlay über dem Video (z-index: 300)
+│   └── GamepadPrompt.tsx — Typisierte Gamepad-Button-Icons (Face, Shoulder, D-Pad)
+├── hooks/
+│   └── usePlaybackSession.ts — Gemeinsamer Playback-State-Hook für AppShell + ChannelScreen
 ├── input/gamepad.ts     — Browser Gamepad API (Windows, Dev-Mode)
 └── context/SettingsContext.tsx — localStorage-Settings (streamBadgeMode, sidebarWidth, …)
 ```
@@ -96,6 +99,8 @@ src/main/
     authService.ts            — Auth-Lifecycle, Token-Refresh, Event-Emitter
     deviceCodeFlow.ts         — OAuth Device Code + Polling (https://id.twitch.tv/oauth2/)
     tokenStore.ts             — safeStorage-Verschlüsselung, Fallback auf plaintext
+  constants/
+    input.ts                  — TRIGGER_THRESHOLD, DEDUP_WINDOW_MS, HOTPLUG_SCAN_INTERVAL_MS
   input/
     gamepadReader.ts          — evdev /dev/input/event* Leser (via js*-Discovery), Hotplug (3s-Scan), Deduplizierung (40ms); BTN_*-Codes für controller-unabhängiges Mapping
   ipc/
@@ -104,6 +109,8 @@ src/main/
     playbackService.ts        — Orchestrator: streamlink --stream-url → HLS-URL → playback-hls-url Event; startVod(quality?); getAvailableQualities()
     streamlink.ts             — getStreamUrl() + getAvailableQualities() via streamlink (--stream-url für URL, --json für Qualitätsliste)
     types.ts                  — Quality-Typ, PlaybackEvent, HlsUrlPayload
+  prefs/
+    hlsCachePref.ts           — In-Memory-Flag für HLS-Disk-Cache-Aktivierung (gesetzt via app:set-hls-cache-enabled IPC)
   store/
     db.ts                     — SQLite-Init, WAL-Modus, Migration (vod_history-Tabelle)
     historyRepo.ts            — upsertVod, updatePosition, markCompleted, getProgressMap
@@ -133,15 +140,23 @@ src/renderer/src/
   components/
     VideoPlayer.tsx           — hls.js <video> Wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia vor loadSource; play() in MANIFEST_PARSED
     PlaybackOverlay.tsx       — DOM-Overlay (Seek-Bar, Kanalinfo, Gamepad-Hints, Auto-Hide, Qualitäts-Button + Panel); playState: 'playing'|'paused'
+    GamepadPrompt.tsx         — Typisierter Gamepad-Button-Renderer (<GamepadPrompt prompt="a"/>, <GamepadHintItem>)
     FocusableCard.tsx         — Wiederverwendbare Kanal-Karte (Thumbnail, Badge, Progress)
     Sidebar.tsx               — Navigationssidebar (6 Tabs)
     LanguageBadge.tsx         — Sprach-/Flagge-Badge
     Icons.tsx                 — SVG-Icons
+  constants/
+    ui.ts                     — CARD_W, CARD_GAP, STREAM_W, STREAM_GAP (Karten-/Grid-Größen)
+    playback.ts               — OVERLAY_HIDE_DELAY_MS, DOUBLE_TAP_MS, POSITION_REPORT_INTERVAL_MS
+    input.ts                  — AXIS_THRESHOLD, REPEAT_INITIAL_MS, REPEAT_INTERVAL_MS
   context/
     SettingsContext.tsx        — localStorage-Settings (streamBadgeMode, sidebarWidth, badgeGap), CSS-Custom-Properties-Sync
+  hooks/
+    usePlaybackSession.ts     — Gemeinsamer Hook: hlsPayload, playState, videoRef, Quality-Panel-State, startLive/startVod/stop; genutzt von AppShell + ChannelScreen
   input/
     gamepad.ts                — Browser Gamepad API, rAF-Poll, Achsen-Debounce
   lib/
+    formatting.ts             — Gemeinsame Format-Utilities (Zeit, Zahlen, Dauer)
     languageBadge.ts          — ISO-Code → Flagge/Kürzel Mapping (~40 Sprachen)
   styles/
     global.css                — Dark Theme (#0e0e10, #9147ff Akzent), 1280x800-optimiert
@@ -168,17 +183,20 @@ Alle Renderer→Main-Calls gehen über `window.t4sd.*` (definiert in `src/preloa
 2. Bridge-Methode in `src/preload/index.ts`
 3. Typ-Deklaration in `src/renderer/src/types/t4sd.d.ts`
 
+IPC-Namespaces: `app:` (quit, Cache-Größe, Cache leeren, HLS-Cache-Toggle), `auth:`, `twitch:`, `history:`, `playback:`, `gamepad:` (Main→Renderer-Events).
+
 ### Zwei Playback-Kontexte
+
+Beide Kontexte nutzen `usePlaybackSession` (`src/renderer/src/hooks/usePlaybackSession.ts`) — der Hook kapselt `hlsPayload`, `playState`, `videoRef`, Quality-Panel-State sowie `startLive`/`startVod`/`stop`. Der `active`-Parameter steuert, ob der Hook auf IPC-Events (hls-url, playback-event) subscribed.
 
 **1. ChannelScreen-Playback** (Live + VOD, X-Button oder „Du folgst"):
 - Nutzer navigiert zur ChannelScreen → drückt „▶ Live ansehen" oder wählt einen VOD
-- ChannelScreen hält eigenen `hlsPayload`-State, eigenen `videoRef`, eigene PlaybackOverlay
+- ChannelScreen instanziiert `usePlaybackSession({ active: true })` — hält eigene Session, eigene PlaybackOverlay
 - VOD-Features: Resume, Kapitel-Panel, Position-Tracking
 
 **2. Globaler AppShell-Overlay** (Direkt-Start, A-Button in BrowseScreen/StreamListScreen/CategoryScreen):
 - Nutzer drückt A auf einer Stream-Karte → `onStartLive(ch)` → AppShell ruft `startLive()` direkt auf
-- AppShell hält `liveChannel`, `liveHlsPayload`, `livePlayState`, `liveVideoRef`
-- `isGlobalPlaybackInitiated` Ref verhindert, dass ChannelScreen-IPC-Events den globalen Overlay aktivieren
+- AppShell instanziiert `usePlaybackSession({ active: !isChannelScreenActive })` — `active` schaltet IPC-Subscription frei
 - Während Playback: `hasFocus={false}` für alle Browse-Screens → keine Tastenkonflikte
 - AppShell-eigener Keydown-Handler: Escape=Stop, Enter=Pause, Pfeile=Seek
 - Nur Live-Streams (kein VOD, kein Resume, kein Position-Tracking)

@@ -1,4 +1,5 @@
 // Spiegel der Preload-API. Manuell synchron halten zu src/preload/index.ts.
+// IPC-Channel-Namen: src/main/ipc/channels.ts (Renderer kann nicht direkt importieren).
 
 export type AuthStatus = 'logged-out' | 'logged-in'
 

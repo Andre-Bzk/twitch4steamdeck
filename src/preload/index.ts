@@ -1,37 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-
-const IPC = {
-  appQuit: 'app:quit',
-  authStatus: 'auth:get-status',
-  authStart: 'auth:start-device-flow',
-  authCancel: 'auth:cancel',
-  authLogout: 'auth:logout',
-  authConfigured: 'auth:is-configured',
-  authEvent: 'auth:event',
-
-  twitchGetFollowed: 'twitch:get-followed',
-  twitchGetOwnUser: 'twitch:get-own-user',
-  twitchGetVideos: 'twitch:get-videos',
-  twitchGetTopGames: 'twitch:get-top-games',
-  twitchGetTopStreams: 'twitch:get-top-streams',
-  twitchGetVodChapters: 'twitch:get-vod-chapters',
-  historyGetProgress: 'history:get-progress',
-
-  playbackStartLive: 'playback:start-live',
-  playbackStartVod: 'playback:start-vod',
-  playbackStop: 'playback:stop',
-  playbackPause: 'playback:pause',
-  playbackReportPosition: 'playback:report-position',
-  playbackGetQualities: 'playback:get-qualities',
-  playbackEvent: 'playback:event',
-  playbackHlsUrl: 'playback:hls-url',
-
-  appGetCacheSize: 'app:get-cache-size',
-  appClearCache: 'app:clear-cache',
-  appSetHlsCacheEnabled: 'app:set-hls-cache-enabled',
-
-  gamepadInput: 'gamepad-input'
-} as const
+import { IPC } from '../main/ipc/channels'
 
 export type AuthStatus = 'logged-out' | 'logged-in'
 

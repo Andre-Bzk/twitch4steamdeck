@@ -25,6 +25,16 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
     startBtnRef.current?.focus()
   }, [])
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Enter') return
+      if (phase.kind === 'idle' || phase.kind === 'error') void start()
+      else if (phase.kind === 'awaiting') void cancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase])
+
   // Auth-Events aus Main abonnieren.
   useEffect(() => {
     const off = window.t4sd.auth.onEvent((event) => {
