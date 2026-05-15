@@ -1,6 +1,7 @@
 import Hls from 'hls.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { POSITION_REPORT_INTERVAL_MS } from '../constants/playback'
+import log from 'electron-log/renderer'
 
 export interface VideoPlayerHandle {
   seek(delta: number): void
@@ -81,7 +82,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
         hlsRef.current = null
       }
 
-      console.log('[VideoPlayer] Hls.isSupported:', Hls.isSupported(), '| URL:', hlsUrl.slice(0, 80))
+      log.info('[VideoPlayer] Hls.isSupported:', Hls.isSupported(), '| URL:', hlsUrl.slice(0, 80))
 
       if (Hls.isSupported()) {
         const hls = new Hls({ enableWorker: false })
@@ -89,30 +90,30 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
 
         // Attach media first, then load the source — more reliable in Electron/Chromium
         hls.attachMedia(video)
-        console.log('[VideoPlayer] attachMedia aufgerufen')
+        log.info('[VideoPlayer] attachMedia aufgerufen')
 
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          console.log('[VideoPlayer] MEDIA_ATTACHED — lade Source')
+          log.info('[VideoPlayer] MEDIA_ATTACHED — lade Source')
           hls.loadSource(hlsUrl)
         })
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('[VideoPlayer] MANIFEST_PARSED — readyState:', video.readyState, 'networkState:', video.networkState)
+          log.info('[VideoPlayer] MANIFEST_PARSED — readyState:', video.readyState, 'networkState:', video.networkState)
           if (startPosition > 0 && !isLive) {
             video.currentTime = startPosition
           }
           // With the correct order (attachMedia → MEDIA_ATTACHED → loadSource)
           // the MediaSource is already attached at MANIFEST_PARSED — play() is safe to call.
           video.play().then(() => {
-            console.log('[VideoPlayer] play() erfolgreich')
+            log.info('[VideoPlayer] play() erfolgreich')
           }).catch((err: unknown) => {
-            console.error('[VideoPlayer] play() fehlgeschlagen:', err)
+            log.error('[VideoPlayer] play() fehlgeschlagen:', err)
             onError?.(`Wiedergabe konnte nicht gestartet werden: ${err}`)
           })
         })
 
         hls.on(Hls.Events.ERROR, (_evt, data) => {
-          console.warn('[VideoPlayer] hls.js Fehler:', data.type, data.details, data.fatal)
+          log.warn('[VideoPlayer] hls.js Fehler:', data.type, data.details, data.fatal)
           if (data.fatal) {
             onError?.(`HLS-Fehler: ${data.type} – ${data.details}`)
           }

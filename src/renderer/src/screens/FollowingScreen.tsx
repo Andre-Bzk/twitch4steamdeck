@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import FocusableCard from '../components/FocusableCard'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
+import log from 'electron-log/renderer'
 
 interface Props {
   hasFocus: boolean
@@ -29,7 +30,7 @@ export default function FollowingScreen({
       setFocusedIndex(0)
       setLoadState('ok')
     } catch (err) {
-      console.error('[FollowingScreen] getFollowed fehlgeschlagen:', err)
+      log.error('[FollowingScreen] getFollowed fehlgeschlagen:', err)
       setLoadState('error')
     }
   }, [])

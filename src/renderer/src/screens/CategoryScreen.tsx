@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import FocusableCard from '../components/FocusableCard'
+import log from 'electron-log/renderer'
 
 interface Props {
   game: GameInfo
@@ -26,7 +27,7 @@ export default function CategoryScreen({ game, onSelectChannel, onStartLive, onB
       setFocusedIndex(0)
       setLoadState('ok')
     } catch (err) {
-      console.error('[CategoryScreen] Laden fehlgeschlagen:', err)
+      log.error('[CategoryScreen] Laden fehlgeschlagen:', err)
       setLoadState('error')
     }
   }, [game.id])

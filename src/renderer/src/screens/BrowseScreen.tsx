@@ -4,6 +4,7 @@ import LanguageBadge from '../components/LanguageBadge'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import { formatViewers, formatViewersFull } from '../lib/formatting'
 import { STREAM_GAP, STREAM_W } from '../constants/ui'
+import log from 'electron-log/renderer'
 
 interface Props {
   hasFocus: boolean
@@ -50,7 +51,7 @@ export default function BrowseScreen({
       setFocusRegion('shelf')
       setLoadState('ok')
     } catch (err) {
-      console.error('[BrowseScreen] Laden fehlgeschlagen:', err)
+      log.error('[BrowseScreen] Laden fehlgeschlagen:', err)
       setLoadState('error')
     }
   }, [])
@@ -63,7 +64,7 @@ export default function BrowseScreen({
       setTopGames((prev) => [...prev, ...result.games])
       setNextCursor(result.cursor)
     } catch (err) {
-      console.error('[BrowseScreen] Nachladen fehlgeschlagen:', err)
+      log.error('[BrowseScreen] Nachladen fehlgeschlagen:', err)
     } finally {
       setIsLoadingMore(false)
     }

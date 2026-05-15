@@ -12,6 +12,7 @@ import type {
   VodChapter,
   VodInfo
 } from './types'
+import log from 'electron-log/main'
 
 function parseDuration(d: string): number {
   let s = 0
@@ -103,7 +104,7 @@ export class HelixClient {
       for (const id of chunk) url.searchParams.append('user_id', id)
       url.searchParams.set('first', '100')
       const res = await fetch(url.toString(), { headers: await this.authHeaders() })
-      if (!res.ok) continue
+      if (!res.ok) { log.warn('[helixClient] getLiveStreams batch failed, partial result:', res.status); continue }
       const data = (await res.json()) as { data: HelixStream[] }
       for (const stream of data.data) map.set(stream.user_id, stream)
     }
@@ -117,7 +118,7 @@ export class HelixClient {
       const url = new URL(`${BASE}/users`)
       for (const id of chunk) url.searchParams.append('id', id)
       const res = await fetch(url.toString(), { headers: await this.authHeaders() })
-      if (!res.ok) continue
+      if (!res.ok) { log.warn('[helixClient] getProfileImages batch failed, partial result:', res.status); continue }
       const data = (await res.json()) as { data: HelixUser[] }
       for (const user of data.data) map.set(user.id, user.profile_image_url)
     }
@@ -165,10 +166,11 @@ export class HelixClient {
           url.searchParams.set('game_id', g.id)
           url.searchParams.set('first', '100')
           const res = await fetch(url.toString(), { headers })
-          if (!res.ok) return undefined
+          if (!res.ok) { log.warn('[helixClient] viewer-count fetch failed for game', g.id, res.status); return undefined }
           const d = (await res.json()) as { data: HelixStream[] }
           return d.data.reduce((sum, s) => sum + s.viewer_count, 0)
-        } catch {
+        } catch (err) {
+          log.warn('[helixClient] viewer-count fetch failed for game', g.id, err)
           return undefined
         }
       })
@@ -252,7 +254,7 @@ export class HelixClient {
           query: HelixClient.CHAPTERS_QUERY
         }])
       })
-      if (!res.ok) return []
+      if (!res.ok) { log.warn('[helixClient] getVodChapters non-ok status:', res.status); return [] }
       const json = await res.json() as Array<{
         data?: { video?: { moments?: { edges: Array<{ node: {
           positionMilliseconds: number
@@ -270,7 +272,8 @@ export class HelixClient {
         gameName: node.details?.game?.name ?? node.description,
         gameId: node.details?.game?.id ?? null
       }))
-    } catch {
+    } catch (err) {
+      log.warn('[helixClient] getVodChapters failed, returning [] (chapters optional):', err)
       return []
     }
   }

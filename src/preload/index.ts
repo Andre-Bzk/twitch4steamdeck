@@ -1,3 +1,4 @@
+import 'electron-log/preload'
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC } from '../main/ipc/channels'
 import type {

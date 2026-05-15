@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import FocusableCard from '../components/FocusableCard'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
+import log from 'electron-log/renderer'
 
 interface Props {
   hasFocus: boolean
@@ -39,7 +40,7 @@ export default function StreamListScreen({
       setFocusedIndex(0)
       setLoadState('ok')
     } catch (err) {
-      console.error('[StreamListScreen] Laden fehlgeschlagen:', err)
+      log.error('[StreamListScreen] Laden fehlgeschlagen:', err)
       setLoadState('error')
     }
   }, [language])
@@ -52,7 +53,7 @@ export default function StreamListScreen({
       setStreams((prev) => [...prev, ...result.streams])
       setNextCursor(result.cursor)
     } catch (err) {
-      console.error('[StreamListScreen] Nachladen fehlgeschlagen:', err)
+      log.error('[StreamListScreen] Nachladen fehlgeschlagen:', err)
     } finally {
       setIsLoadingMore(false)
     }

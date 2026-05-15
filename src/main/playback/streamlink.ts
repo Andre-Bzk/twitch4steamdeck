@@ -73,7 +73,7 @@ export function getStreamUrl(url: string, quality: string): Promise<string> {
       if (code === 0 && hlsUrl) {
         resolve(hlsUrl)
       } else {
-        reject(new Error(`streamlink --stream-url exit ${code}, stdout: ${out.trim().slice(0, 200)}`))
+        reject(new Error(`streamlink --stream-url ${url} ${quality} exit ${code}, stdout: ${out.trim().slice(0, 200)}`))
       }
     })
   })

@@ -21,6 +21,7 @@
  */
 
 import { AXIS_THRESHOLD, REPEAT_INITIAL_MS, REPEAT_INTERVAL_MS } from '../constants/input'
+import log from 'electron-log/renderer'
 
 const BUTTON_MAP: Record<number, string> = {
   0: 'Enter',   // A
@@ -70,11 +71,11 @@ export class GamepadService {
   }
 
   private onConnected = (e: GamepadEvent): void => {
-    console.log(`[gamepad] connected: ${e.gamepad.id} (index ${e.gamepad.index})`)
+    log.info(`[gamepad] connected: ${e.gamepad.id} (index ${e.gamepad.index})`)
   }
 
   private onDisconnected = (e: GamepadEvent): void => {
-    console.log(`[gamepad] disconnected: ${e.gamepad.id} (index ${e.gamepad.index})`)
+    log.info(`[gamepad] disconnected: ${e.gamepad.id} (index ${e.gamepad.index})`)
     this.padStates.delete(e.gamepad.index)
   }
 

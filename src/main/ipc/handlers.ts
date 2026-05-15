@@ -9,31 +9,42 @@ import type { HlsUrlPayload } from '../playback/playbackService'
 import type { PlaybackEvent } from '../playback/types'
 import { getProgressMap } from '../store/historyRepo'
 import { IPC } from './channels'
+import log from 'electron-log/main'
 
 export { IPC }
+
+function safeHandle<A extends unknown[], R>(
+  channel: string,
+  fn: (...args: A) => R | Promise<R>,
+): void {
+  ipcMain.handle(channel, async (_e, ...args) => {
+    try { return await fn(...(args as A)) }
+    catch (err) { log.error(`[ipc:${channel}]`, err); throw err }
+  })
+}
 
 export function registerIpcHandlers(
   auth: AuthService,
   helix: HelixClient,
   playback: PlaybackService
 ): void {
-  ipcMain.handle(IPC.appQuit, () => {
+  safeHandle(IPC.appQuit, () => {
     app.quit()
   })
 
-  ipcMain.handle(IPC.appGetCacheSize, () => session.defaultSession.getCacheSize())
-  ipcMain.handle(IPC.appClearCache, () => session.defaultSession.clearCache())
-  ipcMain.handle(IPC.appSetHlsCacheEnabled, (_e, enabled: boolean) => {
+  safeHandle(IPC.appGetCacheSize, () => session.defaultSession.getCacheSize())
+  safeHandle(IPC.appClearCache, () => session.defaultSession.clearCache())
+  safeHandle(IPC.appSetHlsCacheEnabled, (enabled: boolean) => {
     setHlsCacheEnabled(Boolean(enabled))
   })
 
-  ipcMain.handle(IPC.authStatus, () => auth.getStatus())
-  ipcMain.handle(IPC.authConfigured, () => auth.isConfigured())
-  ipcMain.handle(IPC.authStart, () => auth.startDeviceFlow())
-  ipcMain.handle(IPC.authCancel, () => {
+  safeHandle(IPC.authStatus, () => auth.getStatus())
+  safeHandle(IPC.authConfigured, () => auth.isConfigured())
+  safeHandle(IPC.authStart, () => auth.startDeviceFlow())
+  safeHandle(IPC.authCancel, () => {
     auth.cancelFlow()
   })
-  ipcMain.handle(IPC.authLogout, () => auth.logout())
+  safeHandle(IPC.authLogout, () => auth.logout())
 
   auth.on('auth-event', (event: AuthEvent) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -41,15 +52,15 @@ export function registerIpcHandlers(
     }
   })
 
-  ipcMain.handle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
-  ipcMain.handle(IPC.twitchGetOwnUser, () => helix.getOwnUserInfo())
-  ipcMain.handle(
+  safeHandle(IPC.twitchGetFollowed, () => helix.getFollowedWithLiveStatus())
+  safeHandle(IPC.twitchGetOwnUser, () => helix.getOwnUserInfo())
+  safeHandle(
     IPC.twitchGetTopGames,
-    (_e, cursor?: string) => helix.getTopGames(40, cursor)
+    (cursor?: string) => helix.getTopGames(40, cursor)
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.twitchGetTopStreams,
-    (_e, options?: { gameId?: string; language?: string; cursor?: string; limit?: number }) =>
+    (options?: { gameId?: string; language?: string; cursor?: string; limit?: number }) =>
       helix.getTopStreams({
         gameId: options?.gameId,
         language: options?.language,
@@ -57,40 +68,40 @@ export function registerIpcHandlers(
         limit: options?.limit ?? (options?.gameId ? 40 : 100)
       })
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.twitchGetVideos,
-    (_e, broadcasterId: string) => helix.getVideos(broadcasterId)
+    (broadcasterId: string) => helix.getVideos(broadcasterId)
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.twitchGetVodChapters,
-    (_e, videoId: string) => helix.getVodChapters(videoId)
+    (videoId: string) => helix.getVodChapters(videoId)
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.historyGetProgress,
-    (_e, vodIds: string[]) => getProgressMap(vodIds)
+    (vodIds: string[]) => getProgressMap(vodIds)
   )
 
-  ipcMain.handle(
+  safeHandle(
     IPC.playbackStartLive,
-    (_e, channelLogin: string, quality?: string) => playback.startLive(channelLogin, quality)
+    (channelLogin: string, quality?: string) => playback.startLive(channelLogin, quality)
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.playbackStartVod,
-    (_e, vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number, quality?: string) =>
+    (vodId: string, channelLogin: string, title: string, durationSeconds: number, startSeconds?: number, quality?: string) =>
       playback.startVod(vodId, channelLogin, title, durationSeconds, startSeconds, quality)
   )
-  ipcMain.handle(
+  safeHandle(
     IPC.playbackGetQualities,
-    (_e, twitchUrl: string) => playback.getAvailableQualities(twitchUrl)
+    (twitchUrl: string) => playback.getAvailableQualities(twitchUrl)
   )
-  ipcMain.handle(IPC.playbackStop, () => playback.stop())
-  ipcMain.handle(IPC.playbackPause, () => {
+  safeHandle(IPC.playbackStop, () => playback.stop())
+  safeHandle(IPC.playbackPause, () => {
     // Bring Electron window back into focus (Windows: Gamepad API requires window focus)
     for (const win of BrowserWindow.getAllWindows()) win.focus()
   })
-  ipcMain.handle(
+  safeHandle(
     IPC.playbackReportPosition,
-    (_e, vodId: string, positionSeconds: number, durationSeconds: number) => {
+    (vodId: string, positionSeconds: number, durationSeconds: number) => {
       playback.updateVodPosition(vodId, positionSeconds, durationSeconds)
     }
   )

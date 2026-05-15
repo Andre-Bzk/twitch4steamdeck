@@ -33,6 +33,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { BrowserWindow } from 'electron'
 import { DEDUP_WINDOW_MS, HOTPLUG_SCAN_INTERVAL_MS, TRIGGER_THRESHOLD } from '../constants/input'
+import log from 'electron-log/main'
 
 // evdev input_event auf 64-bit Linux:
 // { u64 tv_sec (8 Bytes), u64 tv_usec (8 Bytes), u16 type (2), u16 code (2), s32 value (4) } = 24 Bytes
@@ -397,21 +398,21 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
           reader = new EvdevReader(eventPath, onKey)
           if (reader.start()) {
             readers.set(jsPath, reader)
-            console.log(`[gamepad] geöffnet (evdev): ${jsPath} → ${eventPath}`)
+            log.info(`[gamepad] geöffnet (evdev): ${jsPath} → ${eventPath}`)
           }
         } else {
           // Fallback to legacy joystick API when no /sys mapping is found
           reader = new JoystickFallbackReader(jsPath, onKey)
           if (reader.start()) {
             readers.set(jsPath, reader)
-            console.log(`[gamepad] geöffnet (js-fallback): ${jsPath}`)
+            log.info(`[gamepad] geöffnet (js-fallback): ${jsPath}`)
           }
         }
       }
 
       for (const [jsPath, reader] of readers) {
         if (!seen.has(jsPath)) {
-          console.log(`[gamepad] getrennt: ${jsPath}`)
+          log.info(`[gamepad] getrennt: ${jsPath}`)
           reader.stop()
           readers.delete(jsPath)
         }

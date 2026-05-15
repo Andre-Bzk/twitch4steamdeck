@@ -6,6 +6,11 @@ import { PlaybackService } from './playback/playbackService'
 import { registerIpcHandlers } from './ipc/handlers'
 import { startGamepadReader } from './input/gamepadReader'
 import { getHlsCacheEnabled } from './prefs/hlsCachePref'
+import log from 'electron-log/main'
+
+log.initialize()
+log.transports.file.level = 'info'
+log.transports.console.level = 'debug'
 
 const isDev = !app.isPackaged
 
@@ -130,9 +135,7 @@ app.whenReady().then(async () => {
   })
 
   if (!clientId) {
-    console.warn(
-      '[twitch4steamdeck] MAIN_VITE_TWITCH_CLIENT_ID nicht gesetzt — Login wird im UI als nicht konfiguriert angezeigt.'
-    )
+    log.warn('[twitch4steamdeck] MAIN_VITE_TWITCH_CLIENT_ID nicht gesetzt — Login wird im UI als nicht konfiguriert angezeigt.')
   }
 
   createWindow()
