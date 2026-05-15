@@ -5,7 +5,7 @@ import { HelixClient } from './twitch/helixClient'
 import { PlaybackService } from './playback/playbackService'
 import { registerIpcHandlers } from './ipc/handlers'
 import { startGamepadReader } from './input/gamepadReader'
-import { getHlsCacheEnabled } from './prefs/hlsCachePref'
+
 import log from 'electron-log/main'
 
 log.initialize()
@@ -63,23 +63,22 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-function isHlsStreamContent(url: string): boolean {
-  const pathEnd = url.indexOf('?')
-  const path = pathEnd === -1 ? url : url.slice(0, pathEnd)
-  return /\.(m3u8|ts|m4s|aac)$/i.test(path)
-}
-
 /**
  * CORS-Bypass für Twitch CDN und HLS-Streams.
  * hls.js im Renderer sendet Requests von localhost/file:// — Twitch CDN erwartet
  * Origin: https://www.twitch.tv. Wir setzen Origin + Referer auf ausgehenden Requests
  * und ergänzen CORS-Response-Header, damit Chromium die Antworten akzeptiert.
- * Zusätzlich: cache-control: no-store für HLS-Inhalte wenn hlsCacheEnabled=false.
+ *
+ * HLS-Cache-Unterdrückung: xhrSetup in hls.js setzt Cache-Control: no-store auf jedem
+ * XHR. Das löst einen CORS-Preflight aus (Cache-Control ist kein safelisted header).
+ * Damit der Preflight durchkommt, muss onHeadersReceived auch ttvnw.net-Domains abdecken
+ * (Segment-CDN: *.j.cloudfront.hls.ttvnw.net — enthält nicht "cloudfront.net").
  */
 function setupTwitchCors(): void {
   const isTwitchCdn = (url: string): boolean =>
     url.includes('twitchsvc.net') ||
     url.includes('cloudfront.net') ||
+    url.includes('ttvnw.net') ||
     url.includes('twitch.tv') ||
     url.includes('twitch.amazon.com')
 
@@ -92,23 +91,15 @@ function setupTwitchCors(): void {
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const isCdn = isTwitchCdn(details.url)
-    const applyNoStore = isHlsStreamContent(details.url) && !getHlsCacheEnabled()
-
-    if (!isCdn && !applyNoStore) { callback({}); return }
+    if (!isTwitchCdn(details.url)) { callback({}); return }
 
     const headers: Record<string, string[]> = {}
     for (const [k, v] of Object.entries(details.responseHeaders ?? {})) {
       headers[k.toLowerCase()] = Array.isArray(v) ? v : [v]
     }
-    if (isCdn) {
-      headers['access-control-allow-origin'] = ['*']
-      headers['access-control-allow-headers'] = ['*']
-      headers['access-control-allow-methods'] = ['GET, HEAD, OPTIONS']
-    }
-    if (applyNoStore) {
-      headers['cache-control'] = ['no-store']
-    }
+    headers['access-control-allow-origin'] = ['*']
+    headers['access-control-allow-headers'] = ['*']
+    headers['access-control-allow-methods'] = ['GET, HEAD, OPTIONS']
     callback({ responseHeaders: headers })
   })
 }

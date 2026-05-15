@@ -1,6 +1,8 @@
 import Hls from 'hls.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { POSITION_REPORT_INTERVAL_MS } from '../constants/playback'
+import { useSettings } from '../context/SettingsContext'
+import { NoCacheLoader } from '../lib/hlsNoCacheLoader'
 import log from 'electron-log/renderer'
 
 export interface VideoPlayerHandle {
@@ -30,6 +32,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
   ({ hlsUrl, startPosition, isLive, vodId, durationSeconds, onPlaying, onPaused, onEnded, onError, onTimeUpdate }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const hlsRef = useRef<Hls | null>(null)
+    const { settings } = useSettings()
 
     useImperativeHandle(ref, () => ({
       seek(delta: number) {
@@ -85,7 +88,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
       log.info('[VideoPlayer] Hls.isSupported:', Hls.isSupported(), '| URL:', hlsUrl.slice(0, 80))
 
       if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: false })
+        const hlsConfig: Partial<Hls['config']> = { enableWorker: false }
+        if (!settings.hlsCacheEnabled) {
+          // XHR-based approaches (xhrSetup, webRequest hooks) cannot prevent Chromium's HTTP
+          // disk cache from storing responses — the cache layer ignores no-store in XHR request
+          // headers. The Fetch API's cache mode is the only reliable mechanism: it is evaluated
+          // before the cache storage decision is made.
+          hlsConfig.loader = NoCacheLoader
+        }
+        const hls = new Hls(hlsConfig)
         hlsRef.current = hls
 
         // Attach media first, then load the source — more reliable in Electron/Chromium
