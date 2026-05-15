@@ -8,10 +8,4 @@ export type Quality =
   | 'audio_only'
   | 'worst'
 
-export interface PlaybackEvent {
-  kind: 'started' | 'stopped' | 'error'
-  channelLogin?: string
-  message?: string
-  durationSeconds?: number
-  isLive?: boolean
-}
+export type { PlaybackEvent } from '../../shared/types'

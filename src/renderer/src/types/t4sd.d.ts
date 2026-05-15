@@ -1,92 +1,37 @@
-// Spiegel der Preload-API. Manuell synchron halten zu src/preload/index.ts.
-// IPC-Channel-Namen: src/main/ipc/channels.ts (Renderer kann nicht direkt importieren).
+// Data types: src/shared/types.ts (canonical source, compiler-enforced).
+// T4sdApi: keep manually in sync with src/preload/index.ts.
+// Direct import is not possible: tsconfig.web.json and tsconfig.node.json are separate
+// composite projects — preload/index.ts is not reachable from the renderer build.
 
-export type AuthStatus = 'logged-out' | 'logged-in'
+export type {
+  AuthStatus,
+  DeviceFlowStartInfo,
+  AuthEvent,
+  FollowedChannelInfo,
+  OwnUserInfo,
+  PlaybackEvent,
+  HlsUrlPayload,
+  GameInfo,
+  VodInfo,
+  VodProgress,
+  VodChapter,
+  TopStreamsResult
+} from '../../../shared/types'
 
-export interface DeviceFlowStartInfo {
-  userCode: string
-  verificationUri: string
-  expiresInSec: number
-}
-
-export type AuthEvent =
-  | { kind: 'authorized' }
-  | { kind: 'denied' }
-  | { kind: 'expired' }
-  | { kind: 'cancelled' }
-  | { kind: 'error'; message: string }
-
-export interface FollowedChannelInfo {
-  broadcasterId: string
-  broadcasterLogin: string
-  broadcasterName: string
-  profileImageUrl: string
-  isLive: boolean
-  streamTitle?: string
-  gameId?: string
-  gameName?: string
-  viewerCount?: number
-  thumbnailUrl?: string
-  startedAt?: string
-  language?: string
-}
-
-export interface OwnUserInfo {
-  id: string
-  login: string
-  displayName: string
-  profileImageUrl: string
-}
-
-export interface GameInfo {
-  id: string
-  name: string
-  boxArtUrl: string
-  viewerCount?: number
-}
-
-export interface PlaybackEvent {
-  kind: 'started' | 'stopped' | 'error'
-  channelLogin?: string
-  message?: string
-  durationSeconds?: number
-  isLive?: boolean
-}
-
-export interface HlsUrlPayload {
-  url: string
-  isLive: boolean
-  startPosition: number
-  durationSeconds: number
-  vodId?: string
-}
-
-export interface VodInfo {
-  id: string
-  title: string
-  createdAt: string
-  durationSeconds: number
-  viewCount: number
-  thumbnailUrl: string
-}
-
-export interface VodProgress {
-  resumePositionSeconds: number
-  watchedAt: number
-  completed: boolean
-}
-
-export interface VodChapter {
-  positionSeconds: number
-  durationSeconds: number
-  gameName: string
-  gameId: string | null
-}
-
-export interface TopStreamsResult {
-  streams: FollowedChannelInfo[]
-  cursor?: string
-}
+import type {
+  AuthStatus,
+  DeviceFlowStartInfo,
+  AuthEvent,
+  FollowedChannelInfo,
+  OwnUserInfo,
+  PlaybackEvent,
+  HlsUrlPayload,
+  GameInfo,
+  VodInfo,
+  VodProgress,
+  VodChapter,
+  TopStreamsResult
+} from '../../../shared/types'
 
 export interface T4sdApi {
   appVersion: string
