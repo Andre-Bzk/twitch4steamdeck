@@ -9,11 +9,12 @@ import { getHlsCacheEnabled } from './prefs/hlsCachePref'
 
 const isDev = !app.isPackaged
 
-// Erlaubt video.play() ohne vorangehende User-Geste (nötig, weil play() in hls.js-Callbacks
-// aufgerufen wird, die asynchron weit nach dem ursprünglichen Click-Event stattfinden).
+// Allows video.play() without a prior user gesture — play() is called from hls.js callbacks
+// that fire asynchronously long after the original click event.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
-// Explizite Cache-Größe verhindert Chromiums dynamische Größenberechnung, die bei
-// wechselndem freiem Speicherplatz zu "Invalid cache (current) size"-Fehlern führt.
+// Explicit cache size prevents Chromium's dynamic sizing, which causes "Invalid cache (current)
+// size" errors when available disk space fluctuates.
+
 app.commandLine.appendSwitch('disk-cache-size', String(500 * 1024 * 1024))
 
 function createWindow(): BrowserWindow {

@@ -70,12 +70,12 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
       }
     }))
 
-    // HLS-Player initialisieren und URL laden
+    // Initialize hls.js and load the URL
     useEffect(() => {
       const video = videoRef.current
       if (!video) return
 
-      // Bestehende hls.js-Instanz zerstören
+      // Tear down any existing hls.js instance
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
@@ -87,7 +87,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
         const hls = new Hls({ enableWorker: false })
         hlsRef.current = hls
 
-        // Erst Media attachieren, dann Source laden (zuverlässiger in Electron/Chromium)
+        // Attach media first, then load the source — more reliable in Electron/Chromium
         hls.attachMedia(video)
         console.log('[VideoPlayer] attachMedia aufgerufen')
 
@@ -101,9 +101,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           if (startPosition > 0 && !isLive) {
             video.currentTime = startPosition
           }
-          // Mit der korrekten Reihenfolge (attachMedia → MEDIA_ATTACHED → loadSource)
-          // ist die MediaSource beim MANIFEST_PARSED-Event bereits am Video-Element —
-          // play() kann direkt aufgerufen werden.
+          // With the correct order (attachMedia → MEDIA_ATTACHED → loadSource)
+          // the MediaSource is already attached at MANIFEST_PARSED — play() is safe to call.
           video.play().then(() => {
             console.log('[VideoPlayer] play() erfolgreich')
           }).catch((err: unknown) => {
@@ -119,7 +118,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Native HLS (nicht Electron, aber als Fallback)
+        // Native HLS (not Electron, but as a fallback)
         video.src = hlsUrl
         if (startPosition > 0 && !isLive) {
           video.currentTime = startPosition
@@ -138,7 +137,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hlsUrl])
 
-    // VOD-Fortschritt alle 5s an Main-Prozess melden (für SQLite History)
+    // Report VOD progress every 5 s to the main process (SQLite history)
     useEffect(() => {
       if (!vodId || !durationSeconds || isLive) return
       const id = setInterval(() => {

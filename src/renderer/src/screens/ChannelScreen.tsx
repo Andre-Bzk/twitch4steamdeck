@@ -62,7 +62,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
       .finally(() => setChaptersLoading(false))
   }
 
-  // Playback-Session — ChannelScreen ist immer der aktive Eigentümer wenn gemountet
+  // Playback session — ChannelScreen is always the active owner while mounted
   const session = usePlaybackSession({
     active: true,
     onStarted: (ev) => {
@@ -134,7 +134,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       const isPlaying = playState === 'playing' || playState === 'starting' || playState === 'paused'
 
-      // Kapitel-Panel hat oberste Priorität (gilt auch während Wiedergabe)
+      // Chapter panel has top priority (also applies during playback)
       if (focusRegion === 'chapters' && chapterPanelVod) {
         const duringPlayback = isPlaying
         if (e.key === 'Escape') {
@@ -175,9 +175,9 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         return
       }
 
-      // Während der Wiedergabe: nur Playback-Steuerung erlauben, keine Navigation
+      // During playback: allow only playback controls, block screen navigation
       if (isPlaying) {
-        // Quality-Panel hat Vorrang wenn geöffnet
+        // Quality panel takes priority when open
         if (qualityPanelOpen) {
           if (e.key === 'ArrowUp') {
             e.preventDefault()

@@ -41,7 +41,7 @@ const INPUT_EVENT_SIZE = 24
 const EV_KEY = 0x01
 const EV_ABS = 0x03
 
-// Button-Codes (BTN_GAMEPAD-Bereich) – konsistent über alle Controller und Treiber
+// Button codes (BTN_GAMEPAD range) — consistent across all controllers and drivers
 const BTN_SOUTH = 0x130
 const BTN_EAST  = 0x131
 const BTN_NORTH = 0x133
@@ -70,10 +70,10 @@ const BUTTON_MAP: Record<number, string> = {
   [BTN_TR2]:   'r2',
 }
 
-const STICK_THRESHOLD = 16384  // ~50% von 32767
+const STICK_THRESHOLD = 16384  // ~50% of 32767
 const REPEAT_INITIAL_MS = 400
 const REPEAT_INTERVAL_MS = 150
-// Trigger-Achsen sollen kein Auto-Repeat auslösen (300s-Sprünge nicht wiederholen)
+// Trigger axes must not fire auto-repeat (avoid repeating 300 s jumps)
 const NO_REPEAT_ABS_CODES = new Set([ABS_Z, ABS_RZ])
 
 interface AxisState {
@@ -96,7 +96,7 @@ function findEventDevice(jsDevicePath: string): string | null {
     const eventEntry = entries.find((e) => /^event\d+$/.test(e))
     if (eventEntry) return `/dev/input/${eventEntry}`
   } catch {
-    // Kein /sys-Zugriff oder Device verschwunden
+    // No /sys access or device has disappeared
   }
   return null
 }
@@ -400,7 +400,7 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
             console.log(`[gamepad] geöffnet (evdev): ${jsPath} → ${eventPath}`)
           }
         } else {
-          // Fallback auf altes Joystick-API wenn kein /sys-Mapping gefunden
+          // Fallback to legacy joystick API when no /sys mapping is found
           reader = new JoystickFallbackReader(jsPath, onKey)
           if (reader.start()) {
             readers.set(jsPath, reader)
@@ -417,7 +417,7 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
         }
       }
     } catch {
-      // /dev/input nicht zugänglich
+      // /dev/input not accessible
     }
   }
 

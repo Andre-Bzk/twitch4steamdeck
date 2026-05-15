@@ -17,7 +17,7 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const startBtnRef = useRef<HTMLButtonElement>(null)
 
-  // Initial: prüfen ob Client-ID konfiguriert ist.
+  // On mount: check whether the client ID is configured.
   useEffect(() => {
     void window.t4sd.auth.isConfigured().then((ok) => {
       if (!ok) setPhase({ kind: 'not-configured' })
@@ -35,7 +35,7 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [phase])
 
-  // Auth-Events aus Main abonnieren.
+  // Subscribe to auth events from the main process.
   useEffect(() => {
     const off = window.t4sd.auth.onEvent((event) => {
       switch (event.kind) {
@@ -59,7 +59,7 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
     return off
   }, [onAuthorized])
 
-  // Countdown für die aktive Phase.
+  // Countdown tick for the awaiting phase.
   useEffect(() => {
     if (phase.kind !== 'awaiting') return
     if (phase.remainingSec <= 0) return

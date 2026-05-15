@@ -308,7 +308,7 @@ export class HelixClient {
       }
     })
 
-    // Live-Kanäle zuerst, dann alphabetisch
+    // Live channels first, then alphabetical
     return channels.sort((a, b) => {
       if (a.isLive !== b.isLive) return a.isLive ? -1 : 1
       return a.broadcasterName.localeCompare(b.broadcasterName)

@@ -50,13 +50,13 @@ export default function FollowingScreen({
     if (!hasFocus) return
 
     const onKey = (e: KeyboardEvent): void => {
-      // Refresh über [Y] funktioniert immer
+      // [Y] refresh always works regardless of focus region
       if (e.key === 'y' || e.key === 'Y') {
         void load()
         return
       }
 
-      // Bei leeren / Fehler-Zuständen nur Left zum Sidebar zulassen
+      // In empty / error states only allow Left to reach the sidebar
       if (loadState !== 'ok' || channels.length === 0) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault()

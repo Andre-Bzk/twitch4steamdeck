@@ -68,7 +68,7 @@ export function getStreamUrl(url: string, quality: string): Promise<string> {
     proc.stdout?.on('data', (d: Buffer) => { out += d.toString() })
     proc.on('error', reject)
     proc.on('exit', (code) => {
-      // Nimm die letzte Zeile die mit https:// beginnt — ignoriert Info-/Warn-Zeilen
+      // Take the last line starting with https:// — skips info/warn lines from streamlink
       const hlsUrl = out.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('https://')).at(-1) ?? ''
       if (code === 0 && hlsUrl) {
         resolve(hlsUrl)

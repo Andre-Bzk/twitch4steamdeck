@@ -1,4 +1,4 @@
-// Orchestriert den kompletten Twitch-Login-Lifecycle und hält den aktuellen Token-Status.
+// Orchestrates the full Twitch login lifecycle and tracks current token status.
 
 import { EventEmitter } from 'node:events'
 import {

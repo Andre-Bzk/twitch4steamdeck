@@ -50,7 +50,7 @@ function saveSettings(s: AppSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   } catch {
-    // localStorage nicht verfügbar — ignorieren
+    // localStorage not available — ignore
   }
 }
 

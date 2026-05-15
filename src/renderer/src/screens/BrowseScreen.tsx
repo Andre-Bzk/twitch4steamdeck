@@ -73,7 +73,7 @@ export default function BrowseScreen({
     void load()
   }, [load])
 
-  // Nächste Seite automatisch nachladen wenn letztes Element fokussiert wird
+  // Auto-load next page when the last item gets focus
   useEffect(() => {
     if (focusRegion !== 'grid' || loadState !== 'ok') return
     if (gridIndex === topGames.length - 1 && nextCursor && !isLoadingMore) {
@@ -179,7 +179,7 @@ export default function BrowseScreen({
     return () => window.removeEventListener('keydown', onKey)
   }, [hasFocus, loadState, focusRegion, shelfIndex, gridIndex, topStreams, topGames, getGridColumns, onRequestSidebar, onSelectChannel, onStartLive, onSelectCategory, load])
 
-  // Grid-Karte in den Viewport scrollen wenn fokussiert
+  // Scroll the focused grid card into the viewport
   useEffect(() => {
     if (focusRegion !== 'grid') return
     const grid = gridRef.current

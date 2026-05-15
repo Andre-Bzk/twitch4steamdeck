@@ -85,7 +85,7 @@ export function registerIpcHandlers(
   )
   ipcMain.handle(IPC.playbackStop, () => playback.stop())
   ipcMain.handle(IPC.playbackPause, () => {
-    // Fokus auf Electron-Fenster zurückholen (Windows: Win Gamepad API braucht Fokus)
+    // Bring Electron window back into focus (Windows: Gamepad API requires window focus)
     for (const win of BrowserWindow.getAllWindows()) win.focus()
   })
   ipcMain.handle(

@@ -1,5 +1,5 @@
-// Verschlüsselte Persistenz für Twitch-Tokens.
-// Nutzt Electron safeStorage (OS-Keystore unter der Haube) — keine native Module nötig.
+// Encrypted persistence for Twitch tokens.
+// Uses Electron safeStorage (OS keystore under the hood) — no native modules required.
 
 import { app, safeStorage } from 'electron'
 import { promises as fs } from 'node:fs'
@@ -27,8 +27,8 @@ export async function saveTokens(tokens: StoredTokens): Promise<void> {
     const encrypted = safeStorage.encryptString(json)
     await fs.writeFile(path, encrypted)
   } else {
-    // Fallback: unverschlüsselt (z. B. headless Linux ohne Keyring).
-    // Datei nur für aktuellen User lesbar machen.
+    // Fallback: plaintext (e.g. headless Linux without a keyring).
+    // Restrict file permissions to the current user.
     await fs.writeFile(path, json, { mode: 0o600 })
   }
 }
@@ -48,7 +48,7 @@ export async function loadTokens(): Promise<StoredTokens | null> {
     try {
       json = safeStorage.decryptString(raw)
     } catch {
-      // Datei evtl. mit anderem Key geschrieben — als ungültig behandeln.
+      // File may have been written with a different key — treat as invalid.
       return null
     }
   } else {

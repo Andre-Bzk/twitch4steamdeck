@@ -29,11 +29,11 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   const [quitDialogOpen, setQuitDialogOpen] = useState(false)
   const [quitDialogChoice, setQuitDialogChoice] = useState<QuitChoice>('no')
 
-  // Kanal-Info für den globalen Overlay — AppShell-spezifisch, kein Playback-State
+  // Channel info for the global overlay — AppShell-specific, not part of playback state
   const [liveChannel, setLiveChannel] = useState<FollowedChannelInfo | null>(null)
   const [livePosition, setLivePosition] = useState(0)
 
-  // Globale Playback-Session — aktiv wenn kein ChannelScreen offen ist
+  // Global playback session — active when no ChannelScreen is open
   const globalSession = usePlaybackSession({
     active: !selectedChannel,
     onStopped: () => { setLiveChannel(null); setLivePosition(0) },
@@ -84,7 +84,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     setSelectedChannel(ch)
   }, [])
 
-  // Direkt-Start: kein ChannelScreen — globaler Overlay startet sofort
+  // Direct start: no ChannelScreen — global overlay starts immediately
   const handleStartLive = useCallback((ch: FollowedChannelInfo) => {
     setLiveChannel(ch)
     void startGlobalLive(ch.broadcasterLogin)
@@ -108,11 +108,11 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     setSelectedCategory(game)
   }, [])
 
-  // Key-Handler für den globalen Playback-Overlay (B=Stop, A=Pause, Pfeile=Seek)
+  // Key handler for the global playback overlay (B=Stop, A=Pause, arrows=Seek)
   useEffect(() => {
     if (!isGlobalPlaying) return
     const onKey = (e: KeyboardEvent): void => {
-      // Quality-Panel hat Vorrang wenn geöffnet
+      // Quality panel takes priority when open
       if (liveQualityPanelOpen) {
         if (e.key === 'ArrowUp') {
           e.preventDefault()
@@ -177,7 +177,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [isGlobalPlaying, livePlayState, handleStopLive, liveQualityPanelOpen, liveAvailableQualities, liveQualityFocusedIndex, liveCurrentQuality, liveChannel, handleLiveQualityChange])
 
-  // Key-Handler für die Sidebar (wenn sie den Fokus hat)
+  // Key handler for the sidebar (when it has focus)
   useEffect(() => {
     if (region !== 'sidebar') return
     const onKey = (e: KeyboardEvent): void => {

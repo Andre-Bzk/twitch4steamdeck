@@ -92,7 +92,7 @@ export async function pollForToken(opts: PollOptions): Promise<PollOutcome> {
       return { kind: 'authorized', token }
     }
 
-    // Twitch liefert bei Pending einen 400 mit message-Feld.
+    // Twitch returns a 400 with a message field while the code is pending.
     let payload: ErrorResponse = {}
     try {
       const json = (await res.json()) as unknown
