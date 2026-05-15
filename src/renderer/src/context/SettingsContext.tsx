@@ -7,6 +7,7 @@ export interface AppSettings {
   sidebarWidth: number
   badgeGap: number
   hlsCacheEnabled: boolean
+  fileLoggingEnabled: boolean
 }
 
 const STORAGE_KEY = 't4sd:settings'
@@ -20,7 +21,8 @@ const DEFAULTS: AppSettings = {
   streamBadgeMode: 'both',
   sidebarWidth: SIDEBAR_DEFAULT,
   badgeGap: BADGE_GAP_DEFAULT,
-  hlsCacheEnabled: false
+  hlsCacheEnabled: false,
+  fileLoggingEnabled: false
 }
 
 export { SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_DEFAULT, BADGE_GAP_MIN, BADGE_GAP_MAX, BADGE_GAP_DEFAULT }
@@ -39,7 +41,8 @@ function loadSettings(): AppSettings {
         : DEFAULTS.streamBadgeMode,
       sidebarWidth: sw >= SIDEBAR_MIN && sw <= SIDEBAR_MAX ? sw : SIDEBAR_DEFAULT,
       badgeGap: bg >= BADGE_GAP_MIN && bg <= BADGE_GAP_MAX ? bg : BADGE_GAP_DEFAULT,
-      hlsCacheEnabled: typeof parsed.hlsCacheEnabled === 'boolean' ? parsed.hlsCacheEnabled : DEFAULTS.hlsCacheEnabled
+      hlsCacheEnabled: typeof parsed.hlsCacheEnabled === 'boolean' ? parsed.hlsCacheEnabled : DEFAULTS.hlsCacheEnabled,
+      fileLoggingEnabled: typeof parsed.fileLoggingEnabled === 'boolean' ? parsed.fileLoggingEnabled : DEFAULTS.fileLoggingEnabled
     }
   } catch {
     return DEFAULTS
@@ -60,6 +63,7 @@ interface SettingsCtx {
   setSidebarWidth: (width: number) => void
   setBadgeGap: (gap: number) => void
   setHlsCacheEnabled: (enabled: boolean) => void
+  setFileLoggingEnabled: (enabled: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsCtx | null>(null)
@@ -71,6 +75,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): J
     document.documentElement.style.setProperty('--sidebar-width', `${settings.sidebarWidth}px`)
     document.documentElement.style.setProperty('--badge-gap', `${settings.badgeGap}px`)
     void window.t4sd.app.setHlsCacheEnabled(settings.hlsCacheEnabled)
+    void window.t4sd.app.setFileLoggingEnabled(settings.fileLoggingEnabled)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setStreamBadgeMode = useCallback((mode: StreamBadgeMode) => {
@@ -110,8 +115,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): J
     void window.t4sd.app.setHlsCacheEnabled(enabled)
   }, [])
 
+  const setFileLoggingEnabled = useCallback((enabled: boolean) => {
+    setSettings((prev) => {
+      const next = { ...prev, fileLoggingEnabled: enabled }
+      saveSettings(next)
+      return next
+    })
+    void window.t4sd.app.setFileLoggingEnabled(enabled)
+  }, [])
+
   return (
-    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled }}>
+    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled }}>
       {children}
     </SettingsContext.Provider>
   )

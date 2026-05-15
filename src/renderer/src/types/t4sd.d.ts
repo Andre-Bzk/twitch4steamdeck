@@ -40,6 +40,7 @@ export interface T4sdApi {
     getCacheSize: () => Promise<number>
     clearCache: () => Promise<void>
     setHlsCacheEnabled: (enabled: boolean) => Promise<void>
+    setFileLoggingEnabled: (enabled: boolean) => Promise<void>
   }
   auth: {
     isConfigured: () => Promise<boolean>

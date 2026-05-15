@@ -13,10 +13,12 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
   const [user, setUser] = useState<OwnUserInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [confirmVisible, setConfirmVisible] = useState(false)
+  const [confirmIndex, setConfirmIndex] = useState(0) // 0 = Nein, 1 = Ja
 
   useEffect(() => {
-    if (hasFocus) logoutBtnRef.current?.focus({ preventScroll: true })
-  }, [hasFocus])
+    if (hasFocus && !confirmVisible) logoutBtnRef.current?.focus({ preventScroll: true })
+  }, [hasFocus, confirmVisible])
 
   useEffect(() => {
     let cancelled = false
@@ -47,16 +49,40 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
   useEffect(() => {
     if (!hasFocus) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'ArrowLeft') {
+      if (confirmVisible) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          setConfirmIndex(0)
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          setConfirmIndex(1)
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          setConfirmVisible(false)
+          setConfirmIndex(0)
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          if (confirmIndex === 1) {
+            void handleLogout()
+          } else {
+            setConfirmVisible(false)
+            setConfirmIndex(0)
+          }
+        }
+        return
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'Escape') {
         e.preventDefault()
         onRequestSidebar()
       } else if (e.key === 'Enter') {
-        void handleLogout()
+        e.preventDefault()
+        setConfirmVisible(true)
+        setConfirmIndex(0)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, onRequestSidebar])
+  }, [hasFocus, confirmVisible, confirmIndex, onRequestSidebar])
 
   async function handleLogout(): Promise<void> {
     await window.t4sd.auth.logout()
@@ -92,9 +118,29 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
           )}
         </div>
         <p className="account__version">App-Version {window.t4sd.appVersion}</p>
-        <button ref={logoutBtnRef} className="btn" onClick={handleLogout}>
-          Abmelden
-        </button>
+        {confirmVisible ? (
+          <div className="account__confirm">
+            <p className="account__confirm-text">Wirklich abmelden?</p>
+            <div className="account__confirm-buttons">
+              <button
+                className={['btn', confirmIndex === 0 ? 'btn--focused' : ''].filter(Boolean).join(' ')}
+                onClick={() => { setConfirmVisible(false); setConfirmIndex(0) }}
+              >
+                Nein
+              </button>
+              <button
+                className={['btn', confirmIndex === 1 ? 'btn--focused' : ''].filter(Boolean).join(' ')}
+                onClick={() => { void handleLogout() }}
+              >
+                Ja
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button ref={logoutBtnRef} className="btn" onClick={() => { setConfirmVisible(true); setConfirmIndex(0) }}>
+            Abmelden
+          </button>
+        )}
       </div>
     </div>
   )

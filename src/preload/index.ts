@@ -37,7 +37,8 @@ const api = {
     quit: (): Promise<void> => ipcRenderer.invoke(IPC.appQuit),
     getCacheSize: (): Promise<number> => ipcRenderer.invoke(IPC.appGetCacheSize),
     clearCache: (): Promise<void> => ipcRenderer.invoke(IPC.appClearCache),
-    setHlsCacheEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.appSetHlsCacheEnabled, enabled)
+    setHlsCacheEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.appSetHlsCacheEnabled, enabled),
+    setFileLoggingEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.appSetFileLoggingEnabled, enabled)
   },
   auth: {
     isConfigured: (): Promise<boolean> => ipcRenderer.invoke(IPC.authConfigured),

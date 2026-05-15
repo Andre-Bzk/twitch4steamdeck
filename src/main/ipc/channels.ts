@@ -30,6 +30,7 @@ export const IPC = {
   appGetCacheSize: 'app:get-cache-size',
   appClearCache: 'app:clear-cache',
   appSetHlsCacheEnabled: 'app:set-hls-cache-enabled',
+  appSetFileLoggingEnabled: 'app:set-file-logging-enabled',
 
   /** main → renderer */
   gamepadInput: 'gamepad-input'

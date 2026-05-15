@@ -42,15 +42,16 @@ function formatCacheSize(bytes: number): string {
   return `${(mb / 1024).toFixed(2)} GB`
 }
 
-/** Total focusable rows: badge options + sidebar slider + badge gap slider + hls toggle + cache action */
+/** Total focusable rows: badge options + sidebar slider + badge gap slider + hls toggle + file logging toggle + cache action */
 const SIDEBAR_SLIDER_ROW = OPTIONS.length
 const BADGE_GAP_SLIDER_ROW = OPTIONS.length + 1
 const HLS_CACHE_TOGGLE_ROW = OPTIONS.length + 2
 const CACHE_ACTION_ROW = OPTIONS.length + 3
-const TOTAL_ROWS = OPTIONS.length + 4
+const FILE_LOGGING_TOGGLE_ROW = OPTIONS.length + 4
+const TOTAL_ROWS = OPTIONS.length + 5
 
 export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): JSX.Element {
-  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled } = useSettings()
+  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled } = useSettings()
   const [focusedIndex, setFocusedIndex] = useState(() =>
     Math.max(0, OPTIONS.findIndex((o) => o.mode === settings.streamBadgeMode))
   )
@@ -128,6 +129,8 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
             setBadgeGap(BADGE_GAP_DEFAULT)
           } else if (focusedIndex === HLS_CACHE_TOGGLE_ROW) {
             setHlsCacheEnabled(!settings.hlsCacheEnabled)
+          } else if (focusedIndex === FILE_LOGGING_TOGGLE_ROW) {
+            setFileLoggingEnabled(!settings.fileLoggingEnabled)
           } else if (focusedIndex === CACHE_ACTION_ROW) {
             void handleClearCache()
           }
@@ -137,7 +140,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.hlsCacheEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, handleClearCache])
+  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.hlsCacheEnabled, settings.fileLoggingEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled, handleClearCache])
 
   const rowRefs = useRef<Array<HTMLElement | null>>([])
 
@@ -150,6 +153,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
   const sidebarSliderFocused = hasFocus && focusedIndex === SIDEBAR_SLIDER_ROW
   const badgeGapSliderFocused = hasFocus && focusedIndex === BADGE_GAP_SLIDER_ROW
   const hlsCacheToggleFocused = hasFocus && focusedIndex === HLS_CACHE_TOGGLE_ROW
+  const fileLoggingToggleFocused = hasFocus && focusedIndex === FILE_LOGGING_TOGGLE_ROW
   const cacheActionFocused = hasFocus && focusedIndex === CACHE_ACTION_ROW
 
   return (
@@ -323,6 +327,30 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           </span>
           <span className="settings-cache__action">
             {clearing ? 'Wird geleert …' : 'Cache leeren'}
+          </span>
+        </button>
+
+        <button
+          ref={(el) => { rowRefs.current[FILE_LOGGING_TOGGLE_ROW] = el }}
+          className={[
+            'settings-option',
+            settings.fileLoggingEnabled ? 'settings-option--active' : '',
+            fileLoggingToggleFocused ? 'settings-option--focused' : ''
+          ].filter(Boolean).join(' ')}
+          onClick={() => {
+            setFocusedIndex(FILE_LOGGING_TOGGLE_ROW)
+            setFileLoggingEnabled(!settings.fileLoggingEnabled)
+          }}
+          tabIndex={fileLoggingToggleFocused ? 0 : -1}
+        >
+          <span className="settings-option__radio" aria-hidden="true">
+            {settings.fileLoggingEnabled ? '●' : '○'}
+          </span>
+          <span className="settings-option__label">Datei-Logging</span>
+          <span className="settings-option__preview">
+            {settings.fileLoggingEnabled
+              ? 'Aktiv — Info-Logs in main.log'
+              : 'Inaktiv — nur Fehler werden geloggt (empfohlen)'}
           </span>
         </button>
       </div>

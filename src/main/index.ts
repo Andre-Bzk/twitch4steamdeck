@@ -9,7 +9,7 @@ import { getHlsCacheEnabled } from './prefs/hlsCachePref'
 import log from 'electron-log/main'
 
 log.initialize()
-log.transports.file.level = 'info'
+log.transports.file.level = 'error'
 log.transports.console.level = 'debug'
 
 const isDev = !app.isPackaged

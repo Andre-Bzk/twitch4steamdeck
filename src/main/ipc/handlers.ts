@@ -37,6 +37,9 @@ export function registerIpcHandlers(
   safeHandle(IPC.appSetHlsCacheEnabled, (enabled: boolean) => {
     setHlsCacheEnabled(Boolean(enabled))
   })
+  safeHandle(IPC.appSetFileLoggingEnabled, (enabled: boolean) => {
+    log.transports.file.level = Boolean(enabled) ? 'info' : 'error'
+  })
 
   safeHandle(IPC.authStatus, () => auth.getStatus())
   safeHandle(IPC.authConfigured, () => auth.isConfigured())

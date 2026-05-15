@@ -64,6 +64,12 @@ body,
   background: var(--color-accent);
 }
 
+.btn--focused {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .btn--primary:hover {
   background: #a970ff;
 }
@@ -1437,6 +1443,23 @@ body,
   font-size: 18px;
   color: #ff6868;
   text-align: center;
+}
+
+.account__confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.account__confirm-text {
+  margin: 0;
+  font-size: 20px;
+}
+
+.account__confirm-buttons {
+  display: flex;
+  gap: 16px;
 }
 
 /* ── Chapter Overlay (Modal) ──────────────────────────── */
