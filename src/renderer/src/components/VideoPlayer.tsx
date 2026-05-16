@@ -1,3 +1,6 @@
+// Technical hls.js wrapper — renders a <video> element and exposes an imperative
+// handle for seek, pause, play, and stop. No screen navigation or playback-state
+// logic lives here; that belongs to the caller (ChannelScreen / AppShell).
 import Hls from 'hls.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { POSITION_REPORT_INTERVAL_MS } from '../constants/playback'

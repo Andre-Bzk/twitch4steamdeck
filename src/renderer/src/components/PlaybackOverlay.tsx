@@ -1,6 +1,10 @@
+// Video playback overlay rendered inside the Electron window.
+// Responsibility: overlay UI only (seek bar, channel info, controls, hints).
+// No screen navigation logic — that lives in the parent (AppShell / ChannelScreen).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem } from './GamepadPrompt'
-import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, QualityIcon, StopIcon } from './Icons'
+import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, StopIcon } from './Icons'
+import { QualityPanel } from './QualityPanel'
 import { formatCount, formatTimestamp } from '../lib/formatting'
 import { DOUBLE_TAP_MS, OVERLAY_HIDE_DELAY_MS } from '../constants/playback'
 
@@ -365,37 +369,14 @@ export function PlaybackOverlay({
             </div>
           )}
           {onOpenQuality && availableQualities !== undefined && availableQualities.length > 0 && (
-            <div className="playback-overlay__quality-wrap">
-              <button
-                className="playback-overlay__quality-btn"
-                onClick={() => { onOpenQuality(); showOverlay() }}
-                aria-label="Qualität ändern"
-              >
-                <QualityIcon width={18} height={18} />
-                <span>{currentQuality ?? 'best'}</span>
-              </button>
-              {qualityPanelOpen && (
-                <div className="playback-overlay__quality-panel">
-                  <div className="playback-overlay__quality-panel-title">Qualität</div>
-                  <ul className="playback-overlay__quality-list">
-                    {availableQualities.map((q, i) => (
-                      <li
-                        key={q}
-                        className={[
-                          'playback-overlay__quality-item',
-                          i === qualityFocusedIndex ? 'playback-overlay__quality-item--focused' : '',
-                          q === currentQuality ? 'playback-overlay__quality-item--active' : ''
-                        ].join(' ').trim()}
-                        onClick={() => { onChangeQuality?.(q); showOverlay() }}
-                      >
-                        <span>{q}</span>
-                        {q === currentQuality && <span className="playback-overlay__quality-check">✓</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <QualityPanel
+              qualities={availableQualities}
+              current={currentQuality ?? 'best'}
+              open={qualityPanelOpen ?? false}
+              focusedIndex={qualityFocusedIndex ?? 0}
+              onOpen={() => { onOpenQuality(); showOverlay() }}
+              onChange={(q) => { onChangeQuality?.(q); showOverlay() }}
+            />
           )}
           <button
             className="playback-overlay__stop-btn"

@@ -1,3 +1,14 @@
+// Global live-playback context: direct-start via A-button from browse screens.
+// Live only — no VOD, no resume, no chapter panel.
+// For the full channel-bound context (Live + VOD + chapters), see ChannelScreen.
+//
+// Two playback contexts:
+// 1. ChannelScreen — Live + VOD with resume, chapters, position tracking.
+//    Active when selectedChannel is set.
+// 2. AppShell global overlay — Direct-start via A-button from BrowseScreen,
+//    StreamListScreen, CategoryScreen. Live only, no resume. Controlled by
+//    liveChannel / liveVideoRef.
+// Both share usePlaybackSession() but hold independent videoRef instances.
 import { useCallback, useEffect, useState } from 'react'
 import { PlaybackOverlay } from '../components/PlaybackOverlay'
 import { GamepadHintItem } from '../components/GamepadPrompt'
@@ -12,6 +23,7 @@ import SettingsScreen from './SettingsScreen'
 import StreamListScreen from './StreamListScreen'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import { usePlaybackSession } from '../hooks/usePlaybackSession'
+import { dispatchPlaybackKey, dispatchQualityPanelKey } from '../lib/playbackKeys'
 
 type Region = 'sidebar' | 'main'
 type QuitChoice = 'yes' | 'no'
@@ -100,6 +112,16 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
     void startGlobalLive(channelLogin, quality)
   }, [startGlobalLive])
 
+  const handleLiveTogglePause = useCallback(() => {
+    if (livePlayState === 'playing') {
+      liveVideoRef.current?.pause()
+      setLivePlayState('paused')
+    } else if (livePlayState === 'paused') {
+      liveVideoRef.current?.play()
+      setLivePlayState('playing')
+    }
+  }, [livePlayState, setLivePlayState])
+
   const handleBack = useCallback(() => {
     setSelectedChannel(null)
   }, [])
@@ -112,70 +134,35 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
   useEffect(() => {
     if (!isGlobalPlaying) return
     const onKey = (e: KeyboardEvent): void => {
-      // Quality panel takes priority when open
       if (liveQualityPanelOpen) {
-        if (e.key === 'ArrowUp') {
-          e.preventDefault()
-          setLiveQualityFocusedIndex((i) => Math.max(0, i - 1))
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault()
-          setLiveQualityFocusedIndex((i) => Math.min((liveAvailableQualities?.length ?? 1) - 1, i + 1))
-        } else if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          const q = liveAvailableQualities?.[liveQualityFocusedIndex]
-          if (q && liveChannel) handleLiveQualityChange(q, liveChannel.broadcasterLogin)
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          setLiveQualityPanelOpen(false)
-        }
+        dispatchQualityPanelKey(e, {
+          qualities: liveAvailableQualities ?? [],
+          focusedIndex: liveQualityFocusedIndex,
+          onMoveFocus: (d) => setLiveQualityFocusedIndex((i) =>
+            d < 0 ? Math.max(0, i - 1) : Math.min((liveAvailableQualities?.length ?? 1) - 1, i + 1)),
+          onApply: (q) => liveChannel && handleLiveQualityChange(q, liveChannel.broadcasterLogin),
+          onClose: () => setLiveQualityPanelOpen(false),
+        })
         return
       }
-
-      switch (e.key) {
-        case 'Escape':
-          e.preventDefault()
-          handleStopLive()
-          break
-        case 'Enter':
-        case ' ':
-          e.preventDefault()
-          if (livePlayState === 'playing') {
-            liveVideoRef.current?.pause()
-            setLivePlayState('paused')
-          } else if (livePlayState === 'paused') {
-            liveVideoRef.current?.play()
-            setLivePlayState('playing')
-          }
-          break
-        case 'ArrowLeft':
-          e.preventDefault()
-          liveVideoRef.current?.seek(-30)
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          liveVideoRef.current?.seek(30)
-          break
-        case 'l2':
-          e.preventDefault()
-          liveVideoRef.current?.seek(-300)
-          break
-        case 'r2':
-          e.preventDefault()
-          liveVideoRef.current?.seek(300)
-          break
-        case 'x':
-          e.preventDefault()
-          if (liveAvailableQualities && liveAvailableQualities.length > 0) {
-            const idx = liveAvailableQualities.indexOf(liveCurrentQuality)
-            setLiveQualityFocusedIndex(idx >= 0 ? idx : 0)
-            setLiveQualityPanelOpen(true)
-          }
-          break
-      }
+      dispatchPlaybackKey(e, {
+        onTogglePause: handleLiveTogglePause,
+        onSeek: (s) => liveVideoRef.current?.seek(s),
+        onStop: handleStopLive,
+        onOpenQuality: liveAvailableQualities?.length
+          ? () => {
+              const idx = liveAvailableQualities.indexOf(liveCurrentQuality)
+              setLiveQualityFocusedIndex(idx >= 0 ? idx : 0)
+              setLiveQualityPanelOpen(true)
+            }
+          : undefined,
+      })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isGlobalPlaying, livePlayState, handleStopLive, liveQualityPanelOpen, liveAvailableQualities, liveQualityFocusedIndex, liveCurrentQuality, liveChannel, handleLiveQualityChange])
+  }, [isGlobalPlaying, handleLiveTogglePause, handleStopLive, liveQualityPanelOpen,
+      liveAvailableQualities, liveQualityFocusedIndex, liveCurrentQuality, liveChannel,
+      handleLiveQualityChange, setLiveQualityFocusedIndex, setLiveQualityPanelOpen])
 
   // Key handler for the sidebar (when it has focus)
   useEffect(() => {
@@ -367,15 +354,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                     setLiveQualityPanelOpen(true)
                   }}
                   onChangeQuality={(q) => liveChannel && handleLiveQualityChange(q, liveChannel.broadcasterLogin)}
-                  onTogglePause={() => {
-                    if (livePlayState === 'playing') {
-                      liveVideoRef.current?.pause()
-                      setLivePlayState('paused')
-                    } else {
-                      liveVideoRef.current?.play()
-                      setLivePlayState('playing')
-                    }
-                  }}
+                  onTogglePause={handleLiveTogglePause}
                   onSeek={(s) => liveVideoRef.current?.seek(s)}
                   onSeekTo={(s) => liveVideoRef.current?.seekTo(s)}
                   onStop={handleStopLive}

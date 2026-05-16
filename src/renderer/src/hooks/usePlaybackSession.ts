@@ -3,21 +3,33 @@ import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { HlsUrlPayload, PlaybackEvent } from '../types/t4sd'
 import type { VideoPlayerHandle } from '../components/VideoPlayer'
 
+// Shared playback session mechanics for ChannelScreen and AppShell.
+// Owns: HLS payload state, playState transitions (via IPC events), quality list,
+//       the videoRef passed to <VideoPlayer>, and the start/stop commands.
+// Does NOT own: overlay visibility, chapter state, position tracking — those
+// belong to the caller (ChannelScreen or AppShell).
+
 export type PlayState = 'idle' | 'starting' | 'playing' | 'paused' | 'error'
 
 export interface PlaybackSession {
+  // ── Session state (driven by IPC events) ─────────────────────────────────
   hlsPayload: HlsUrlPayload | null
   playState: PlayState
   videoRef: RefObject<VideoPlayerHandle>
   availableQualities: string[] | undefined
   currentQuality: string
-  qualityPanelOpen: boolean
-  qualityFocusedIndex: number
   errorMsg: string
   isActive: boolean
+
+  // ── Quality-panel UI state (caller drives the panel; hook stores it so
+  //    both the key handler and the overlay prop always see the same value) ──
+  qualityPanelOpen: boolean
+  qualityFocusedIndex: number
   setPlayState: Dispatch<SetStateAction<PlayState>>
   setQualityPanelOpen: Dispatch<SetStateAction<boolean>>
   setQualityFocusedIndex: Dispatch<SetStateAction<number>>
+
+  // ── Commands ──────────────────────────────────────────────────────────────
   startLive: (login: string, quality?: string) => Promise<void>
   startVod: (vodId: string, login: string, title: string, duration: number, startSeconds?: number, quality?: string) => Promise<void>
   stop: () => void
@@ -25,9 +37,14 @@ export interface PlaybackSession {
 }
 
 interface Options {
+  /** Subscribe to IPC playback events only when true. Set to false when
+   *  another playback context (ChannelScreen) is mounted and should own the session. */
   active: boolean
+  /** Called when a new stream/VOD has started and the first event arrives. */
   onStarted?: (ev: PlaybackEvent) => void
+  /** Called when playback stops (user stop, stream end, or error recovery). */
   onStopped?: () => void
+  /** Called on a fatal playback error, before the session resets to idle. */
   onError?: () => void
 }
 
