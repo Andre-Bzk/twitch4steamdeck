@@ -97,6 +97,7 @@ modules:
       - mkdir -p /app/lib/twitch4steamdeck/node_modules
       - cp -r node_modules/better-sqlite3 /app/lib/twitch4steamdeck/node_modules/
       - cp -r node_modules/bindings /app/lib/twitch4steamdeck/node_modules/
+      - cp -r node_modules/electron-log /app/lib/twitch4steamdeck/node_modules/
       - cp -r node_modules/file-uri-to-path /app/lib/twitch4steamdeck/node_modules/
       # Electron-Binary (Linux, via npm install in WSL2)
       # Electron binary (Linux, via npm install in WSL2)
