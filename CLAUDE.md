@@ -1,339 +1,372 @@
 # Twitch4SteamDeck — CLAUDE.md
 
-Twitch-Client für das Steam Deck. Electron + React, gamepad-navigierbar, Big-Screen-UI (auf Linux/Steam Deck: Fenster maximiert auf Primärdisplay; im Windows-Dev: 1280x800). Unterstützt Live-Streams und VODs mit Resume und Kapitelwahl. Deployment als Flatpak auf dem Steam Deck.
+Twitch client for the Steam Deck. Electron + React, gamepad-navigable, Big-Screen UI (on Linux/Steam Deck: window maximized on primary display; on Windows dev: 1280x800). Supports live streams and VODs with resume and chapter selection. Deployed as a Flatpak on the Steam Deck.
 
 ---
 
-## Tech-Stack
+## Tech Stack
 
-| Schicht | Technologie |
+| Layer | Technology |
 |---|---|
 | Framework | Electron 33, electron-vite, React 18, TypeScript 5.5 |
-| Playback | hls.js 1.6 (HTML5 `<video>` im Renderer), Streamlink 6.11.0 im Flatpak-Build / 8.2.1 im Windows-Dev (nur für `--stream-url`) |
-| Gamepad (Linux) | evdev `/dev/input/event*` mit BTN_*-Codes (Xbox, PlayStation, Nintendo; USB + Bluetooth) |
-| DB | better-sqlite3 (VOD-Verlauf + Resume-Positionen) |
+| Playback | hls.js 1.6 (HTML5 `<video>` in renderer), Streamlink 6.11.0 in Flatpak build / 8.2.1 on Windows dev (only for `--stream-url`) |
+| Gamepad (Linux) | evdev `/dev/input/event*` with BTN_* codes (Xbox, PlayStation, Nintendo; USB + Bluetooth) |
+| DB | better-sqlite3 (VOD history + resume positions) |
 | Packaging | Flatpak (freedesktop SDK 24.08, Electron2 BaseApp) |
-| Build-Host | Windows, Flatpak-Build läuft in WSL2 |
+| Build host | Windows, Flatpak build runs in WSL2 |
 | Target | Steam Deck (Linux x86_64, Gaming Mode) |
 
 ---
 
-## Architektur
+## Architecture
 
 ```
 Electron Main Process
-├── AuthService          — Twitch Device Code Flow, Token-Verwaltung (safeStorage)
-├── HelixClient          — Twitch Helix REST API + GQL (Kapitel)
-├── PlaybackService      — Live-/VOD-Orchestrierung
+├── AuthService          — Twitch Device Code Flow, token management (safeStorage)
+├── HelixClient          — Twitch Helix REST API + GQL (chapters)
+├── PlaybackService      — Live/VOD orchestration
 │   └── streamlink.ts    — getStreamUrl() + getAvailableQualities() via streamlink
-├── historyRepo          — SQLite VOD-Verlauf (Resume, Completed)
-└── gamepadReader        — Linux evdev /dev/input/event* (via js*-Discovery, BTN_*-Codes)
+├── historyRepo          — SQLite VOD history (resume, completed)
+└── gamepadReader        — Linux evdev /dev/input/event* (via js* discovery, BTN_* codes)
 
 Preload (contextBridge)
-└── window.t4sd          — Typisierte IPC-Bridge (auth, twitch, history, playback, gamepad)
+└── window.t4sd          — Typed IPC bridge (auth, twitch, history, playback, gamepad)
 
 Renderer (React)
-├── App.tsx              — Auth-Gate: LoginScreen | AppShell
-├── AppShell.tsx         — Tab-Routing, Sidebar/Main-Fokus, Globaler Playback-Overlay
+├── App.tsx              — Auth gate: LoginScreen | AppShell (wrapped in ErrorBoundary)
+├── AppShell.tsx         — Tab routing, sidebar/main focus, global playback overlay
 ├── screens/             — FollowingScreen, BrowseScreen, CategoryScreen,
-│                          ChannelScreen (Hauptscreen), StreamListScreen, Settings, Account
+│                          ChannelScreen (main screen), StreamListScreen, Settings, Account
 ├── components/
-│   ├── VideoPlayer.tsx  — hls.js <video> Wrapper (forwardRef, imperative handle)
-│   ├── PlaybackOverlay.tsx — DOM-Overlay über dem Video (z-index: 300)
-│   └── GamepadPrompt.tsx — Typisierte Gamepad-Button-Icons (Face, Shoulder, D-Pad)
+│   ├── VideoPlayer.tsx  — hls.js <video> wrapper (forwardRef, imperative handle)
+│   ├── PlaybackOverlay.tsx — DOM overlay over the video (z-index: 300)
+│   ├── ChapterPanel.tsx — Chapter selection panel as a standalone component
+│   ├── QualityPanel.tsx — Quality selection panel as a standalone component
+│   ├── ErrorBoundary.tsx — React Error Boundary (errors logged via electron-log)
+│   └── GamepadPrompt.tsx — Typed gamepad button icons (face, shoulder, D-pad)
 ├── hooks/
-│   └── usePlaybackSession.ts — Gemeinsamer Playback-State-Hook für AppShell + ChannelScreen
-├── input/gamepad.ts     — Browser Gamepad API (Windows, Dev-Mode)
-└── context/SettingsContext.tsx — localStorage-Settings (streamBadgeMode, sidebarWidth, …)
+│   ├── usePlaybackSession.ts — Shared playback state hook for AppShell + ChannelScreen
+│   └── useChannelKeyHandler.ts — Mode-based key handler for ChannelScreen
+├── lib/
+│   ├── playbackKeys.ts  — Shared key dispatch for playback (AppShell + ChannelScreen)
+│   └── hlsNoCacheLoader.ts — Fetch API-based hls.js loader (cache: 'no-store')
+├── input/gamepad.ts     — Browser Gamepad API (Windows, dev mode)
+└── context/SettingsContext.tsx — localStorage settings (streamBadgeMode, sidebarWidth, …)
 ```
 
-### Datenfluss
+### Data Flow
 
-- **Auth:** LoginScreen → IPC → AuthService → Device Code Flow → Token (safeStorage)
+- **Auth:** LoginScreen → IPC → AuthService → Device Code Flow → token (safeStorage)
 - **Browsing:** Screen → IPC → HelixClient → Twitch Helix API → Screen
-- **Live-Playback (via ChannelScreen):** ChannelScreen → IPC `playback:start-live` → PlaybackService → `streamlink --stream-url twitch.tv/<login>` → HLS-URL → IPC-Event `playback:hls-url` → Renderer → `VideoPlayer` (hls.js)
-- **Live-Playback (Direkt-Start):** BrowseScreen/StreamListScreen/CategoryScreen → A-Button → `window.t4sd.playback.startLive()` → PlaybackService → HLS-URL → IPC-Event `playback:hls-url` → AppShell-Globaler-Overlay → `VideoPlayer` (hls.js) — **kein ChannelScreen-Routing**
-- **VOD-Playback:** ChannelScreen → IPC `playback:start-vod` → PlaybackService → `streamlink --stream-url twitch.tv/videos/<id>` → HLS-URL → IPC-Event `playback:hls-url` → Renderer → `VideoPlayer` (hls.js, seekTo startPosition)
-- **Overlay:** `PlaybackOverlay` (z-index: 300) liegt als normales DOM-Element über `VideoPlayer` (z-index: 100) — kein Fenster-Layering nötig
-- **Seek/Pause/Stop:** direkt über `videoRef.current` (kein IPC-Roundtrip)
-- **Qualitätswechsel:** `videoRef.current.stop()` → `startLive/startVod(quality)` → neuer `playback:hls-url` Event — streamlink-Neustart nötig, da Single-Bitrate-HLS (kein hls.js Level-Switch möglich)
-- **Qualitätsliste:** `IPC playback:get-qualities` → `streamlink --json <url>` → `Object.keys(streams)` sortiert nach fixem Order-Array
-- **Position-Tracking:** `VideoPlayer` meldet alle 5s via IPC `playback:report-position` → Main → SQLite
-- **Gamepad:** evdev `/dev/input/event*` via js*-Discovery (Linux/Gaming-Mode) **oder** `navigator.getGamepads()` (Windows/Dev) → synthetische `KeyboardEvent`s → alle Screen-Handler reagieren auf Keys
+- **Live playback (via ChannelScreen):** ChannelScreen → IPC `playback:start-live` → PlaybackService → `streamlink --stream-url twitch.tv/<login>` → HLS URL → IPC event `playback:hls-url` → renderer → `VideoPlayer` (hls.js)
+- **Live playback (direct start):** BrowseScreen/StreamListScreen/CategoryScreen → A button → `window.t4sd.playback.startLive()` → PlaybackService → HLS URL → IPC event `playback:hls-url` → AppShell global overlay → `VideoPlayer` (hls.js) — **no ChannelScreen routing**
+- **VOD playback:** ChannelScreen → IPC `playback:start-vod` → PlaybackService → `streamlink --stream-url twitch.tv/videos/<id>` → HLS URL → IPC event `playback:hls-url` → renderer → `VideoPlayer` (hls.js, seekTo startPosition)
+- **Overlay:** `PlaybackOverlay` (z-index: 300) sits as a normal DOM element over `VideoPlayer` (z-index: 100) — no window layering needed
+- **Seek/pause/stop:** directly via `videoRef.current` (no IPC round-trip)
+- **Quality switch:** `videoRef.current.stop()` → `startLive/startVod(quality)` → new `playback:hls-url` event — streamlink restart required since single-bitrate HLS (no hls.js level switch possible)
+- **Quality list:** IPC `playback:get-qualities` → `streamlink --json <url>` → `Object.keys(streams)` sorted by fixed order array
+- **Position tracking:** `VideoPlayer` reports every 5s via IPC `playback:report-position` → main → SQLite
+- **Gamepad:** evdev `/dev/input/event*` via js* discovery (Linux/Gaming Mode) **or** `navigator.getGamepads()` (Windows/dev) → synthetic `KeyboardEvent`s → all screen handlers respond to keys
 
 ---
 
-## Entwicklung
+## Development
 
-### Voraussetzungen
+### Prerequisites
 - Node.js, npm
-- `.env` mit `MAIN_VITE_TWITCH_CLIENT_ID=<deine-client-id>` (Twitch Application, Public, Device Code Flow)
-- Windows: Streamlink unter `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
+- `.env` with `MAIN_VITE_TWITCH_CLIENT_ID=<your-client-id>` (Twitch Application, Public, Device Code Flow)
+- Windows: Streamlink at `%LOCALAPPDATA%\Programs\Streamlink\bin\streamlink.exe`
 
-### Build-Befehle
+### Build Commands
 
 ```bash
-npm install          # Dependencies installieren
-npm run dev          # Electron Dev-Server mit Hot-Reload starten
-npm run build        # Produktions-Build (out/)
-npm run typecheck    # TypeScript prüfen (npx tsc --noEmit)
-npm run package      # Linux AppImage bauen (dist/)
+npm install          # Install dependencies
+npm run dev          # Start Electron dev server with hot reload
+npm run build        # Production build (out/)
+npm run typecheck    # Check TypeScript (npx tsc --noEmit)
+npm run package      # Build Linux AppImage (dist/)
 ```
 
-### Flatpak-Build (WSL2)
-Muss aus dem WSL2-Dateisystem (NICHT `/mnt/`) laufen:
+### Flatpak Build (WSL2)
+Must run from the WSL2 filesystem (NOT `/mnt/`):
 ```bash
 bash flatpak/build-flatpak.sh
 ```
-Das Skript: prüft deps → npm-Build → Python-Deps generieren → Streamlink-Tarballs hashen → `flatpak-builder` → SCP zum Steam Deck.
+The script: checks deps → npm build → generate Python deps → hash Streamlink tarballs → `flatpak-builder` → SCP to Steam Deck.
 
 ---
 
-## Codebase-Struktur
+## Codebase Structure
 
 ```
+src/shared/
+  types.ts                    — Shared types between main + renderer (AuthStatus, PlaybackEvent, HlsUrlPayload, VodInfo, VodChapter, …)
+
 src/main/
-  index.ts                    — Electron-Einstiegspunkt, Service-Wiring, Window (Linux: maximiert auf Primärdisplay; Windows: 1280x800), CORS-Handler für Twitch CDN
-  env.d.ts                    — Typ für MAIN_VITE_TWITCH_CLIENT_ID
+  index.ts                    — Electron entry point, service wiring, window (Linux: maximized on primary display; Windows: 1280x800), CORS handler for Twitch CDN
+  env.d.ts                    — Type for MAIN_VITE_TWITCH_CLIENT_ID
   auth/
-    authService.ts            — Auth-Lifecycle, Token-Refresh, Event-Emitter
-    deviceCodeFlow.ts         — OAuth Device Code + Polling (https://id.twitch.tv/oauth2/)
-    tokenStore.ts             — safeStorage-Verschlüsselung, Fallback auf plaintext
+    authService.ts            — Auth lifecycle, token refresh, event emitter
+    deviceCodeFlow.ts         — OAuth Device Code + polling (https://id.twitch.tv/oauth2/)
+    tokenStore.ts             — safeStorage encryption, plaintext fallback
   constants/
     input.ts                  — TRIGGER_THRESHOLD, DEDUP_WINDOW_MS, HOTPLUG_SCAN_INTERVAL_MS
   input/
-    gamepadReader.ts          — evdev /dev/input/event* Leser (via js*-Discovery), Hotplug (3s-Scan), Deduplizierung (40ms); BTN_*-Codes für controller-unabhängiges Mapping
+    gamepadReader.ts          — evdev /dev/input/event* reader (via js* discovery), hotplug (3s scan), deduplication (40ms); BTN_* codes for driver-independent controller mapping
   ipc/
-    handlers.ts               — Alle ipcMain.handle()-Registrierungen + Event-Forwarding
+    channels.ts               — IPC channel names as a typed constants object (IPC.*); single source of truth
+    handlers.ts               — All ipcMain.handle() registrations + event forwarding
   playback/
-    playbackService.ts        — Orchestrator: streamlink --stream-url → HLS-URL → playback-hls-url Event; startVod(quality?); getAvailableQualities()
-    streamlink.ts             — getStreamUrl() + getAvailableQualities() via streamlink (--stream-url für URL, --json für Qualitätsliste)
-    types.ts                  — Quality-Typ, PlaybackEvent, HlsUrlPayload
+    playbackService.ts        — Orchestrator: streamlink --stream-url → HLS URL → playback:hls-url event; startVod(quality?); getAvailableQualities()
+    streamlink.ts             — getStreamUrl() + getAvailableQualities() via streamlink (--stream-url for URL, --json for quality list)
+    types.ts                  — Quality type; re-exports PlaybackEvent from src/shared/types
   prefs/
-    hlsCachePref.ts           — In-Memory-Flag für HLS-Disk-Cache-Aktivierung (gesetzt via app:set-hls-cache-enabled IPC)
+    hlsCachePref.ts           — In-memory flag for HLS disk cache activation (set via app:set-hls-cache-enabled IPC)
   store/
-    db.ts                     — SQLite-Init, WAL-Modus, Migration (vod_history-Tabelle)
+    db.ts                     — SQLite init, WAL mode, migration (vod_history table)
     historyRepo.ts            — upsertVod, updatePosition, markCompleted, getProgressMap
   twitch/
-    helixClient.ts            — Helix-API (followed, streams, videos, games) + GQL (Kapitel)
-    types.ts                  — Helix-Typen + vereinfachte Renderer-Typen
+    helixClient.ts            — Helix API (followed, streams, videos, games) + GQL (chapters)
+    types.ts                  — Helix-specific types
 
 src/preload/
   index.ts                    — contextBridge: window.t4sd (auth, twitch, history, playback, gamepad)
 
 src/renderer/
-  index.html                  — CSP: default-src 'self'; media-src 'self' blob: (blob: nötig für hls.js MediaSource)
+  index.html                  — CSP: default-src 'self'; media-src 'self' blob: (blob: required for hls.js MediaSource)
 
 src/renderer/src/
-  App.tsx                     — Auth-Gate, Gamepad-Init
-  main.tsx                    — React-DOM-Bootstrap, SettingsProvider
+  App.tsx                     — Auth gate, gamepad init, ErrorBoundary wrapper
+  main.tsx                    — React DOM bootstrap, SettingsProvider
   screens/
-    AppShell.tsx              — Tab-Routing, Sidebar/Main-Fokus-Split, Globaler Playback-Overlay (direkter Stream-Start ohne ChannelScreen), Qualitätswahl für Live
-    LoginScreen.tsx           — Device-Code-Login, QR-Code, Countdown
-    FollowingScreen.tsx       — Gefolgte Kanäle (Grid), Live/Offline-Sort
-    BrowseScreen.tsx          — Top-Streams-Shelf (A=Direkt-Play, X=Kanalseite) + Kategorien-Grid (Infinite Scroll)
-    CategoryScreen.tsx        — Streams einer Kategorie (A=Direkt-Play, X=Kanalseite)
-    ChannelScreen.tsx         — Channel-Detail, VOD-Shelf, VideoPlayer + PlaybackOverlay, Kapitel-Panel, Qualitätswahl
-    StreamListScreen.tsx      — Sprachgefilterte Stream-Liste DE/EN (A=Direkt-Play, X=Kanalseite)
-    SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap
-    AccountScreen.tsx         — Nutzerinfo, Logout
+    AppShell.tsx              — Tab routing, sidebar/main focus split, global playback overlay (direct stream start without ChannelScreen), quality selection for live
+    LoginScreen.tsx           — Device code login, QR code, countdown
+    FollowingScreen.tsx       — Followed channels (grid), live/offline sort
+    BrowseScreen.tsx          — Top streams shelf (A=direct play, X=channel page) + category grid (infinite scroll)
+    CategoryScreen.tsx        — Streams for a category (A=direct play, X=channel page)
+    ChannelScreen.tsx         — Channel detail, VOD shelf, VideoPlayer + PlaybackOverlay, chapter panel, quality selection; key handling via useChannelKeyHandler
+    StreamListScreen.tsx      — Language-filtered stream list DE/EN (A=direct play, X=channel page)
+    SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled
+    AccountScreen.tsx         — User info, logout (with confirmation dialog)
   components/
-    VideoPlayer.tsx           — hls.js <video> Wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia vor loadSource; play() in MANIFEST_PARSED
-    PlaybackOverlay.tsx       — DOM-Overlay (Seek-Bar, Kanalinfo, Gamepad-Hints, Auto-Hide, Qualitäts-Button + Panel); playState: 'playing'|'paused'
-    GamepadPrompt.tsx         — Typisierter Gamepad-Button-Renderer (<GamepadPrompt prompt="a"/>, <GamepadHintItem>)
-    FocusableCard.tsx         — Wiederverwendbare Kanal-Karte (Thumbnail, Badge, Progress)
-    Sidebar.tsx               — Navigationssidebar (6 Tabs)
-    LanguageBadge.tsx         — Sprach-/Flagge-Badge
-    Icons.tsx                 — SVG-Icons
+    VideoPlayer.tsx           — hls.js <video> wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia before loadSource; play() in MANIFEST_PARSED
+    PlaybackOverlay.tsx       — DOM overlay (seek bar, channel info, gamepad hints, auto-hide); playState: 'playing'|'paused'
+    ChapterPanel.tsx          — Chapter selection panel (during playback or VOD start); duringPlayback prop controls label
+    QualityPanel.tsx          — Quality selection panel with button + dropdown list
+    ErrorBoundary.tsx         — React Error Boundary; logs via electron-log, shows reload button
+    GamepadPrompt.tsx         — Typed gamepad button renderer (<GamepadPrompt prompt="a"/>, <GamepadHintItem>)
+    FocusableCard.tsx         — Reusable channel card (thumbnail, badge, progress)
+    Sidebar.tsx               — Navigation sidebar (6 tabs)
+    LanguageBadge.tsx         — Language/flag badge
+    Icons.tsx                 — SVG icons
   constants/
-    ui.ts                     — CARD_W, CARD_GAP, STREAM_W, STREAM_GAP (Karten-/Grid-Größen)
+    ui.ts                     — CARD_W, CARD_GAP, STREAM_W, STREAM_GAP (card/grid sizes)
     playback.ts               — OVERLAY_HIDE_DELAY_MS, DOUBLE_TAP_MS, POSITION_REPORT_INTERVAL_MS
     input.ts                  — AXIS_THRESHOLD, REPEAT_INITIAL_MS, REPEAT_INTERVAL_MS
   context/
-    SettingsContext.tsx        — localStorage-Settings (streamBadgeMode, sidebarWidth, badgeGap), CSS-Custom-Properties-Sync
+    SettingsContext.tsx        — localStorage settings (streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled), CSS custom properties sync
   hooks/
-    usePlaybackSession.ts     — Gemeinsamer Hook: hlsPayload, playState, videoRef, Quality-Panel-State, startLive/startVod/stop; genutzt von AppShell + ChannelScreen
+    usePlaybackSession.ts     — Shared hook: hlsPayload, playState, videoRef, quality panel state, startLive/startVod/stop; used by AppShell + ChannelScreen
+    useChannelKeyHandler.ts   — Mode-based key handler for ChannelScreen; 5 modes: chapter/playback-quality/playback/hero/shelf
   input/
-    gamepad.ts                — Browser Gamepad API, rAF-Poll, Achsen-Debounce
+    gamepad.ts                — Browser Gamepad API, rAF poll, axis debounce
   lib/
-    formatting.ts             — Gemeinsame Format-Utilities (Zeit, Zahlen, Dauer)
-    languageBadge.ts          — ISO-Code → Flagge/Kürzel Mapping (~40 Sprachen)
+    formatting.ts             — Shared format utilities (time, numbers, duration)
+    languageBadge.ts          — ISO code → flag/abbreviation mapping (~40 languages)
+    playbackKeys.ts           — Shared key dispatch for playback mode + quality panel; used by AppShell + ChannelScreen
+    hlsNoCacheLoader.ts       — Fetch API-based hls.js loader (cache: 'no-store'); prevents HLS disk cache more reliably than XHR headers
   styles/
-    global.css                — Dark Theme (#0e0e10, #9147ff Akzent), 1280x800-optimiert
+    global.css                — Dark theme (#0e0e10, #9147ff accent), 1280x800-optimized
   types/
-    t4sd.d.ts                 — window.t4sd-Typ-Deklaration
+    t4sd.d.ts                 — window.t4sd type declaration
 
 scripts/
-  test-playback-pipeline.mjs  — Standalone-Test: streamlink → HLS-URL → Manifest → Segment (node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>)
+  test-playback-pipeline.mjs  — Standalone test: streamlink → HLS URL → manifest → segment (node scripts/test-playback-pipeline.mjs twitch.tv/<channel>)
 
 flatpak/
-  tv.twitch4steamdeck.App.yml — Flatpak-Manifest (Streamlink, alle Native-Deps)
-  build-flatpak.sh            — 6-Schritt Build-Pipeline (WSL2)
-  twitch4steamdeck.sh         — Launcher mit zypak-wrapper
+  tv.twitch4steamdeck.App.yml — Flatpak manifest (Streamlink, all native deps)
+  build-flatpak.sh            — 6-step build pipeline (WSL2)
+  twitch4steamdeck.sh         — Launcher with zypak wrapper
   tv.twitch4steamdeck.App.desktop
 ```
 
 ---
 
-## Wichtige Patterns & Architektur-Entscheidungen
+## Key Patterns & Architecture Decisions
 
-### IPC-Bridge Pattern
-Alle Renderer→Main-Calls gehen über `window.t4sd.*` (definiert in `src/preload/index.ts`). Neue Features brauchen:
-1. Handler in `src/main/ipc/handlers.ts` (`ipcMain.handle('kanal:aktion', ...)`)
-2. Bridge-Methode in `src/preload/index.ts`
-3. Typ-Deklaration in `src/renderer/src/types/t4sd.d.ts`
+### IPC Bridge Pattern
+All renderer→main calls go through `window.t4sd.*` (defined in `src/preload/index.ts`). New features require:
+1. Channel constant in `src/main/ipc/channels.ts` (in the `IPC` object)
+2. Handler in `src/main/ipc/handlers.ts` (`ipcMain.handle(IPC.channelAction, ...)`)
+3. Bridge method in `src/preload/index.ts`
+4. Type declaration in `src/renderer/src/types/t4sd.d.ts`
 
-IPC-Namespaces: `app:` (quit, Cache-Größe, Cache leeren, HLS-Cache-Toggle), `auth:`, `twitch:`, `history:`, `playback:`, `gamepad:` (Main→Renderer-Events).
+IPC namespaces: `app:` (quit, cache size, clear cache, HLS cache toggle, file logging toggle), `auth:`, `twitch:`, `history:`, `playback:`, `gamepad:` (main→renderer events).
 
-### Zwei Playback-Kontexte
+### Two Playback Contexts
 
-Beide Kontexte nutzen `usePlaybackSession` (`src/renderer/src/hooks/usePlaybackSession.ts`) — der Hook kapselt `hlsPayload`, `playState`, `videoRef`, Quality-Panel-State sowie `startLive`/`startVod`/`stop`. Der `active`-Parameter steuert, ob der Hook auf IPC-Events (hls-url, playback-event) subscribed.
+Both contexts use `usePlaybackSession` (`src/renderer/src/hooks/usePlaybackSession.ts`) — the hook encapsulates `hlsPayload`, `playState`, `videoRef`, quality panel state, and `startLive`/`startVod`/`stop`. The `active` parameter controls whether the hook subscribes to IPC events (hls-url, playback-event).
 
-**1. ChannelScreen-Playback** (Live + VOD, X-Button oder „Du folgst"):
-- Nutzer navigiert zur ChannelScreen → drückt „▶ Live ansehen" oder wählt einen VOD
-- ChannelScreen instanziiert `usePlaybackSession({ active: true })` — hält eigene Session, eigene PlaybackOverlay
-- VOD-Features: Resume, Kapitel-Panel, Position-Tracking
+**1. ChannelScreen playback** (live + VOD, via X button or "You follow"):
+- User navigates to ChannelScreen → presses "▶ Watch live" or selects a VOD
+- ChannelScreen instantiates `usePlaybackSession({ active: true })` — owns its own session and PlaybackOverlay
+- VOD features: resume, chapter panel, position tracking
 
-**2. Globaler AppShell-Overlay** (Direkt-Start, A-Button in BrowseScreen/StreamListScreen/CategoryScreen):
-- Nutzer drückt A auf einer Stream-Karte → `onStartLive(ch)` → AppShell ruft `startLive()` direkt auf
-- AppShell instanziiert `usePlaybackSession({ active: !isChannelScreenActive })` — `active` schaltet IPC-Subscription frei
-- Während Playback: `hasFocus={false}` für alle Browse-Screens → keine Tastenkonflikte
-- AppShell-eigener Keydown-Handler: Escape=Stop, Enter=Pause, Pfeile=Seek
-- Nur Live-Streams (kein VOD, kein Resume, kein Position-Tracking)
+**2. Global AppShell overlay** (direct start, A button in BrowseScreen/StreamListScreen/CategoryScreen):
+- User presses A on a stream card → `onStartLive(ch)` → AppShell calls `startLive()` directly
+- AppShell instantiates `usePlaybackSession({ active: !isChannelScreenActive })` — `active` enables IPC subscription
+- During playback: `hasFocus={false}` for all browse screens → no key conflicts
+- AppShell key handler uses `dispatchPlaybackKey()` + `dispatchQualityPanelKey()` from `playbackKeys.ts`
+- Live streams only (no VOD, no resume, no position tracking)
 
-### Playback-Architektur (hls.js im Renderer)
-Video läuft als HTML5 `<video>` Element innerhalb des Electron-Fensters — **kein externer mpv-Prozess**.
+### Playback Architecture (hls.js in renderer)
+Video runs as an HTML5 `<video>` element inside the Electron window — **no external mpv process**.
 
-**VideoPlayer-Initialisierung (kritisch):**
-1. `hls.attachMedia(video)` — zuerst Media-Kontext aufbauen
-2. Im `MEDIA_ATTACHED`-Event: `hls.loadSource(hlsUrl)` — dann erst Source laden
-3. Im `MANIFEST_PARSED`-Event: `video.play()` — jetzt ist MediaSource bereit
-- **Reihenfolge wichtig:** `loadSource` vor `attachMedia` → MANIFEST_PARSED feuert bevor MSE bereit → `play()` wirft `NotSupportedError: The element has no supported sources`
-- **CSP:** `media-src 'self' blob:` in `src/renderer/index.html` — hls.js braucht `blob:` für MediaSource
+**VideoPlayer initialization (critical order):**
+1. `hls.attachMedia(video)` — build the media context first
+2. In the `MEDIA_ATTACHED` event: `hls.loadSource(hlsUrl)` — load the source only then
+3. In the `MANIFEST_PARSED` event: `video.play()` — MediaSource is ready now
+- **Order matters:** `loadSource` before `attachMedia` → MANIFEST_PARSED fires before MSE is ready → `play()` throws `NotSupportedError: The element has no supported sources`
+- **CSP:** `media-src 'self' blob:` in `src/renderer/index.html` — hls.js needs `blob:` for MediaSource
 
-**Imperative Handle** — ChannelScreen / AppShell halten `videoRef = useRef<VideoPlayerHandle>()`:
-- `videoRef.current.seek(delta)` — relativer Seek (Sekunden)
-- `videoRef.current.seekTo(abs)` — absoluter Seek
+**Imperative handle** — ChannelScreen / AppShell hold `videoRef = useRef<VideoPlayerHandle>()`:
+- `videoRef.current.seek(delta)` — relative seek (seconds)
+- `videoRef.current.seekTo(abs)` — absolute seek
 - `videoRef.current.pause()` / `.play()` / `.togglePause()`
-- `videoRef.current.stop()` — zerstört hls.js-Instanz, leert `<video>`
-- `videoRef.current.getCurrentTime()` — aktuell abgespielte Position (synchron)
+- `videoRef.current.stop()` — destroys the hls.js instance, clears `<video>`
+- `videoRef.current.getCurrentTime()` — current playback position (synchronous)
 
-**Warum dieser Ansatz:** Früherer Ansatz mit externem mpv-Fullscreen-Fenster wurde vom OS-Windowmanager (Gamescope auf Steam Deck) immer über das Electron-Fenster gelegt. CSS `z-index` wirkt nur innerhalb eines Dokuments, nicht auf OS-Fensterebene. Die Lösung: Video und Overlay im selben Rendering-Kontext halten.
+**Why this approach:** The earlier approach with an external mpv fullscreen window was always placed over the Electron window by the OS window manager (Gamescope on Steam Deck). CSS `z-index` only works within a single document, not at the OS window level. The fix: keep video and overlay in the same rendering context.
 
-### Qualitätswahl während Wiedergabe
-- **Qualitätswechsel = streamlink-Neustart**: streamlink liefert Single-Bitrate-HLS → hls.js-Level-Switch nicht nutzbar. Wechsel: `videoRef.stop()` → `startLive/startVod(quality)` → neuer `hls-url` Event.
-- **VOD mit Resume**: `getCurrentTime()` vor Stop → als `startSeconds` an neues `startVod()`.
-- **Qualitätsliste**: asynchron nach Stream-Start via `playback:get-qualities` IPC → `streamlink --json <url>` → `Object.keys(json.streams)`, sortiert: `['best', '1080p60', '720p60', '480p', '360p', '160p', 'audio_only', 'worst']`
-- **Session-only**: kein Persistieren in Settings/localStorage.
-- **Panel-State im Parent**: `qualityPanelOpen`, `qualityFocusedIndex` in ChannelScreen/AppShell — PlaybackOverlay bekommt Props + Callbacks.
-- **Key-Handler Priorität**: `qualityPanelOpen`-Block wird VOR allen anderen Keys geprüft und gibt `return` — verhindert Seek/Pause-Konflikte während das Panel offen ist.
-- **X-Taste** öffnet Quality-Panel (Gamepad Button X → `x`-KeyboardEvent).
+### Quality Selection During Playback
+- **Quality switch = streamlink restart**: streamlink delivers single-bitrate HLS → hls.js level switch not usable. Switch: `videoRef.stop()` → `startLive/startVod(quality)` → new `hls-url` event.
+- **VOD with resume**: `getCurrentTime()` before stop → passed as `startSeconds` to the new `startVod()`.
+- **Quality list**: fetched asynchronously after stream start via `playback:get-qualities` IPC → `streamlink --json <url>` → `Object.keys(json.streams)`, sorted: `['best', '1080p60', '720p60', '480p', '360p', '160p', 'audio_only', 'worst']`
+- **Session-only**: not persisted to settings/localStorage.
+- **Panel state in parent**: `qualityPanelOpen`, `qualityFocusedIndex` in ChannelScreen/AppShell — the `QualityPanel` component receives props + callbacks.
+- **Key handler isolation**: In ChannelScreen the `playback-quality` mode of `useChannelKeyHandler` takes full control; in AppShell `dispatchQualityPanelKey()` from `playbackKeys.ts` handles it — seek/pause conflicts are impossible.
+- **X button** opens the quality panel (gamepad button X → `x` keyboard event).
 
-### Kapitel-Panel during Playback
-Wenn der User während der Wiedergabe das Kapitel-Panel öffnet (Y-Taste), läuft das Video **weiter** (nicht pausiert). `PlaybackOverlay` wird per conditional render (`!chapterPanelVod`) ausgeblendet, sodass das Kapitel-Panel sauber über dem Video erscheint. Nach Kapitelwahl: `seekTo(chapter.positionSeconds)` — kein `play()` nötig, da Video bereits läuft. Nach Schließen ohne Auswahl: Panel weg, Video läuft unverändert weiter. Bei leerer Kapitelliste: X-Taste seeked zu `0` (Videoanfang).
+### Chapter Panel During Playback
+When the user opens the chapter panel during playback (Y button), the video keeps **playing** (not paused). `PlaybackOverlay` is hidden via conditional render (`!chapterPanelVod`); instead `ChapterPanel` appears with `duringPlayback={true}`. After selecting a chapter: `seekTo(chapter.positionSeconds)` — no `play()` needed since the video is already running. After closing without a selection: panel gone, video continues unchanged. With an empty chapter list: X button seeks to `0` (start of video).
 
-### Gamepad Dual-Path
-- **Linux/Gaming-Mode:** `src/main/input/gamepadReader.ts` nutzt Linux evdev (`/dev/input/event*`). Erkennung läuft über `/dev/input/js*`-Scan; für jedes js*-Device wird via `/sys/class/input/jsN` das zugehörige `event*`-Device ermittelt und geöffnet. Dadurch werden standardisierte `BTN_*`-Codes gelesen (BTN_NORTH=X, BTN_SOUTH=A usw.) — funktioniert treiber- und controller-unabhängig für Xbox, PlayStation, Nintendo und beliebige USB/Bluetooth-Gamepads.
-- **Windows/Dev:** `src/renderer/src/input/gamepad.ts` nutzt `navigator.getGamepads()` via rAF-Loop
-- Beide Pfade erzeugen synthetische `KeyboardEvent('keydown')`. Alle UI-Komponenten reagieren nur auf Key-Events — kein Gamepad-Code in Screens.
-- Button-Mapping: A=Enter, B=Escape, X=x, Y=y, LB=l1, RB=r1, LT=l2, RT=r2, DPad=Arrows
-- Fallback: Falls `/sys`-Lookup fehlschlägt, öffnet `JoystickFallbackReader` das js*-Device direkt (altes Joystick-API mit festem Button-Nummern-Mapping)
+### Key Handler Architecture (ChannelScreen)
+`useChannelKeyHandler` (`src/renderer/src/hooks/useChannelKeyHandler.ts`) encapsulates all keyboard input for ChannelScreen. The hook registers **one** stable `keydown` listener and dispatches based on a `mode` parameter:
 
-### A-Button-Verhalten je Screen
-| Screen | A-Button | X-Button |
+| Mode | Active when |
+|---|---|
+| `chapter` | Chapter panel is open |
+| `playback-quality` | Quality panel is open during playback |
+| `playback` | Video is playing, no panel open |
+| `hero` | Channel hero is focused (no playback) |
+| `shelf` | VOD shelf is focused |
+
+All binding objects are held in a ref — the listener never needs to be re-registered. No stale-closure bugs, no long dependency arrays.
+
+**Shared playback dispatch** (`src/renderer/src/lib/playbackKeys.ts`): `dispatchPlaybackKey()` and `dispatchQualityPanelKey()` are pure functions used both by `useChannelKeyHandler` (ChannelScreen) and directly by AppShell — a single source of truth for playback key bindings in both contexts.
+
+### Gamepad Dual Path
+- **Linux/Gaming Mode:** `src/main/input/gamepadReader.ts` uses Linux evdev (`/dev/input/event*`). Discovery scans `/dev/input/js*`; for each js* device the corresponding `event*` device is found via `/sys/class/input/jsN` and opened. This reads standardized `BTN_*` codes (BTN_NORTH=X, BTN_SOUTH=A, etc.) — works driver- and controller-independently for Xbox, PlayStation, Nintendo, and any USB/Bluetooth gamepad.
+- **Windows/dev:** `src/renderer/src/input/gamepad.ts` uses `navigator.getGamepads()` via rAF loop
+- Both paths produce synthetic `KeyboardEvent('keydown')` events. All UI components respond to key events only — no gamepad code in screens.
+- Button mapping: A=Enter, B=Escape, X=x, Y=y, LB=l1, RB=r1, LT=l2, RT=r2, D-Pad=Arrows
+- Fallback: if `/sys` lookup fails, `JoystickFallbackReader` opens the js* device directly (legacy joystick API with fixed button number mapping)
+
+### A Button Behavior per Screen
+| Screen | A button | X button |
 |---|---|---|
-| FollowingScreen | Kanalseite öffnen | — |
-| BrowseScreen (Shelf) | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
-| StreamListScreen | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
-| CategoryScreen | Stream direkt starten (AppShell-Overlay) | Kanalseite öffnen |
-| ChannelScreen | Live-Stream starten / Bestätigen | — |
+| FollowingScreen | Open channel page | — |
+| BrowseScreen (shelf) | Start stream directly (AppShell overlay) | Open channel page |
+| StreamListScreen | Start stream directly (AppShell overlay) | Open channel page |
+| CategoryScreen | Start stream directly (AppShell overlay) | Open channel page |
+| ChannelScreen | Start live stream / confirm | — |
 
 ### VOD vs. Live Playback
-- **Live:** `streamlink --stream-url twitch.tv/<login> <quality>` → HLS-URL → hls.js spielt Live-Playlist nativ
-- **VOD:** `streamlink --stream-url twitch.tv/videos/<id> <quality>` → HLS-URL → hls.js seeked zu `startPosition` via `video.currentTime`
-- **Quality-Default:** `'best'` — kein Persistieren, nur Session-State
-- **Resume:** `history.getPosition(vodId)` im Main-Prozess → als `startPosition` im `playback:hls-url` Event → `VideoPlayer` seeked nach MANIFEST_PARSED
+- **Live:** `streamlink --stream-url twitch.tv/<login> <quality>` → HLS URL → hls.js plays live playlist natively
+- **VOD:** `streamlink --stream-url twitch.tv/videos/<id> <quality>` → HLS URL → hls.js seeks to `startPosition` via `video.currentTime`
+- **Quality default:** `'best'` — not persisted, session state only
+- **Resume:** `history.getPosition(vodId)` in the main process → as `startPosition` in the `playback:hls-url` event → `VideoPlayer` seeks after MANIFEST_PARSED
 
-### Position-Tracking
-`VideoPlayer` meldet alle 5s via `window.t4sd.playback.reportPosition(vodId, currentTime, durationSeconds)` → Main → `historyRepo.updatePosition()` + `markCompleted()` (bei >95% Fortschritt). Nur für VODs (nicht Live).
+### Position Tracking
+`VideoPlayer` reports every 5s via `window.t4sd.playback.reportPosition(vodId, currentTime, durationSeconds)` → main → `historyRepo.updatePosition()` + `markCompleted()` (at >95% progress). VODs only (not live).
 
 ### Twitch API
-- Helix REST API für alle Standard-Daten: `https://api.twitch.tv/helix`
-- Twitch GraphQL für Kapitel-Daten (`getVodChapters`): `https://gql.twitch.tv/gql` mit public client-id `kimne78kx3ncx6brgo4mv6wki5h1ko` (kein eigener Token nötig)
-- Auth-Scope: nur `user:read:follows`
-- `getTopGames()` macht 40 parallele `/streams?game_id=<id>&first=100` Calls zur Zuschauerzahl-Schätzung
+- Helix REST API for all standard data: `https://api.twitch.tv/helix`
+- Twitch GraphQL for chapter data (`getVodChapters`): `https://gql.twitch.tv/gql` with public client ID `kimne78kx3ncx6brgo4mv6wki5h1ko` (no own token needed)
+- Auth scope: `user:read:follows` only
+- `getTopGames()` makes 40 parallel `/streams?game_id=<id>&first=100` calls to estimate viewer counts
 
-### Settings-Persistenz
-- UI-Settings (Badge-Mode, Sidebar-Breite, Badge-Gap) → `localStorage` unter Key `t4sd:settings` (kein IPC, kein Flicker beim Start)
-- VOD-Verlauf + Resume → SQLite `history.db` in `userData/`
-- Twitch-Tokens → Electron `safeStorage` (OS-Keystore), Datei: `userData/twitch-tokens.bin`
+### Settings Persistence
+- UI settings (badge mode, sidebar width, badge gap, HLS cache toggle, file logging toggle) → `localStorage` under key `t4sd:settings` (no IPC, no flicker on startup); changes are mirrored to the main process via IPC (`app:set-hls-cache-enabled`, `app:set-file-logging-enabled`)
+- VOD history + resume → SQLite `history.db` in `userData/`
+- Twitch tokens → Electron `safeStorage` (OS keystore), file: `userData/twitch-tokens.bin`
 
 ---
 
-## Bekannte Einschränkungen
+## Known Limitations
 
 | Problem | Status | Details |
 |---|---|---|
-| hls.js Performance auf Steam Deck | Ungetestet | Chromiums VA-API Hardware-Decode sollte ausreichen. Falls Dropped Frames bei 1080p60 → Qualitäts-Button im Overlay nutzen (720p60 wählen). |
-| Twitch Live-Stream URL-Expiry | Unkritisch | `streamlink --stream-url` Token in URL kann ablaufen. hls.js handelt Playlist-Refresh automatisch; bei Verbindungsabbruch muss neu gestartet werden. |
-| Ad-Bypass | Nicht implementiert | `--twitch-disable-ads` von Streamlink deprecated. Post-MVP. |
-| Flaggen-Emojis auf Windows | Nur Rechtecke | Unicode Regional Indicators brauchen Noto Color Emoji (Linux). Im Dev-Mode ignorieren. |
-| Browser Gamepad API in Gaming Mode | Nicht nutzbar | Steam Input + Flatpak-Sandbox blockiert udev-Events für Chromium. Deshalb evdev direkt im Main-Process. |
-| Bluetooth-Controller-Deduplizierung | Aktiv | Mehrere `/dev/input/js*`-Devices (z.B. Raw-Device + Steam-Virtual-Device) → 40ms-Deduplizierungsfenster in `gamepadReader.ts` |
-| Direkt-Start: kein VOD-Support | By Design | AppShell-Overlay nur für Live-Streams. VODs nur über Kanalseite (ChannelScreen) mit Resume + Kapitel. |
+| hls.js performance on Steam Deck | Untested | Chromium's VA-API hardware decode should be sufficient. If dropped frames at 1080p60 → use the quality button in the overlay (select 720p60). |
+| Twitch live stream URL expiry | Non-critical | `streamlink --stream-url` token in URL can expire. hls.js handles playlist refresh automatically; on connection loss the stream must be restarted. |
+| Ad bypass | Not implemented | `--twitch-disable-ads` is deprecated in Streamlink. Post-MVP. |
+| Flag emojis on Windows | Boxes only | Unicode Regional Indicators require Noto Color Emoji (Linux). Ignore in dev mode. |
+| Browser Gamepad API in Gaming Mode | Not usable | Steam Input + Flatpak sandbox blocks udev events for Chromium. That is why evdev is read directly in the main process. |
+| Bluetooth controller deduplication | Active | Multiple `/dev/input/js*` devices (e.g. raw device + Steam virtual device) → 40ms deduplication window in `gamepadReader.ts` |
+| Direct start: no VOD support | By design | AppShell overlay is live streams only. VODs are only available via the channel page (ChannelScreen) with resume + chapters. |
 
 ---
 
-## Deployment auf dem Steam Deck
+## Deployment on Steam Deck
 
 ```bash
-# Auf Steam Deck installieren (einmalig)
+# Install on Steam Deck (once)
 flatpak install --user twitch4steamdeck.flatpak
 
-# Starten
+# Launch
 flatpak run tv.twitch4steamdeck.App
 
-# Update (Neuinstallation)
+# Update (reinstall)
 flatpak uninstall tv.twitch4steamdeck.App
 flatpak install --user twitch4steamdeck.flatpak
 ```
 
-Flatpak-Berechtigungen (aus Manifest): `--share=network`, `--socket=x11`, `--socket=pulseaudio`, `--device=all` (GPU + `/dev/input/*`), `--share=ipc`.
+Flatpak permissions (from manifest): `--share=network`, `--socket=x11`, `--socket=pulseaudio`, `--device=all` (GPU + `/dev/input/*`), `--share=ipc`.
 
 ---
 
-## Typische Debugging-Workflows
+## Typical Debugging Workflows
 
-### Kein Playback / Video startet nicht
-1. In DevTools (Ctrl+Shift+I im Dev-Mode) Console prüfen — `[VideoPlayer]`-Logs zeigen jeden Schritt
-2. `node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>` ausführen — testet streamlink + Manifest + Segment
-3. `streamlink --stream-url <url> best` manuell ausführen: liefert es eine gültige `https://`-URL?
-4. CSP-Fehler? → `src/renderer/index.html` prüfen: `media-src 'self' blob:` muss vorhanden sein
-5. CORS-Fehler? → `session.defaultSession.webRequest` in `index.ts` prüfen
+### No playback / video does not start
+1. Check DevTools console (Ctrl+Shift+I in dev mode) — `[VideoPlayer]` logs show every step
+2. Run `node scripts/test-playback-pipeline.mjs twitch.tv/<channel>` — tests streamlink + manifest + segment
+3. Run `streamlink --stream-url <url> best` manually: does it return a valid `https://` URL?
+4. CSP error? → check `src/renderer/index.html`: `media-src 'self' blob:` must be present
+5. CORS error? → check `session.defaultSession.webRequest` in `index.ts`
 
-### VideoPlayer-Diagnose (DevTools Console)
-Beim Start erscheinen diese Logs (alle mit `[VideoPlayer]`-Prefix):
-- `Hls.isSupported: true` — hls.js kann MSE nutzen
-- `attachMedia aufgerufen` — MediaSource wird aufgebaut
-- `MEDIA_ATTACHED — lade Source` — MediaSource bereit, Manifest wird geladen
-- `MANIFEST_PARSED — readyState: X networkState: Y` — Manifest geladen, play() wird aufgerufen
-- `play() erfolgreich` — Video läuft
+### VideoPlayer diagnostics (DevTools console)
+These logs appear on startup (all with `[VideoPlayer]` prefix):
+- `Hls.isSupported: true` — hls.js can use MSE
+- `attachMedia called` — MediaSource is being built
+- `MEDIA_ATTACHED — loading source` — MediaSource ready, manifest is being loaded
+- `MANIFEST_PARSED — readyState: X networkState: Y` — manifest loaded, play() is called
+- `play() succeeded` — video is running
 
-### VOD startet an falscher Position
-1. `startPosition` im `playback:hls-url` Event korrekt? In `PlaybackService.startVod()` prüfen
-2. hls.js seeked in `MANIFEST_PARSED`-Handler: `video.currentTime = startPosition`
+### VOD starts at wrong position
+1. Is `startPosition` correct in the `playback:hls-url` event? Check `PlaybackService.startVod()`
+2. hls.js seeks in the `MANIFEST_PARSED` handler: `video.currentTime = startPosition`
 
-### Gamepad-Eingaben kommen nicht an (Steam Deck)
-1. `gamepadReader.ts` scannt `/dev/input/js*` — prüfen ob js-Device vorhanden (`ls /dev/input/js*`)
-2. Für jedes js-Device wird via `/sys/class/input/jsN` ein evdev-Device (`event*`) gesucht — Log `[gamepad] geöffnet (evdev): /dev/input/js0 → /dev/input/event4` zeigt ob das funktioniert
-3. Deduplizierungs-Fenster: 40ms — bei Doppel-Inputs `DUPLICATE_EVENT_WINDOW_MS` erhöhen
-4. Axis-Mapping: DPad ist ABS_HAT0X/Y (code 16/17), Stick ist ABS_X/Y (code 0/1, threshold 16384)
+### Gamepad inputs not received (Steam Deck)
+1. `gamepadReader.ts` scans `/dev/input/js*` — check if js device is present (`ls /dev/input/js*`)
+2. For each js device, an evdev device (`event*`) is looked up via `/sys/class/input/jsN` — log `[gamepad] opened (evdev): /dev/input/js0 → /dev/input/event4` shows whether this worked
+3. Deduplication window: 40ms — increase `DUPLICATE_EVENT_WINDOW_MS` for double inputs
+4. Axis mapping: D-pad is ABS_HAT0X/Y (code 16/17), stick is ABS_X/Y (code 0/1, threshold 16384)
 
-### IPC-Channel fehlt / unbekannt
-Prüfen: `handlers.ts` (Main), `preload/index.ts` (Bridge), `t4sd.d.ts` (Renderer-Typen) — alle drei müssen übereinstimmen.
+### IPC channel missing / unknown
+Check: `channels.ts` (channel constant), `handlers.ts` (main), `preload/index.ts` (bridge), `t4sd.d.ts` (renderer types) — all four must be consistent.
 
-### TypeScript-Fehler
+### TypeScript errors
 ```bash
 npm run typecheck
 ```
-Zwei unabhängige tsconfig: `tsconfig.node.json` (Main+Preload) und `tsconfig.web.json` (Renderer).
+Two independent tsconfigs: `tsconfig.node.json` (main + preload) and `tsconfig.web.json` (renderer).

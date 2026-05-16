@@ -40,6 +40,7 @@ Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and V
 - **VOD History** — Local SQLite database with playback history and progress
 - **Hardware Decoding** — GPU-accelerated video via Chromium's built-in VA-API on Steam Deck
 - **Quit Dialog** — Confirm quit via Xbox/Start button
+- **Logout Confirmation** — Confirmation dialog before logging out
 
 ## Architecture
 
@@ -51,10 +52,15 @@ Electron (Main Process)
   ├── Gamepad       -- Linux evdev (/dev/input/event*), discovered via js*, BTN_* codes
   └── History       -- SQLite (better-sqlite3) for VOD history + resume
 
+Shared (src/shared/)
+  └── Types         -- Shared types between main and renderer (PlaybackEvent, HlsUrlPayload, …)
+
 Electron (Renderer)
   ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
   │                    StreamList (DE/EN), Settings, Account
   ├── VideoPlayer   -- hls.js <video> wrapper (forwardRef, imperative handle)
+  ├── ChapterPanel  -- Chapter selection panel (during playback or VOD start)
+  ├── QualityPanel  -- Quality selection panel
   └── AppShell      -- Global playback overlay for direct stream start
 ```
 
@@ -212,6 +218,7 @@ The script handles automatically:
 - **VOD-Verlauf** — Lokale SQLite-Datenbank mit Wiedergabe-Historie und Fortschritt
 - **Hardware-Decoding** — GPU-beschleunigte Videowiedergabe ueber Chromiums eingebaute VA-API auf dem Steam Deck
 - **Quit-Dialog** — Beenden per Xbox/Start-Button bestaetigen
+- **Logout-Bestaetigung** — Bestaedigungsdialog vor dem Abmelden
 
 ## Architektur
 
@@ -223,10 +230,15 @@ Electron (Main Process)
   ├── Gamepad       -- Linux evdev (/dev/input/event*), via js* erkannt, BTN_*-Codes
   └── History       -- SQLite (better-sqlite3) fuer VOD-Verlauf + Resume
 
+Geteilt (src/shared/)
+  └── Types         -- Geteilte Typen zwischen Main und Renderer (PlaybackEvent, HlsUrlPayload, …)
+
 Electron (Renderer)
   ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
   │                    StreamList (DE/EN), Settings, Account
   ├── VideoPlayer   -- hls.js <video> Wrapper (forwardRef, imperative handle)
+  ├── ChapterPanel  -- Kapitel-Auswahl-Panel (waehrend Wiedergabe oder VOD-Start)
+  ├── QualityPanel  -- Qualitaets-Auswahl-Panel
   └── AppShell      -- Globaler Playback-Overlay fuer Direkt-Stream-Start
 ```
 
