@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import type { DeviceFlowStartInfo } from '../types/t4sd'
 import { useT } from '../i18n/useT'
+import { useSettings } from '../context/SettingsContext'
 
 interface Props {
   onAuthorized: () => void
@@ -16,8 +17,11 @@ type Phase =
 
 export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
   const t = useT()
+  const { settings, setLanguage } = useSettings()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const startBtnRef = useRef<HTMLButtonElement>(null)
+  const langEnRef = useRef<HTMLButtonElement>(null)
+  const langDeRef = useRef<HTMLButtonElement>(null)
 
   // On mount: check whether the client ID is configured.
   useEffect(() => {
@@ -29,9 +33,21 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Enter') return
-      if (phase.kind === 'idle' || phase.kind === 'error') void start()
-      else if (phase.kind === 'awaiting') void cancel()
+      const active = document.activeElement
+      if (e.key === 'ArrowRight' && active === langEnRef.current) {
+        langDeRef.current?.focus()
+      } else if (e.key === 'ArrowLeft' && active === langDeRef.current) {
+        langEnRef.current?.focus()
+      } else if (e.key === 'ArrowDown' && active === startBtnRef.current) {
+        langEnRef.current?.focus()
+      } else if (e.key === 'ArrowUp' && (active === langEnRef.current || active === langDeRef.current)) {
+        startBtnRef.current?.focus()
+      } else if (e.key === 'Enter') {
+        if (active === langEnRef.current) { setLanguage('en'); return }
+        if (active === langDeRef.current) { setLanguage('de'); return }
+        if (phase.kind === 'idle' || phase.kind === 'error') void start()
+        else if (phase.kind === 'awaiting') void cancel()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -134,6 +150,27 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
       >
         {phase.kind === 'starting' ? t('login.starting') : t('login.connect')}
       </button>
+      <div className="login__lang-select">
+        <span className="login__lang-label">{t('login.languageSelect')}</span>
+        <div className="login__lang-buttons">
+          <button
+            ref={langEnRef}
+            className={`login__lang-btn${settings.language === 'en' ? ' login__lang-btn--active' : ''}`}
+            onClick={() => setLanguage('en')}
+            aria-label="English"
+          >
+            🇺🇸
+          </button>
+          <button
+            ref={langDeRef}
+            className={`login__lang-btn${settings.language === 'de' ? ' login__lang-btn--active' : ''}`}
+            onClick={() => setLanguage('de')}
+            aria-label="Deutsch"
+          >
+            🇩🇪
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

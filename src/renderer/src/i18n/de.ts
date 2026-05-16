@@ -48,6 +48,7 @@ export const de = {
   'login.expiresIn': 'Code läuft in {time} ab.',
   'login.error.accessDenied': 'Zugriff abgelehnt.',
   'login.error.expired': 'Code abgelaufen — bitte erneut versuchen.',
+  'login.languageSelect': 'Sprachauswahl',
 
   // ─── Following ──────────────────────────────────────────────────────────
   'following.loading': 'Lade Kanäle…',

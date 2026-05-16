@@ -20,7 +20,7 @@ function interpolate(raw: string, vars?: Record<string, string | number>): strin
 
 export function useT(): TranslateFn {
   const { settings } = useSettings()
-  const table = TABLES[settings.language] ?? de
+  const table = TABLES[settings.language] ?? en
   return useCallback((key: MessageKey, vars?: Record<string, string | number>): string =>
     interpolate(table[key], vars), [table])
 }
@@ -36,7 +36,7 @@ export function getActiveLanguage(): Language {
       if (parsed.language === 'en' || parsed.language === 'de') return parsed.language
     }
   } catch { /* ignore */ }
-  return 'de'
+  return 'en'
 }
 
 export function tStatic(key: MessageKey, vars?: Record<string, string | number>): string {

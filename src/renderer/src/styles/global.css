@@ -149,6 +149,58 @@ body,
   color: #ff6868;
 }
 
+.login__lang-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.login__lang-label {
+  font-size: 13px;
+  color: var(--color-fg-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.login__lang-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.login__lang-btn {
+  width: 80px;
+  height: 56px;
+  font-size: 36px;
+  line-height: 1;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.login__lang-btn:hover,
+.login__lang-btn:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.login__lang-btn--active {
+  border-color: var(--color-accent);
+  background: rgba(145, 71, 255, 0.15);
+}
+
+.login__lang-btn--active:focus {
+  border-color: var(--color-accent);
+  background: rgba(145, 71, 255, 0.25);
+}
+
 /* ── App Layout (post-auth) ───────────────────────── */
 .app-layout {
   display: grid;

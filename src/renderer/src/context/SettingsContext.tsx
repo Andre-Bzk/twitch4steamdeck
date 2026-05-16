@@ -25,7 +25,7 @@ const DEFAULTS: AppSettings = {
   badgeGap: BADGE_GAP_DEFAULT,
   hlsCacheEnabled: false,
   fileLoggingEnabled: false,
-  language: 'de'
+  language: 'en'
 }
 
 export { SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_DEFAULT, BADGE_GAP_MIN, BADGE_GAP_MAX, BADGE_GAP_DEFAULT }

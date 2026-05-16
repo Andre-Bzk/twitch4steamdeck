@@ -49,6 +49,7 @@ export const en: Messages = {
   'login.expiresIn': 'Code expires in {time}.',
   'login.error.accessDenied': 'Access denied.',
   'login.error.expired': 'Code expired — please try again.',
+  'login.languageSelect': 'Language',
 
   // ─── Following ──────────────────────────────────────────────────────────
   'following.loading': 'Loading channels…',
