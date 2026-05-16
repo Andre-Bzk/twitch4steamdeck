@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { GamepadHintItem, GamepadPrompt } from './GamepadPrompt'
 import { formatTimestamp } from '../lib/formatting'
 import type { VodChapter, VodInfo } from '../types/t4sd'
+import { useT } from '../i18n/useT'
 
 interface Props {
   vod: VodInfo
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ChapterPanel({ vod, chapters, focusedIndex, loading, duringPlayback }: Props): JSX.Element {
+  const t = useT()
   const listRef = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
@@ -25,37 +27,37 @@ export function ChapterPanel({ vod, chapters, focusedIndex, loading, duringPlayb
     <div className="chapter-overlay">
       <div className="chapter-overlay__panel">
         <div className="chapter-overlay__header">
-          <span className="chapter-overlay__title">Kapitel wählen</span>
+          <span className="chapter-overlay__title">{t('chapter.selectTitle')}</span>
           <span className="chapter-overlay__vod-name">{vod.title}</span>
         </div>
         <p className="chapter-overlay__hint gamepad-hint-line">
-          <GamepadHintItem prompt={['dpad-up', 'dpad-down']}>Navigieren</GamepadHintItem>
+          <GamepadHintItem prompt={['dpad-up', 'dpad-down']}>{t('chapter.navigate')}</GamepadHintItem>
           <span className="gamepad-hint-separator">·</span>
-          <GamepadHintItem prompt="a">{duringPlayback ? 'Springen' : 'Starten'}</GamepadHintItem>
+          <GamepadHintItem prompt="a">{duringPlayback ? t('chapter.jump') : t('chapter.start')}</GamepadHintItem>
           <span className="gamepad-hint-separator">·</span>
-          <GamepadHintItem prompt="b">Schließen</GamepadHintItem>
+          <GamepadHintItem prompt="b">{t('common.close')}</GamepadHintItem>
         </p>
-        {loading && <p className="chapter-overlay__msg">Lade Kapitel…</p>}
+        {loading && <p className="chapter-overlay__msg">{t('chapter.loading')}</p>}
         {!loading && chapters.length === 0 && (
           <div className="chapter-overlay__msg">
-            <p>Keine Kapitel gefunden.</p>
+            <p>{t('chapter.empty')}</p>
             <p>
               {duringPlayback ? (
                 <>
                   <span className="gamepad-inline-action">
                     <GamepadPrompt prompt="a" />
-                    <span>zum Fortsetzen.</span>
+                    <span>{t('chapter.toResume')}</span>
                   </span>
                   {' · '}
                   <span className="gamepad-inline-action">
                     <GamepadPrompt prompt="x" />
-                    <span>zum Anfang springen.</span>
+                    <span>{t('chapter.toStart')}</span>
                   </span>
                 </>
               ) : (
                 <span className="gamepad-inline-action">
                   <GamepadPrompt prompt="a" />
-                  <span>zum Abspielen.</span>
+                  <span>{t('chapter.toPlay')}</span>
                 </span>
               )}
             </p>

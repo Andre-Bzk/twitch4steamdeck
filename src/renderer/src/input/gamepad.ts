@@ -1,11 +1,11 @@
 /**
- * Gamepad-Service: pollt Gamepad-State via requestAnimationFrame und
- * dispatcht synthetische KeyboardEvents, sodass die Spatial-Navigation
- * ohne Gamepad-spezifischen Code in den Komponenten auskommt.
+ * Gamepad service: polls gamepad state via requestAnimationFrame and dispatches
+ * synthetic KeyboardEvents so spatial navigation in components can stay free of
+ * gamepad-specific code.
  *
- * Unterstützt mehrere Gamepads gleichzeitig (z.B. Steam Deck + Xbox BT).
+ * Supports multiple gamepads simultaneously (e.g. Steam Deck + Xbox BT).
  *
- * Standard-Mapping (Xbox / Steam Deck):
+ * Default mapping (Xbox / Steam Deck):
  *   Button 12 = DPad Up    → ArrowUp
  *   Button 13 = DPad Down  → ArrowDown
  *   Button 14 = DPad Left  → ArrowLeft

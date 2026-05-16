@@ -3,6 +3,7 @@ import FocusableCard from '../components/FocusableCard'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
 import log from 'electron-log/renderer'
+import { useT } from '../i18n/useT'
 
 interface Props {
   hasFocus: boolean
@@ -17,6 +18,7 @@ export default function FollowingScreen({
   onRequestSidebar,
   onSelectChannel
 }: Props): JSX.Element {
+  const t = useT()
   const [channels, setChannels] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -114,13 +116,13 @@ export default function FollowingScreen({
   return (
     <div className="screen screen--following">
       <header className="screen__header">
-        <h2 className="screen__title">Du folgst</h2>
+        <h2 className="screen__title">{t('nav.following')}</h2>
         {loadState === 'ok' && channels.length > 0 && (
           <div className="screen__meta">
-            {liveCount > 0 && <span className="screen__live-count">● {liveCount} live</span>}
-            <span>{channels.length} Kanäle</span>
+            {liveCount > 0 && <span className="screen__live-count">{t('following.liveCount', { count: liveCount })}</span>}
+            <span>{t('following.channelCount', { count: channels.length })}</span>
             <span className="screen__hint gamepad-hint-line">
-              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <GamepadHintItem prompt="y">{t('common.refresh')}</GamepadHintItem>
             </span>
           </div>
         )}
@@ -128,22 +130,22 @@ export default function FollowingScreen({
 
       {loadState === 'loading' && (
         <div className="screen__state">
-          <p>Lade Kanäle…</p>
+          <p>{t('following.loading')}</p>
         </div>
       )}
 
       {loadState === 'error' && (
         <div className="screen__state">
-          <p>Fehler beim Laden der Kanäle.</p>
+          <p>{t('following.loadError')}</p>
           <button className="btn" onClick={load}>
-            Erneut versuchen
+            {t('common.tryAgain')}
           </button>
         </div>
       )}
 
       {loadState === 'ok' && channels.length === 0 && (
         <div className="screen__state">
-          <p>Du folgst noch keinen Kanälen.</p>
+          <p>{t('following.empty')}</p>
         </div>
       )}
 

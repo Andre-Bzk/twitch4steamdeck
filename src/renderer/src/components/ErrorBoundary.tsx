@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import log from 'electron-log/renderer'
+import { tStatic } from '../i18n/useT'
 
 interface Props {
   children: ReactNode
@@ -35,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
           padding: 32,
           fontFamily: 'sans-serif'
         }}>
-          <div style={{ fontSize: 24, color: '#ff6b6b' }}>Ein Fehler ist aufgetreten</div>
+          <div style={{ fontSize: 24, color: '#ff6b6b' }}>{tStatic('app.error.title')}</div>
           <pre style={{ fontSize: 12, color: '#adadb8', maxWidth: 640, whiteSpace: 'pre-wrap', textAlign: 'left' }}>
             {this.state.error.message}
           </pre>
@@ -51,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
               cursor: 'pointer'
             }}
           >
-            Neu laden
+            {tStatic('app.error.reload')}
           </button>
         </div>
       )

@@ -3,6 +3,7 @@ import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import FocusableCard from '../components/FocusableCard'
 import log from 'electron-log/renderer'
+import { useT } from '../i18n/useT'
 
 interface Props {
   game: GameInfo
@@ -14,6 +15,7 @@ interface Props {
 type LoadState = 'loading' | 'ok' | 'error'
 
 export default function CategoryScreen({ game, onSelectChannel, onStartLive, onBack }: Props): JSX.Element {
+  const t = useT()
   const [streams, setStreams] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -103,7 +105,7 @@ export default function CategoryScreen({ game, onSelectChannel, onStartLive, onB
     <div className="category-screen">
       <header className="category-screen__header">
         <button className="btn category-screen__back" onClick={onBack}>
-          ← Zurück
+          ← {t('common.back')}
         </button>
         <img
           className="category-screen__art"
@@ -115,11 +117,11 @@ export default function CategoryScreen({ game, onSelectChannel, onStartLive, onB
           <h2 className="category-screen__title">{game.name}</h2>
           {loadState === 'ok' && (
             <p className="category-screen__meta gamepad-hint-line">
-              <span>{streams.length} Streams</span>
+              <span>{t('category.streamCount', { count: streams.length })}</span>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <GamepadHintItem prompt="y">{t('common.refresh')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+              <GamepadHintItem prompt="x">{t('common.channelPage')}</GamepadHintItem>
             </p>
           )}
         </div>
@@ -127,22 +129,22 @@ export default function CategoryScreen({ game, onSelectChannel, onStartLive, onB
 
       {loadState === 'loading' && (
         <div className="screen__state">
-          <p>Lade Streams…</p>
+          <p>{t('category.loading')}</p>
         </div>
       )}
 
       {loadState === 'error' && (
         <div className="screen__state">
-          <p>Fehler beim Laden der Streams.</p>
+          <p>{t('category.loadError')}</p>
           <button className="btn" onClick={() => void load()}>
-            Erneut versuchen
+            {t('common.tryAgain')}
           </button>
         </div>
       )}
 
       {loadState === 'ok' && streams.length === 0 && (
         <div className="screen__state">
-          <p>Keine Live-Streams in dieser Kategorie.</p>
+          <p>{t('category.empty')}</p>
         </div>
       )}
 

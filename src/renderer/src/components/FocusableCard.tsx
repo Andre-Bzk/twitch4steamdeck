@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { FollowedChannelInfo } from '../types/t4sd'
 import LanguageBadge from './LanguageBadge'
 import { formatViewers } from '../lib/formatting'
+import { useT } from '../i18n/useT'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function FocusableCard({ channel, focused, onFocus, onSelect }: Props): JSX.Element {
+  const t = useT()
   const ref = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function FocusableCard({ channel, focused, onFocus, onSelect }: P
             {channel.gameName && <span className="card__meta">{channel.gameName}</span>}
           </>
         ) : (
-          <span className="card__offline-label">Offline</span>
+          <span className="card__offline-label">{t('common.offline')}</span>
         )}
       </div>
     </button>

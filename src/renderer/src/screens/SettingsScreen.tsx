@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GamepadHintItem, GamepadPrompt } from '../components/GamepadPrompt'
 import { SettingsIcon } from '../components/Icons'
 import {
+  type Language,
   type StreamBadgeMode,
   useSettings,
   SIDEBAR_MIN,
@@ -11,23 +12,34 @@ import {
   BADGE_GAP_MAX,
   BADGE_GAP_DEFAULT,
 } from '../context/SettingsContext'
+import { useT, type MessageKey } from '../i18n/useT'
 
 interface Props {
   hasFocus: boolean
   onRequestSidebar: () => void
 }
 
-interface Option {
+interface BadgeOption {
   mode: StreamBadgeMode
-  label: string
-  preview: string
+  labelKey: MessageKey
+  previewKey: MessageKey
 }
 
-const OPTIONS: Option[] = [
-  { mode: 'off',      label: 'Aus',                       preview: '— kein Badge' },
-  { mode: 'language', label: 'Nur Sprach-Kürzel',         preview: 'z.B.  DE  EN  PT' },
-  { mode: 'flag',     label: 'Nur Flagge',                preview: 'z.B.  🇩🇪  🇺🇸  🇧🇷' },
-  { mode: 'both',     label: 'Beides (Flagge + Kürzel)',  preview: 'z.B.  🇩🇪 DE  🇺🇸 EN' }
+interface LanguageOption {
+  lang: Language
+  labelKey: MessageKey
+}
+
+const LANGUAGE_OPTIONS: LanguageOption[] = [
+  { lang: 'de', labelKey: 'settings.language.de' },
+  { lang: 'en', labelKey: 'settings.language.en' }
+]
+
+const OPTIONS: BadgeOption[] = [
+  { mode: 'off',      labelKey: 'settings.badge.off',  previewKey: 'settings.badge.previewOff'  },
+  { mode: 'language', labelKey: 'settings.badge.lang', previewKey: 'settings.badge.previewLang' },
+  { mode: 'flag',     labelKey: 'settings.badge.flag', previewKey: 'settings.badge.previewFlag' },
+  { mode: 'both',     labelKey: 'settings.badge.both', previewKey: 'settings.badge.previewBoth' }
 ]
 
 const SIDEBAR_STEP = 10
@@ -42,19 +54,22 @@ function formatCacheSize(bytes: number): string {
   return `${(mb / 1024).toFixed(2)} GB`
 }
 
-/** Total focusable rows: badge options + sidebar slider + badge gap slider + hls toggle + file logging toggle + cache action */
-const SIDEBAR_SLIDER_ROW = OPTIONS.length
-const BADGE_GAP_SLIDER_ROW = OPTIONS.length + 1
-const HLS_CACHE_TOGGLE_ROW = OPTIONS.length + 2
-const CACHE_ACTION_ROW = OPTIONS.length + 3
-const FILE_LOGGING_TOGGLE_ROW = OPTIONS.length + 4
-const TOTAL_ROWS = OPTIONS.length + 5
+/** Row layout: language options → badge options → sidebar/badge sliders → cache toggles/actions → file logging. */
+const BADGE_OPTION_OFFSET = LANGUAGE_OPTIONS.length
+const SIDEBAR_SLIDER_ROW = BADGE_OPTION_OFFSET + OPTIONS.length
+const BADGE_GAP_SLIDER_ROW = SIDEBAR_SLIDER_ROW + 1
+const HLS_CACHE_TOGGLE_ROW = BADGE_GAP_SLIDER_ROW + 1
+const CACHE_ACTION_ROW = HLS_CACHE_TOGGLE_ROW + 1
+const FILE_LOGGING_TOGGLE_ROW = CACHE_ACTION_ROW + 1
+const TOTAL_ROWS = FILE_LOGGING_TOGGLE_ROW + 1
 
 export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): JSX.Element {
-  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled } = useSettings()
-  const [focusedIndex, setFocusedIndex] = useState(() =>
-    Math.max(0, OPTIONS.findIndex((o) => o.mode === settings.streamBadgeMode))
-  )
+  const t = useT()
+  const { settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled, setLanguage } = useSettings()
+  const [focusedIndex, setFocusedIndex] = useState(() => {
+    const langIdx = LANGUAGE_OPTIONS.findIndex((o) => o.lang === settings.language)
+    return langIdx >= 0 ? langIdx : 0
+  })
 
   const [cacheSize, setCacheSize] = useState<number | null>(null)
   const [clearing, setClearing] = useState(false)
@@ -120,8 +135,11 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           break
         case 'Enter': {
           e.preventDefault()
-          if (focusedIndex < OPTIONS.length) {
-            const opt = OPTIONS[focusedIndex]
+          if (focusedIndex < BADGE_OPTION_OFFSET) {
+            const opt = LANGUAGE_OPTIONS[focusedIndex]
+            if (opt) setLanguage(opt.lang)
+          } else if (focusedIndex < SIDEBAR_SLIDER_ROW) {
+            const opt = OPTIONS[focusedIndex - BADGE_OPTION_OFFSET]
             if (opt) setStreamBadgeMode(opt.mode)
           } else if (focusedIndex === SIDEBAR_SLIDER_ROW) {
             setSidebarWidth(SIDEBAR_DEFAULT)
@@ -140,7 +158,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.hlsCacheEnabled, settings.fileLoggingEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled, handleClearCache])
+  }, [hasFocus, focusedIndex, settings.sidebarWidth, settings.badgeGap, settings.hlsCacheEnabled, settings.fileLoggingEnabled, onRequestSidebar, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled, setLanguage, handleClearCache])
 
   const rowRefs = useRef<Array<HTMLElement | null>>([])
 
@@ -159,24 +177,20 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
   return (
     <div className="screen settings-screen">
       <header className="screen__header">
-        <h2 className="screen__title">Einstellungen</h2>
+        <h2 className="screen__title">{t('settings.title')}</h2>
       </header>
 
       <div className="settings-section">
-        <h3 className="settings-section__title">Sprach-Anzeige auf Stream-Karten</h3>
-        <p className="settings-section__hint">
-          Twitch liefert nur die Stream-Sprache — kein Land. Flaggen-Zuordnung
-          ist eine Annäherung basierend auf der dominanten Twitch-Nutzerbase
-          (z.B. Portugiesisch → 🇧🇷 Brasilien).
-        </p>
+        <h3 className="settings-section__title">{t('settings.language.title')}</h3>
+        <p className="settings-section__hint">{t('settings.language.hint')}</p>
 
         <div className="settings-options">
-          {OPTIONS.map((opt, i) => {
-            const isActive = settings.streamBadgeMode === opt.mode
+          {LANGUAGE_OPTIONS.map((opt, i) => {
+            const isActive = settings.language === opt.lang
             const isFocused = hasFocus && i === focusedIndex
             return (
               <button
-                key={opt.mode}
+                key={opt.lang}
                 ref={(el) => { rowRefs.current[i] = el }}
                 className={[
                   'settings-option',
@@ -185,15 +199,14 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
                 ].filter(Boolean).join(' ')}
                 onClick={() => {
                   setFocusedIndex(i)
-                  setStreamBadgeMode(opt.mode)
+                  setLanguage(opt.lang)
                 }}
                 tabIndex={isFocused ? 0 : -1}
               >
                 <span className="settings-option__radio" aria-hidden="true">
                   {isActive ? '●' : '○'}
                 </span>
-                <span className="settings-option__label">{opt.label}</span>
-                <span className="settings-option__preview">{opt.preview}</span>
+                <span className="settings-option__label">{t(opt.labelKey)}</span>
               </button>
             )
           })}
@@ -201,16 +214,51 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
       </div>
 
       <div className="settings-section">
-        <h3 className="settings-section__title">Sidebar-Breite</h3>
+        <h3 className="settings-section__title">{t('settings.badge.title')}</h3>
+        <p className="settings-section__hint">{t('settings.badge.hint')}</p>
+
+        <div className="settings-options">
+          {OPTIONS.map((opt, i) => {
+            const rowIndex = BADGE_OPTION_OFFSET + i
+            const isActive = settings.streamBadgeMode === opt.mode
+            const isFocused = hasFocus && rowIndex === focusedIndex
+            return (
+              <button
+                key={opt.mode}
+                ref={(el) => { rowRefs.current[rowIndex] = el }}
+                className={[
+                  'settings-option',
+                  isActive ? 'settings-option--active' : '',
+                  isFocused ? 'settings-option--focused' : ''
+                ].filter(Boolean).join(' ')}
+                onClick={() => {
+                  setFocusedIndex(rowIndex)
+                  setStreamBadgeMode(opt.mode)
+                }}
+                tabIndex={isFocused ? 0 : -1}
+              >
+                <span className="settings-option__radio" aria-hidden="true">
+                  {isActive ? '●' : '○'}
+                </span>
+                <span className="settings-option__label">{t(opt.labelKey)}</span>
+                <span className="settings-option__preview">{t(opt.previewKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section__title">{t('settings.sidebar.title')}</h3>
         <p className="settings-section__hint">
-          Breite der Seitenleiste anpassen ({SIDEBAR_MIN}–{SIDEBAR_MAX} px).
+          {t('settings.sidebar.hint', { min: SIDEBAR_MIN, max: SIDEBAR_MAX })}
           {' '}
           <span className="gamepad-hint-line">
-            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>verschieben</GamepadHintItem>
+            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>{t('settings.adjust')}</GamepadHintItem>
             <span className="gamepad-hint-separator">·</span>
             <span className="gamepad-inline-action">
               <GamepadPrompt prompt="a" />
-              <span>setzt auf Standard ({SIDEBAR_DEFAULT} px) zurück.</span>
+              <span>{t('settings.resetToDefault', { value: SIDEBAR_DEFAULT })}</span>
             </span>
           </span>
         </p>
@@ -238,16 +286,16 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
       </div>
 
       <div className="settings-section">
-        <h3 className="settings-section__title">Flaggen-Badge Abstand</h3>
+        <h3 className="settings-section__title">{t('settings.badgeGap.title')}</h3>
         <p className="settings-section__hint">
-          Abstand zwischen Menütext und Flaggen-Badge ({BADGE_GAP_MIN}–{BADGE_GAP_MAX} px).
+          {t('settings.badgeGap.hint', { min: BADGE_GAP_MIN, max: BADGE_GAP_MAX })}
           {' '}
           <span className="gamepad-hint-line">
-            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>verschieben</GamepadHintItem>
+            <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>{t('settings.adjust')}</GamepadHintItem>
             <span className="gamepad-hint-separator">·</span>
             <span className="gamepad-inline-action">
               <GamepadPrompt prompt="a" />
-              <span>setzt auf Standard ({BADGE_GAP_DEFAULT} px) zurück.</span>
+              <span>{t('settings.resetToDefault', { value: BADGE_GAP_DEFAULT })}</span>
             </span>
           </span>
         </p>
@@ -275,13 +323,8 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
       </div>
 
       <div className="settings-section">
-        <h3 className="settings-section__title">Speicher</h3>
-        <p className="settings-section__hint">
-          HLS-Segmente (Live &amp; VODs) sind Single-Use — sie werden nach dem Abspielen nie
-          wieder abgerufen. Caching erzeugt auf dem Steam Deck unnötiges Disk-Wachstum und
-          Akku-Belastung. Thumbnails und API-Antworten bleiben immer gecacht.
-          Maximale Cache-Größe: 500 MB.
-        </p>
+        <h3 className="settings-section__title">{t('settings.storage.title')}</h3>
+        <p className="settings-section__hint">{t('settings.storage.hint')}</p>
 
         <button
           ref={(el) => { rowRefs.current[HLS_CACHE_TOGGLE_ROW] = el }}
@@ -299,11 +342,9 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           <span className="settings-option__radio" aria-hidden="true">
             {settings.hlsCacheEnabled ? '●' : '○'}
           </span>
-          <span className="settings-option__label">HLS-Cache (Live &amp; VODs)</span>
+          <span className="settings-option__label">{t('settings.hlsCache.label')}</span>
           <span className="settings-option__preview">
-            {settings.hlsCacheEnabled
-              ? 'Aktiv — Segmente werden gecacht'
-              : 'Inaktiv — kein Disk-Wachstum (empfohlen)'}
+            {settings.hlsCacheEnabled ? t('settings.hlsCache.on') : t('settings.hlsCache.off')}
           </span>
         </button>
 
@@ -326,7 +367,7 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
             </span>
           </span>
           <span className="settings-cache__action">
-            {clearing ? 'Wird geleert …' : 'Cache leeren'}
+            {clearing ? t('settings.cache.clearing') : t('settings.cache.clear')}
           </span>
         </button>
 
@@ -346,11 +387,9 @@ export default function SettingsScreen({ hasFocus, onRequestSidebar }: Props): J
           <span className="settings-option__radio" aria-hidden="true">
             {settings.fileLoggingEnabled ? '●' : '○'}
           </span>
-          <span className="settings-option__label">Datei-Logging</span>
+          <span className="settings-option__label">{t('settings.fileLog.label')}</span>
           <span className="settings-option__preview">
-            {settings.fileLoggingEnabled
-              ? 'Aktiv — Info-Logs in main.log'
-              : 'Inaktiv — nur Fehler werden geloggt (empfohlen)'}
+            {settings.fileLoggingEnabled ? t('settings.fileLog.on') : t('settings.fileLog.off')}
           </span>
         </button>
       </div>

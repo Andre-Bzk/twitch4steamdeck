@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import type { DeviceFlowStartInfo } from '../types/t4sd'
+import { useT } from '../i18n/useT'
 
 interface Props {
   onAuthorized: () => void
@@ -14,6 +15,7 @@ type Phase =
   | { kind: 'not-configured' }
 
 export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
+  const t = useT()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const startBtnRef = useRef<HTMLButtonElement>(null)
 
@@ -43,10 +45,10 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
           onAuthorized()
           break
         case 'denied':
-          setPhase({ kind: 'error', message: 'Zugriff abgelehnt.' })
+          setPhase({ kind: 'error', message: t('login.error.accessDenied') })
           break
         case 'expired':
-          setPhase({ kind: 'error', message: 'Code abgelaufen — bitte erneut versuchen.' })
+          setPhase({ kind: 'error', message: t('login.error.expired') })
           break
         case 'error':
           setPhase({ kind: 'error', message: event.message })
@@ -94,15 +96,9 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
   if (phase.kind === 'not-configured') {
     return (
       <div className="login">
-        <h2>Konfiguration fehlt</h2>
-        <p>
-          Es ist keine Twitch <code>Client ID</code> hinterlegt. Lege im Projektverzeichnis eine
-          Datei <code>.env</code> an (siehe <code>.env.example</code>) und setze
-          <br />
-          <code>MAIN_VITE_TWITCH_CLIENT_ID=…</code>
-          <br />
-          Danach <code>npm run dev</code> neu starten.
-        </p>
+        <h2>{t('login.notConfigured.title')}</h2>
+        <p>{t('login.notConfigured.body')}</p>
+        <p>{t('login.notConfigured.restart')}</p>
       </div>
     )
   }
@@ -110,16 +106,16 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
   if (phase.kind === 'awaiting') {
     return (
       <div className="login">
-        <h2>Mit Twitch verbinden</h2>
+        <h2>{t('login.connect')}</h2>
         <p>
-          Öffne auf einem anderen Gerät{' '}
-          <strong>{phase.info.verificationUri}</strong> und gib den Code ein:
+          {t('login.openOnDevice')}{' '}
+          <strong>{phase.info.verificationUri}</strong> {t('login.enterCode')}
         </p>
         <div className="login__code">{phase.info.userCode}</div>
         <img className="login__qr" src={phase.qrDataUrl} alt="QR Code" />
-        <p className="login__hint">Code läuft in {formatTime(phase.remainingSec)} ab.</p>
+        <p className="login__hint">{t('login.expiresIn', { time: formatTime(phase.remainingSec) })}</p>
         <button className="btn" onClick={cancel}>
-          Abbrechen
+          {t('common.cancel')}
         </button>
       </div>
     )
@@ -127,8 +123,8 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
 
   return (
     <div className="login">
-      <h2>Willkommen</h2>
-      <p>Verbinde deinen Twitch-Account, um gefolgte Kanäle und VODs zu sehen.</p>
+      <h2>{t('login.welcome')}</h2>
+      <p>{t('login.intro')}</p>
       {phase.kind === 'error' && <p className="login__error">{phase.message}</p>}
       <button
         ref={startBtnRef}
@@ -136,7 +132,7 @@ export default function LoginScreen({ onAuthorized }: Props): JSX.Element {
         onClick={start}
         disabled={phase.kind === 'starting'}
       >
-        {phase.kind === 'starting' ? 'Starte…' : 'Mit Twitch verbinden'}
+        {phase.kind === 'starting' ? t('login.starting') : t('login.connect')}
       </button>
     </div>
   )

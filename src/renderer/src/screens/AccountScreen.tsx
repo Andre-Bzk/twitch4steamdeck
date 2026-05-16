@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { UserIcon } from '../components/Icons'
 import type { OwnUserInfo } from '../types/t4sd'
+import { useT } from '../i18n/useT'
 
 interface Props {
   hasFocus: boolean
@@ -9,12 +10,13 @@ interface Props {
 }
 
 export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: Props): JSX.Element {
+  const t = useT()
   const logoutBtnRef = useRef<HTMLButtonElement>(null)
   const [user, setUser] = useState<OwnUserInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [confirmVisible, setConfirmVisible] = useState(false)
-  const [confirmIndex, setConfirmIndex] = useState(0) // 0 = Nein, 1 = Ja
+  const [confirmIndex, setConfirmIndex] = useState(0) // 0 = No, 1 = Yes
 
   useEffect(() => {
     if (hasFocus && !confirmVisible) logoutBtnRef.current?.focus({ preventScroll: true })
@@ -34,7 +36,7 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
       .catch((err) => {
         if (!cancelled) {
           setUser(null)
-          setError(err instanceof Error ? err.message : 'Accountdaten konnten nicht geladen werden.')
+          setError(err instanceof Error ? err.message : t('account.loadError'))
         }
       })
       .finally(() => {
@@ -94,7 +96,7 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
   return (
     <div className="screen">
       <header className="screen__header">
-        <h2 className="screen__title">Mein Account</h2>
+        <h2 className="screen__title">{t('account.title')}</h2>
       </header>
       <div className="account">
         <div className="account__avatar">
@@ -105,40 +107,40 @@ export default function AccountScreen({ hasFocus, onRequestSidebar, onLogout }: 
           )}
         </div>
         <div className="account__identity">
-          <p className="account__hint">Eingeloggt bei Twitch</p>
+          <p className="account__hint">{t('account.loggedInTwitch')}</p>
           {isLoading ? (
-            <p className="account__name">Lade Account…</p>
+            <p className="account__name">{t('account.loading')}</p>
           ) : user ? (
             <>
               <p className="account__name">{user.displayName}</p>
               {showLogin && <p className="account__login">@{user.login}</p>}
             </>
           ) : (
-            <p className="account__error">{error || 'Accountdaten konnten nicht geladen werden.'}</p>
+            <p className="account__error">{error || t('account.loadError')}</p>
           )}
         </div>
-        <p className="account__version">App-Version {window.t4sd.appVersion}</p>
+        <p className="account__version">{t('account.appVersion', { version: window.t4sd.appVersion })}</p>
         {confirmVisible ? (
           <div className="account__confirm">
-            <p className="account__confirm-text">Wirklich abmelden?</p>
+            <p className="account__confirm-text">{t('account.confirmLogout')}</p>
             <div className="account__confirm-buttons">
               <button
                 className={['btn', confirmIndex === 0 ? 'btn--focused' : ''].filter(Boolean).join(' ')}
                 onClick={() => { setConfirmVisible(false); setConfirmIndex(0) }}
               >
-                Nein
+                {t('common.no')}
               </button>
               <button
                 className={['btn', confirmIndex === 1 ? 'btn--focused' : ''].filter(Boolean).join(' ')}
                 onClick={() => { void handleLogout() }}
               >
-                Ja
+                {t('common.yes')}
               </button>
             </div>
           </div>
         ) : (
           <button ref={logoutBtnRef} className="btn" onClick={() => { setConfirmVisible(true); setConfirmIndex(0) }}>
-            Abmelden
+            {t('account.logout')}
           </button>
         )}
       </div>

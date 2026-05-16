@@ -24,7 +24,7 @@ export const IPC = {
   playbackGetQualities: 'playback:get-qualities',
   /** main → renderer */
   playbackEvent: 'playback:event',
-  /** main → renderer: HLS-URL + Metadaten für den Renderer-seitigen Video-Player */
+  /** main → renderer: HLS URL + metadata for the renderer-side video player */
   playbackHlsUrl: 'playback:hls-url',
 
   appGetCacheSize: 'app:get-cache-size',

@@ -19,6 +19,7 @@ import {
   formatWatchedAt
 } from '../lib/formatting'
 import { CARD_GAP, CARD_W } from '../constants/ui'
+import { useT } from '../i18n/useT'
 
 interface Props {
   channel: FollowedChannelInfo
@@ -32,6 +33,7 @@ function resolveThumbnail(url: string | undefined, w = 1280, h = 720): string | 
 }
 
 export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
+  const t = useT()
   const [vods, setVods] = useState<VodInfo[]>([])
   const [vodsLoading, setVodsLoading] = useState(true)
   const [progressMap, setProgressMap] = useState<Record<string, VodProgress>>({})
@@ -109,10 +111,10 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   const currentChapterName = useMemo<string | undefined>(() => {
     if (isLivePlayback) return undefined
     if (!vodChaptersLoaded) return undefined
-    if (chapters.length === 0) return 'Unbekannt'
+    if (chapters.length === 0) return t('channel.unknownChapter')
     const active = [...chapters].reverse().find((ch) => ch.positionSeconds <= currentPosition)
-    return active?.gameName ?? 'Unbekannt'
-  }, [chapters, vodChaptersLoaded, currentPosition, isLivePlayback])
+    return active?.gameName ?? t('channel.unknownChapter')
+  }, [chapters, vodChaptersLoaded, currentPosition, isLivePlayback, t])
 
   const currentChapterIndex = useMemo<number | undefined>(() => {
     if (isLivePlayback || !vodChaptersLoaded || chapters.length === 0) return undefined
@@ -276,7 +278,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
   return (
     <div className="channel-screen">
       <button className="channel-screen__back btn" onClick={onBack} tabIndex={0}>
-        ← Zurück
+        ← {t('common.back')}
       </button>
 
       <div className="channel-screen__hero">
@@ -314,7 +316,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
           )}
           {channel.viewerCount !== undefined && (
             <p className="channel-screen__viewers">
-              {formatViewers(channel.viewerCount)} Zuschauer
+              {t('channel.viewers', { count: formatViewers(channel.viewerCount) })}
             </p>
           )}
 
@@ -325,7 +327,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
                 className="btn btn--primary"
                 onClick={() => void handleWatch()}
               >
-                ▶ Live ansehen
+                {t('channel.watchLive')}
               </button>
             )}
 
@@ -337,18 +339,18 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
             {playState === 'starting' && (
               <button className="btn" disabled>
-                Starte Wiedergabe…
+                {t('channel.startingPlayback')}
               </button>
             )}
 
             {isActivePlayback && (
               <span className="channel-screen__playing-hint">
-                ● Wiedergabe{playState === 'paused' ? ' (Pause)' : ''}
+                {t('channel.playingHint')}{playState === 'paused' ? t('channel.pausedSuffix') : ''}
               </span>
             )}
 
             {!channel.isLive && playState === 'idle' && (
-              <p className="channel-screen__offline">Kanal ist gerade offline.</p>
+              <p className="channel-screen__offline">{t('channel.offline')}</p>
             )}
 
             {playState === 'error' && (
@@ -360,21 +362,21 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
 
       <div className="channel-screen__vods">
         <h3 className="channel-screen__vods-title">
-          Vergangene Streams
+          {t('channel.pastStreams')}
           {focusRegion === 'shelf' && (
             <span className="channel-screen__vods-hint gamepad-hint-line">
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="dpad-up">Zurück</GamepadHintItem>
+              <GamepadHintItem prompt="dpad-up">{t('common.back')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="a">Abspielen</GamepadHintItem>
+              <GamepadHintItem prompt="a">{t('channel.shelfPlay')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="y">Kapitel</GamepadHintItem>
+              <GamepadHintItem prompt="y">{t('channel.shelfChapter')}</GamepadHintItem>
             </span>
           )}
         </h3>
-        {vodsLoading && <p className="channel-screen__vods-loading">Lade VODs…</p>}
+        {vodsLoading && <p className="channel-screen__vods-loading">{t('channel.vodsLoading')}</p>}
         {!vodsLoading && vods.length === 0 && (
-          <p className="channel-screen__vods-empty">Keine archivierten Streams verfügbar.</p>
+          <p className="channel-screen__vods-empty">{t('channel.vodsEmpty')}</p>
         )}
         {vods.length > 0 && (
           <div className="channel-screen__shelf-viewport">
@@ -402,7 +404,10 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
                       )}
                       <span className="channel-screen__vod-duration">
                         {prog && !prog.completed && prog.resumePositionSeconds > 0
-                          ? `${formatDuration(prog.resumePositionSeconds)} von ${formatDuration(vod.durationSeconds)}`
+                          ? t('channel.vodPosition', {
+                              position: formatDuration(prog.resumePositionSeconds),
+                              duration: formatDuration(vod.durationSeconds)
+                            })
                           : formatDuration(vod.durationSeconds)}
                       </span>
                       {pct > 0 && (

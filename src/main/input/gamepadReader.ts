@@ -398,14 +398,14 @@ export function startGamepadReader(getWindow: () => BrowserWindow | null): () =>
           reader = new EvdevReader(eventPath, onKey)
           if (reader.start()) {
             readers.set(jsPath, reader)
-            log.info(`[gamepad] geöffnet (evdev): ${jsPath} → ${eventPath}`)
+            log.info(`[gamepad] opened (evdev): ${jsPath} → ${eventPath}`)
           }
         } else {
           // Fallback to legacy joystick API when no /sys mapping is found
           reader = new JoystickFallbackReader(jsPath, onKey)
           if (reader.start()) {
             readers.set(jsPath, reader)
-            log.info(`[gamepad] geöffnet (js-fallback): ${jsPath}`)
+            log.info(`[gamepad] opened (js-fallback): ${jsPath}`)
           }
         }
       }

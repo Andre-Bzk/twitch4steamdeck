@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 export type StreamBadgeMode = 'off' | 'language' | 'flag' | 'both'
+export type Language = 'de' | 'en'
 
 export interface AppSettings {
   streamBadgeMode: StreamBadgeMode
@@ -8,6 +9,7 @@ export interface AppSettings {
   badgeGap: number
   hlsCacheEnabled: boolean
   fileLoggingEnabled: boolean
+  language: Language
 }
 
 const STORAGE_KEY = 't4sd:settings'
@@ -22,7 +24,8 @@ const DEFAULTS: AppSettings = {
   sidebarWidth: SIDEBAR_DEFAULT,
   badgeGap: BADGE_GAP_DEFAULT,
   hlsCacheEnabled: false,
-  fileLoggingEnabled: false
+  fileLoggingEnabled: false,
+  language: 'de'
 }
 
 export { SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_DEFAULT, BADGE_GAP_MIN, BADGE_GAP_MAX, BADGE_GAP_DEFAULT }
@@ -33,6 +36,7 @@ function loadSettings(): AppSettings {
     if (!raw) return DEFAULTS
     const parsed = JSON.parse(raw) as Partial<AppSettings>
     const modes: StreamBadgeMode[] = ['off', 'language', 'flag', 'both']
+    const languages: Language[] = ['de', 'en']
     const sw = Number(parsed.sidebarWidth)
     const bg = Number(parsed.badgeGap)
     return {
@@ -42,7 +46,10 @@ function loadSettings(): AppSettings {
       sidebarWidth: sw >= SIDEBAR_MIN && sw <= SIDEBAR_MAX ? sw : SIDEBAR_DEFAULT,
       badgeGap: bg >= BADGE_GAP_MIN && bg <= BADGE_GAP_MAX ? bg : BADGE_GAP_DEFAULT,
       hlsCacheEnabled: typeof parsed.hlsCacheEnabled === 'boolean' ? parsed.hlsCacheEnabled : DEFAULTS.hlsCacheEnabled,
-      fileLoggingEnabled: typeof parsed.fileLoggingEnabled === 'boolean' ? parsed.fileLoggingEnabled : DEFAULTS.fileLoggingEnabled
+      fileLoggingEnabled: typeof parsed.fileLoggingEnabled === 'boolean' ? parsed.fileLoggingEnabled : DEFAULTS.fileLoggingEnabled,
+      language: languages.includes(parsed.language as Language)
+        ? (parsed.language as Language)
+        : DEFAULTS.language
     }
   } catch {
     return DEFAULTS
@@ -64,6 +71,7 @@ interface SettingsCtx {
   setBadgeGap: (gap: number) => void
   setHlsCacheEnabled: (enabled: boolean) => void
   setFileLoggingEnabled: (enabled: boolean) => void
+  setLanguage: (language: Language) => void
 }
 
 const SettingsContext = createContext<SettingsCtx | null>(null)
@@ -124,8 +132,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): J
     void window.t4sd.app.setFileLoggingEnabled(enabled)
   }, [])
 
+  const setLanguage = useCallback((language: Language) => {
+    setSettings((prev) => {
+      const next = { ...prev, language }
+      saveSettings(next)
+      return next
+    })
+  }, [])
+
   return (
-    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled }}>
+    <SettingsContext.Provider value={{ settings, setStreamBadgeMode, setSidebarWidth, setBadgeGap, setHlsCacheEnabled, setFileLoggingEnabled, setLanguage }}>
       {children}
     </SettingsContext.Provider>
   )

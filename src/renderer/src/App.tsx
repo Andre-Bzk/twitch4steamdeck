@@ -3,8 +3,10 @@ import { gamepadService } from './input/gamepad'
 import AppShell from './screens/AppShell'
 import LoginScreen from './screens/LoginScreen'
 import type { AuthStatus } from './types/t4sd'
+import { useT } from './i18n/useT'
 
 export default function App(): JSX.Element {
+  const t = useT()
   const [status, setStatus] = useState<AuthStatus | 'loading'>('loading')
 
   const refresh = useCallback(async () => {
@@ -38,7 +40,7 @@ export default function App(): JSX.Element {
   if (status === 'loading') {
     return (
       <div className="fullscreen-center">
-        <p>Lade…</p>
+        <p>{t('common.loading')}</p>
       </div>
     )
   }

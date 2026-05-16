@@ -37,6 +37,7 @@ Renderer (React)
 ├── AppShell.tsx         — Tab routing, sidebar/main focus, global playback overlay
 ├── screens/             — FollowingScreen, BrowseScreen, CategoryScreen,
 │                          ChannelScreen (main screen), StreamListScreen, Settings, Account
+├── i18n/                — `de.ts`, `en.ts`, `useT.ts` for localized UI copy
 ├── components/
 │   ├── VideoPlayer.tsx  — hls.js <video> wrapper (forwardRef, imperative handle)
 │   ├── PlaybackOverlay.tsx — DOM overlay over the video (z-index: 300)
@@ -51,7 +52,7 @@ Renderer (React)
 │   ├── playbackKeys.ts  — Shared key dispatch for playback (AppShell + ChannelScreen)
 │   └── hlsNoCacheLoader.ts — Fetch API-based hls.js loader (cache: 'no-store')
 ├── input/gamepad.ts     — Browser Gamepad API (Windows, dev mode)
-└── context/SettingsContext.tsx — localStorage settings (streamBadgeMode, sidebarWidth, …)
+└── context/SettingsContext.tsx — localStorage settings (streamBadgeMode, sidebarWidth, language, …)
 ```
 
 ### Data Flow
@@ -146,8 +147,12 @@ src/renderer/src/
     CategoryScreen.tsx        — Streams for a category (A=direct play, X=channel page)
     ChannelScreen.tsx         — Channel detail, VOD shelf, VideoPlayer + PlaybackOverlay, chapter panel, quality selection; key handling via useChannelKeyHandler
     StreamListScreen.tsx      — Language-filtered stream list DE/EN (A=direct play, X=channel page)
-    SettingsScreen.tsx        — streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled
+    SettingsScreen.tsx        — language, streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled
     AccountScreen.tsx         — User info, logout (with confirmation dialog)
+  i18n/
+    de.ts                     — German message catalog; source of truth for translation keys
+    en.ts                     — English message catalog typed against the German key set
+    useT.ts                   — Translation hook + static translator for non-React contexts
   components/
     VideoPlayer.tsx           — hls.js <video> wrapper, forwardRef (seek, seekTo, pause, play, stop, getCurrentTime); attachMedia before loadSource; play() in MANIFEST_PARSED
     PlaybackOverlay.tsx       — DOM overlay (seek bar, channel info, gamepad hints, auto-hide); playState: 'playing'|'paused'
@@ -164,7 +169,7 @@ src/renderer/src/
     playback.ts               — OVERLAY_HIDE_DELAY_MS, DOUBLE_TAP_MS, POSITION_REPORT_INTERVAL_MS
     input.ts                  — AXIS_THRESHOLD, REPEAT_INITIAL_MS, REPEAT_INTERVAL_MS
   context/
-    SettingsContext.tsx        — localStorage settings (streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled), CSS custom properties sync
+    SettingsContext.tsx        — localStorage settings (language, streamBadgeMode, sidebarWidth, badgeGap, hlsCacheEnabled, fileLoggingEnabled), CSS custom properties sync
   hooks/
     usePlaybackSession.ts     — Shared hook: hlsPayload, playState, videoRef, quality panel state, startLive/startVod/stop; used by AppShell + ChannelScreen
     useChannelKeyHandler.ts   — Mode-based key handler for ChannelScreen; 5 modes: chapter/playback-quality/playback/hero/shelf
@@ -297,7 +302,7 @@ All binding objects are held in a ref — the listener never needs to be re-regi
 - `getTopGames()` makes 40 parallel `/streams?game_id=<id>&first=100` calls to estimate viewer counts
 
 ### Settings Persistence
-- UI settings (badge mode, sidebar width, badge gap, HLS cache toggle, file logging toggle) → `localStorage` under key `t4sd:settings` (no IPC, no flicker on startup); changes are mirrored to the main process via IPC (`app:set-hls-cache-enabled`, `app:set-file-logging-enabled`)
+- UI settings (language, badge mode, sidebar width, badge gap, HLS cache toggle, file logging toggle) → `localStorage` under key `t4sd:settings` (no IPC, no flicker on startup); changes are mirrored to the main process via IPC (`app:set-hls-cache-enabled`, `app:set-file-logging-enabled`)
 - VOD history + resume → SQLite `history.db` in `userData/`
 - Twitch tokens → Electron `safeStorage` (OS keystore), file: `userData/twitch-tokens.bin`
 

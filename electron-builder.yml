@@ -14,5 +14,5 @@ linux:
   target:
     - AppImage
   category: AudioVideo
-  synopsis: Werbefreier Twitch-Client für das Steam Deck
-  description: Big-Screen-Twitch-Client mit werbefreier Live- und VOD-Wiedergabe, Gamepad-Bedienung und lokalem VOD-Verlauf.
+  synopsis: Ad-free Twitch client for Steam Deck
+  description: Big-screen Twitch client with ad-free live and VOD playback, gamepad navigation, and local VOD history.

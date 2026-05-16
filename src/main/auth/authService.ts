@@ -55,7 +55,7 @@ export class AuthService extends EventEmitter {
   async startDeviceFlow(): Promise<DeviceFlowStartInfo> {
     if (!this.isConfigured()) {
       throw new Error(
-        'TWITCH_CLIENT_ID nicht gesetzt. Trage MAIN_VITE_TWITCH_CLIENT_ID in .env ein.'
+        'TWITCH_CLIENT_ID is not set. Add MAIN_VITE_TWITCH_CLIENT_ID to .env.'
       )
     }
     this.cancelFlow()

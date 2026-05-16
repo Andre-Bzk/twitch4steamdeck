@@ -3,7 +3,7 @@ import { getLanguageDisplay } from '../lib/languageBadge'
 
 interface Props {
   language?: string
-  /** Optional: andere CSS-Klasse für kleinere Karten */
+  /** Optional: alternate CSS class for smaller cards */
   className?: string
 }
 

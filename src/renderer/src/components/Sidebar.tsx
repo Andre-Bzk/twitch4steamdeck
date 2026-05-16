@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CompassIcon, HeartIcon, SettingsIcon, TwitchGlyphIcon, UserIcon, ChartIcon } from './Icons'
 import { getLanguageFlag } from '../lib/languageBadge'
+import { useT, type MessageKey } from '../i18n/useT'
 
 export type TabKey =
   | 'following'
@@ -13,13 +14,13 @@ export type TabKey =
 export type SidebarScreen =
   | { kind: 'following' }
   | { kind: 'browse' }
-  | { kind: 'stream-list'; title: string; language: string }
+  | { kind: 'stream-list'; titleKey: MessageKey; language: string }
   | { kind: 'account' }
   | { kind: 'settings' }
 
 interface SidebarItemDef {
   key: TabKey
-  label: string
+  labelKey: MessageKey
   trailingLabel?: string
   section: 'main' | 'bottom'
   Icon: (props: React.SVGProps<SVGSVGElement>) => JSX.Element
@@ -27,26 +28,26 @@ interface SidebarItemDef {
 }
 
 export const SIDEBAR_ITEMS: SidebarItemDef[] = [
-  { key: 'following', label: 'Du folgst', section: 'main', Icon: HeartIcon, screen: { kind: 'following' } },
-  { key: 'browse', label: 'Durchsuchen', section: 'main', Icon: CompassIcon, screen: { kind: 'browse' } },
+  { key: 'following', labelKey: 'nav.following', section: 'main', Icon: HeartIcon, screen: { kind: 'following' } },
+  { key: 'browse', labelKey: 'nav.browse', section: 'main', Icon: CompassIcon, screen: { kind: 'browse' } },
   {
     key: 'topStreamsDe',
-    label: 'Top Streams DE',
+    labelKey: 'nav.topStreamsDe',
     trailingLabel: getLanguageFlag('de') ?? 'DE',
     section: 'main',
     Icon: ChartIcon,
-    screen: { kind: 'stream-list', title: 'Top Streams DE', language: 'de' }
+    screen: { kind: 'stream-list', titleKey: 'nav.topStreamsDe', language: 'de' }
   },
   {
     key: 'topStreamsEn',
-    label: 'Top Streams EN',
+    labelKey: 'nav.topStreamsEn',
     trailingLabel: getLanguageFlag('en') ?? 'EN',
     section: 'main',
     Icon: ChartIcon,
-    screen: { kind: 'stream-list', title: 'Top Streams EN', language: 'en' }
+    screen: { kind: 'stream-list', titleKey: 'nav.topStreamsEn', language: 'en' }
   },
-  { key: 'account', label: 'Mein Account', section: 'bottom', Icon: UserIcon, screen: { kind: 'account' } },
-  { key: 'settings', label: 'Einstellungen', section: 'bottom', Icon: SettingsIcon, screen: { kind: 'settings' } }
+  { key: 'account', labelKey: 'nav.account', section: 'bottom', Icon: UserIcon, screen: { kind: 'account' } },
+  { key: 'settings', labelKey: 'nav.settings', section: 'bottom', Icon: SettingsIcon, screen: { kind: 'settings' } }
 ]
 
 const MAIN_ITEMS = SIDEBAR_ITEMS.filter((item) => item.section === 'main')
@@ -54,12 +55,13 @@ const BOTTOM_ITEMS = SIDEBAR_ITEMS.filter((item) => item.section === 'bottom')
 
 interface Props {
   activeTab: TabKey
-  /** -1 wenn Sidebar nicht den Fokus hat */
+  /** -1 when the sidebar does not have focus */
   focusedIndex: number
   onItemClick: (tab: TabKey) => void
 }
 
 export default function Sidebar({ activeTab, focusedIndex, onItemClick }: Props): JSX.Element {
+  const t = useT()
   const refs = useRef<Array<HTMLButtonElement | null>>([])
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function Sidebar({ activeTab, focusedIndex, onItemClick }: Props)
     </nav>
   )
 
-  function renderItem({ key, label, trailingLabel, Icon }: SidebarItemDef): JSX.Element {
+  function renderItem({ key, labelKey, trailingLabel, Icon }: SidebarItemDef): JSX.Element {
     const i = SIDEBAR_ITEMS.findIndex((item) => item.key === key)
     const isActive = key === activeTab
     const isFocused = i === focusedIndex
@@ -111,7 +113,7 @@ export default function Sidebar({ activeTab, focusedIndex, onItemClick }: Props)
       >
         <span className="sidebar__item-main">
           <Icon aria-hidden="true" />
-          <span className="sidebar__item-label">{label}</span>
+          <span className="sidebar__item-label">{t(labelKey)}</span>
           {trailingLabel && <span className="sidebar__item-trailing">{trailingLabel}</span>}
         </span>
       </button>

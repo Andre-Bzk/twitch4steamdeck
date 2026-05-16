@@ -19,7 +19,7 @@ export class PlaybackService extends EventEmitter {
     } catch (e) {
       this.emit('playback-event', {
         kind: 'error',
-        message: `Stream-URL konnte nicht abgerufen werden: ${e}`
+        message: `Failed to resolve stream URL: ${e}`
       } satisfies PlaybackEvent)
       return
     }
@@ -59,7 +59,7 @@ export class PlaybackService extends EventEmitter {
     } catch (e) {
       this.emit('playback-event', {
         kind: 'error',
-        message: `Stream-URL konnte nicht abgerufen werden: ${e}`
+        message: `Failed to resolve stream URL: ${e}`
       } satisfies PlaybackEvent)
       return
     }

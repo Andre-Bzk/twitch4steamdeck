@@ -5,6 +5,7 @@ import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import { formatViewers, formatViewersFull } from '../lib/formatting'
 import { STREAM_GAP, STREAM_W } from '../constants/ui'
 import log from 'electron-log/renderer'
+import { useT } from '../i18n/useT'
 
 interface Props {
   hasFocus: boolean
@@ -25,6 +26,7 @@ export default function BrowseScreen({
   onStartLive,
   onSelectCategory
 }: Props): JSX.Element {
+  const t = useT()
   const [topStreams, setTopStreams] = useState<FollowedChannelInfo[]>([])
   const [topGames, setTopGames] = useState<GameInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -194,13 +196,13 @@ export default function BrowseScreen({
   return (
     <div className="browse-screen">
       <header className="browse-screen__header">
-        <h2 className="screen__title">Durchsuchen</h2>
+        <h2 className="screen__title">{t('nav.browse')}</h2>
         {loadState === 'ok' && (
           <div className="screen__meta">
             <span className="screen__hint gamepad-hint-line">
-              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <GamepadHintItem prompt="y">{t('common.refresh')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+              <GamepadHintItem prompt="x">{t('common.channelPage')}</GamepadHintItem>
             </span>
           </div>
         )}
@@ -208,33 +210,33 @@ export default function BrowseScreen({
 
       {loadState === 'loading' && (
         <div className="screen__state">
-          <p>Lade…</p>
+          <p>{t('common.loading')}</p>
         </div>
       )}
 
       {loadState === 'error' && (
         <div className="screen__state">
-          <p>Fehler beim Laden.</p>
+          <p>{t('common.loadError')}</p>
           <button className="btn" onClick={() => void load()}>
-            Erneut versuchen
+            {t('common.tryAgain')}
           </button>
         </div>
       )}
 
       {loadState === 'ok' && (
         <>
-          {/* Top Live-Streams Shelf */}
+          {/* Top live-streams shelf */}
           <div className="browse-shelf">
             <h3 className="browse-section__title">
-              Top Live-Streams
+              {t('browse.topStreams')}
               {focusRegion === 'shelf' && (
                 <span className="browse-section__hint gamepad-hint-line">
                   <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="a">Live</GamepadHintItem>
+                  <GamepadHintItem prompt="a">{t('common.live')}</GamepadHintItem>
                   <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+                  <GamepadHintItem prompt="x">{t('common.channelPage')}</GamepadHintItem>
                   <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="dpad-down">Kategorien</GamepadHintItem>
+                  <GamepadHintItem prompt="dpad-down">{t('browse.categories')}</GamepadHintItem>
                 </span>
               )}
             </h3>
@@ -268,16 +270,16 @@ export default function BrowseScreen({
             </div>
           </div>
 
-          {/* Kategorien Grid */}
+          {/* Categories grid */}
           <div className="browse-games">
             <h3 className="browse-section__title">
-              Kategorien
+              {t('browse.categories')}
               {focusRegion === 'grid' && (
                 <span className="browse-section__hint gamepad-hint-line">
                   <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="a">Öffnen</GamepadHintItem>
+                  <GamepadHintItem prompt="a">{t('browse.openCategory')}</GamepadHintItem>
                   <span className="gamepad-hint-separator">·</span>
-                  <GamepadHintItem prompt="dpad-up">Zurück zu Streams</GamepadHintItem>
+                  <GamepadHintItem prompt="dpad-up">{t('browse.backToStreams')}</GamepadHintItem>
                 </span>
               )}
             </h3>
@@ -295,13 +297,13 @@ export default function BrowseScreen({
                   <span className="game-card__name">{game.name}</span>
                   {game.viewerCount !== undefined && (
                     <span className="game-card__viewers">
-                      {formatViewersFull(game.viewerCount)} Zuschauer
+                      {t('browse.viewersFull', { count: formatViewersFull(game.viewerCount) })}
                     </span>
                   )}
                 </button>
               ))}
               {isLoadingMore && (
-                <div className="game-grid__loading-more">Lade weitere…</div>
+                <div className="game-grid__loading-more">{t('browse.loadingMore')}</div>
               )}
             </div>
           </div>

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Twitch4SteamDeck
-Comment=Werbefreier Twitch-Client für das Steam Deck
+Comment=Twitch client for Steam Deck
 Exec=twitch4steamdeck
 Icon=tv.twitch4steamdeck.App
 Type=Application

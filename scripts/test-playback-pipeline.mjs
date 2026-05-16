@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
  * Testet die Backend-Playback-Pipeline: streamlink → HLS-URL → Manifest-Fetch → Segment-Fetch
+ * Tests the backend playback pipeline: streamlink → HLS URL → manifest fetch → segment fetch
  *
  * Usage:
- *   node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>
+ *   node scripts/test-playback-pipeline.mjs twitch.tv/<channel>
  *   node scripts/test-playback-pipeline.mjs twitch.tv/videos/<vod-id>
  */
 
@@ -13,7 +14,7 @@ import { join } from 'node:path'
 
 const url = process.argv[2]
 if (!url) {
-  console.error('Usage: node scripts/test-playback-pipeline.mjs twitch.tv/<kanal>')
+  console.error('Usage: node scripts/test-playback-pipeline.mjs twitch.tv/<channel>')
   process.exit(1)
 }
 
@@ -41,11 +42,12 @@ async function run() {
   console.log(`\n=== Playback Pipeline Test ===`)
   console.log(`URL:        ${url}`)
   console.log(`Streamlink: ${STREAMLINK_BIN}`)
-  console.log(`Streamlink existiert: ${existsSync(STREAMLINK_BIN)}`)
+  console.log(`Streamlink exists: ${existsSync(STREAMLINK_BIN)}`)
   console.log('')
 
   // Schritt 1: Streamlink aufrufen
-  console.log('[1] Streamlink --stream-url aufrufen ...')
+  // Step 1: invoke Streamlink
+  console.log('[1] Running Streamlink --stream-url ...')
   const { rawOut, rawErr, code, hlsUrl } = await new Promise((resolve) => {
     const proc = spawn(STREAMLINK_BIN, ['--stream-url', url, 'best'], {
       stdio: ['ignore', 'pipe', 'pipe']
@@ -62,22 +64,23 @@ async function run() {
     })
   })
 
-  info(`Exit-Code: ${code}`)
-  info(`stdout (roh):\n${rawOut.trim() || '(leer)'}`)
+  info(`Exit code: ${code}`)
+  info(`stdout (raw):\n${rawOut.trim() || '(empty)'}`)
   if (rawErr.trim()) info(`stderr: ${rawErr.trim().slice(0, 300)}`)
 
   if (code !== 0) {
-    fail(`streamlink Exit-Code ${code}`)
+    fail(`streamlink exit code ${code}`)
     process.exit(1)
   }
   if (!hlsUrl) {
-    fail('Keine https://-URL in stdout gefunden')
+    fail('No https:// URL found in stdout')
     process.exit(1)
   }
-  pass(`HLS-URL gefunden: ${hlsUrl.slice(0, 80)}...`)
+  pass(`Found HLS URL: ${hlsUrl.slice(0, 80)}...`)
 
   // Schritt 2: Manifest fetchen
-  console.log('\n[2] HLS-Manifest fetchen ...')
+  // Step 2: fetch the manifest
+  console.log('\n[2] Fetching HLS manifest ...')
   let manifestText = ''
   try {
     const res = await fetch(hlsUrl, {
@@ -86,53 +89,55 @@ async function run() {
         'Referer': 'https://www.twitch.tv/'
       }
     })
-    info(`HTTP Status: ${res.status}`)
+    info(`HTTP status: ${res.status}`)
     manifestText = await res.text()
-    info(`Manifest (erste 200 Zeichen):\n${manifestText.slice(0, 200)}`)
+    info(`Manifest (first 200 chars):\n${manifestText.slice(0, 200)}`)
 
     if (!manifestText.startsWith('#EXTM3U')) {
-      fail('Antwort ist kein valides m3u8 (fehlt #EXTM3U)')
+      fail('Response is not a valid m3u8 (missing #EXTM3U)')
       process.exit(1)
     }
-    pass('#EXTM3U vorhanden — valides HLS-Manifest')
+    pass('#EXTM3U present - valid HLS manifest')
   } catch (e) {
-    fail(`Manifest-Fetch fehlgeschlagen: ${e}`)
+    fail(`Manifest fetch failed: ${e}`)
     process.exit(1)
   }
 
   // Schritt 3: Erstes Segment erreichbar?
-  console.log('\n[3] Erstes Segment erreichbar? ...')
+  // Step 3: is the first segment reachable?
+  console.log('\n[3] Is the first segment reachable? ...')
   const baseUrl = hlsUrl.substring(0, hlsUrl.lastIndexOf('/') + 1)
   const segmentLine = manifestText.split('\n').find(l => l.trim() && !l.startsWith('#'))
   if (!segmentLine) {
     // Möglicherweise Master-Playlist → Sub-Playlist URL suchen
+    // Possibly a master playlist -> look for a sub-playlist URL
     const subPlaylistLine = manifestText.split('\n').find(l => l.trim().startsWith('https://'))
     if (subPlaylistLine) {
-      info(`Master-Playlist erkannt — Sub-Playlist: ${subPlaylistLine.trim().slice(0, 80)}`)
-      pass('Master-Playlist vorhanden (Sub-Playlists nicht weiter verfolgt)')
+      info(`Detected master playlist - sub-playlist: ${subPlaylistLine.trim().slice(0, 80)}`)
+      pass('Master playlist present (sub-playlists not followed further)')
     } else {
-      fail('Keine Segmente oder Sub-Playlists im Manifest gefunden')
+      fail('No segments or sub-playlists found in manifest')
     }
   } else {
     const segmentUrl = segmentLine.startsWith('https://') ? segmentLine.trim() : `${baseUrl}${segmentLine.trim()}`
-    info(`Segment-URL: ${segmentUrl.slice(0, 80)}`)
+    info(`Segment URL: ${segmentUrl.slice(0, 80)}`)
     try {
       const segRes = await fetch(segmentUrl, { method: 'HEAD' })
-      info(`Segment HTTP Status: ${segRes.status}`)
+      info(`Segment HTTP status: ${segRes.status}`)
       if (segRes.ok) {
-        pass(`Erstes Segment erreichbar (HTTP ${segRes.status})`)
+        pass(`First segment is reachable (HTTP ${segRes.status})`)
       } else {
-        fail(`Erstes Segment HTTP ${segRes.status}`)
+        fail(`First segment returned HTTP ${segRes.status}`)
       }
     } catch (e) {
-      fail(`Segment-Fetch fehlgeschlagen: ${e}`)
+      fail(`Segment fetch failed: ${e}`)
     }
   }
 
-  console.log('\n=== Test abgeschlossen ===\n')
+  console.log('\n=== Test completed ===\n')
 }
 
 run().catch((e) => {
-  console.error('Unerwarteter Fehler:', e)
+  console.error('Unexpected error:', e)
   process.exit(1)
 })

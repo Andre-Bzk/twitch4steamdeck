@@ -111,7 +111,7 @@ app.whenReady().then(async () => {
   await auth.init()
   const helix = new HelixClient(clientId, async () => {
     const token = await auth.getValidAccessToken()
-    if (!token) throw new Error('Kein gueltiges Twitch-Access-Token vorhanden')
+    if (!token) throw new Error('No valid Twitch access token available')
     return token
   })
   const playback = new PlaybackService()
@@ -126,7 +126,7 @@ app.whenReady().then(async () => {
   })
 
   if (!clientId) {
-    log.warn('[twitch4steamdeck] MAIN_VITE_TWITCH_CLIENT_ID nicht gesetzt — Login wird im UI als nicht konfiguriert angezeigt.')
+    log.warn('[twitch4steamdeck] MAIN_VITE_TWITCH_CLIENT_ID is not set — the UI will show login as not configured.')
   }
 
   createWindow()

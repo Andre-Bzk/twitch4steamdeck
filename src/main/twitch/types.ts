@@ -54,24 +54,24 @@ export interface HelixGame {
   box_art_url: string
 }
 
-/** Simplified game info für den Renderer. */
+/** Simplified game info for the renderer. */
 export interface GameInfo {
   id: string
   name: string
-  /** Boxart-URL bereits auf 285×380 aufgelöst */
+  /** Box art URL already resolved to 285×380 */
   boxArtUrl: string
-  /** Summe der Zuschauer aus den Top-100-Streams der Kategorie */
+  /** Sum of viewers from the top-100 streams in the category */
   viewerCount?: number
 }
 
-/** Simplified VOD info für den Renderer. */
+/** Simplified VOD info for the renderer. */
 export interface VodInfo {
   id: string
   title: string
   createdAt: string
   durationSeconds: number
   viewCount: number
-  /** Thumbnail URL bereits auf 440×248 aufgelöst */
+  /** Thumbnail URL already resolved to 440×248 */
   thumbnailUrl: string
 }
 

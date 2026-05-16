@@ -1,4 +1,5 @@
 import { QualityIcon } from './Icons'
+import { useT } from '../i18n/useT'
 
 interface Props {
   qualities: string[]
@@ -12,19 +13,20 @@ interface Props {
 }
 
 export function QualityPanel({ qualities, current, open, focusedIndex, onOpen, onChange }: Props): JSX.Element {
+  const t = useT()
   return (
     <div className="playback-overlay__quality-wrap">
       <button
         className="playback-overlay__quality-btn"
         onClick={onOpen}
-        aria-label="Qualität ändern"
+        aria-label={t('quality.changeAria')}
       >
         <QualityIcon width={18} height={18} />
         <span>{current}</span>
       </button>
       {open && (
         <div className="playback-overlay__quality-panel">
-          <div className="playback-overlay__quality-panel-title">Qualität</div>
+          <div className="playback-overlay__quality-panel-title">{t('quality.title')}</div>
           <ul className="playback-overlay__quality-list">
             {qualities.map((q, i) => (
               <li

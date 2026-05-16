@@ -7,6 +7,7 @@ import { ClapperboardIcon, EyeIcon, GamepadIcon, PauseIcon, PlayIcon, StopIcon }
 import { QualityPanel } from './QualityPanel'
 import { formatCount, formatTimestamp } from '../lib/formatting'
 import { DOUBLE_TAP_MS, OVERLAY_HIDE_DELAY_MS } from '../constants/playback'
+import { useT } from '../i18n/useT'
 
 interface PlaybackOverlayProps {
   playState: 'playing' | 'paused'
@@ -60,6 +61,7 @@ export function PlaybackOverlay({
   onStop,
   onOpenChapters
 }: PlaybackOverlayProps): JSX.Element {
+  const t = useT()
   const [visible, setVisible] = useState(true)
   const [isScrubbing, setIsScrubbing] = useState(false)
   const [scrubPosition, setScrubPosition] = useState(0)
@@ -210,7 +212,7 @@ export function PlaybackOverlay({
 
       {/* Top hints bar */}
       <div className="playback-overlay__top-bar">
-        <GamepadHintItem prompt="a">{playState === 'playing' ? 'Pause' : 'Resume'}</GamepadHintItem>
+        <GamepadHintItem prompt="a">{playState === 'playing' ? t('playback.pause') : t('playback.resume')}</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
         <GamepadHintItem prompt="dpad-left">−30s</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
@@ -220,15 +222,15 @@ export function PlaybackOverlay({
         <span className="playback-overlay__hint-sep">·</span>
         <GamepadHintItem prompt="rt">+5min</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
-        <GamepadHintItem prompt="lb">Kapitel ←</GamepadHintItem>
+        <GamepadHintItem prompt="lb">{t('playback.chapterLeft')}</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
-        <GamepadHintItem prompt="rb">Kapitel →</GamepadHintItem>
+        <GamepadHintItem prompt="rb">{t('playback.chapterRight')}</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
-        <GamepadHintItem prompt="y">Kapitelmenü</GamepadHintItem>
+        <GamepadHintItem prompt="y">{t('playback.chapterMenu')}</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
-        <GamepadHintItem prompt="x">Qualität</GamepadHintItem>
+        <GamepadHintItem prompt="x">{t('playback.qualityHint')}</GamepadHintItem>
         <span className="playback-overlay__hint-sep">·</span>
-        <GamepadHintItem prompt="b">Stop</GamepadHintItem>
+        <GamepadHintItem prompt="b">{t('playback.stop')}</GamepadHintItem>
       </div>
 
       {/* Center play/pause button */}
@@ -236,7 +238,7 @@ export function PlaybackOverlay({
         <button
           className="playback-overlay__center-btn"
           onClick={() => { onTogglePause(); showOverlay() }}
-          aria-label={playState === 'playing' ? 'Pause' : 'Wiedergabe'}
+          aria-label={playState === 'playing' ? t('playback.pause') : t('playback.playLabel')}
         >
           {playState === 'playing'
             ? <PauseIcon width={40} height={40} />
@@ -279,7 +281,7 @@ export function PlaybackOverlay({
           <div className="playback-overlay__meta-row">
             <div className="playback-overlay__live-indicator">
               <span className="playback-overlay__live-dot" />
-              Live
+              {t('common.live')}
             </div>
             {viewerCount !== undefined && viewerCount > 0 && (
               <span className="playback-overlay__meta-chip">
@@ -356,10 +358,10 @@ export function PlaybackOverlay({
               <button
                 className="playback-overlay__chapter-btn"
                 onClick={() => { onOpenChapters(); showOverlay() }}
-                aria-label="Kapitel öffnen"
+                aria-label={t('playback.openChapters')}
               >
                 <ClapperboardIcon width={18} height={18} />
-                <span>Kapitel</span>
+                <span>{t('playback.chapter')}</span>
               </button>
               {totalChapters > 1 && (
                 <span className="playback-overlay__chapter-ios-badge">
@@ -381,10 +383,10 @@ export function PlaybackOverlay({
           <button
             className="playback-overlay__stop-btn"
             onClick={() => { onStop(); showOverlay() }}
-            aria-label="Stop"
+            aria-label={t('playback.stop')}
           >
             <StopIcon width={18} height={18} />
-            <span>Stop</span>
+            <span>{t('playback.stop')}</span>
           </button>
         </div>
       </div>

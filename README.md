@@ -25,7 +25,7 @@ Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and V
 
 ## Features
 
-- **Live Streams** — Ad-free playback via Streamlink + hls.js (HTML5 video, no external player)
+- **Live Streams** — Playback via Streamlink + hls.js (HTML5 video, no external player)
 - **VOD Playback** — Watch recordings with automatic resume at last position
 - **VOD Chapters** — Browse and jump to chapters within VODs; view count displayed on VOD cards
 - **Video Quality Selection** — Change stream quality on-the-fly during playback (Live and VOD); available qualities fetched dynamically via Streamlink; session-only, defaults to `best`
@@ -35,6 +35,7 @@ Twitch client for the Steam Deck with Big-Screen UI, full gamepad control, and V
 - **Twitch Login** — Device Code Flow with QR code (no browser required)
 - **Following** — Live status and overview of followed streamers
 - **Category Browser** — Browse Twitch categories and top streams
+- **UI Language Support** — Switch the interface between German and English in Settings; the selection is stored locally
 - **Language-Filtered Streams** — Top streams filtered by German/English
 - **Account Screen** — User profile, app version, logout
 - **VOD History** — Local SQLite database with playback history and progress
@@ -58,6 +59,7 @@ Shared (src/shared/)
 Electron (Renderer)
   ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
   │                    StreamList (DE/EN), Settings, Account
+  ├── i18n          -- German/English message catalogs + translation hook
   ├── VideoPlayer   -- hls.js <video> wrapper (forwardRef, imperative handle)
   ├── ChapterPanel  -- Chapter selection panel (during playback or VOD start)
   ├── QualityPanel  -- Quality selection panel
@@ -213,6 +215,7 @@ The script handles automatically:
 - **Twitch-Login** — Device Code Flow mit QR-Code (kein Browser noetig)
 - **Gefolgte Kanaele** — Live-Status und Uebersicht der gefolgten Streamer
 - **Kategorie-Browser** — Twitch-Kategorien und Top-Streams durchsuchen
+- **UI-Sprachsupport** — Oberflaeche in den Einstellungen zwischen Deutsch und Englisch umschalten; Auswahl wird lokal gespeichert
 - **Sprachgefilterte Streams** — Top-Streams gefiltert nach Deutsch/Englisch
 - **Account-Ansicht** — Nutzerprofil, App-Version, Abmelden
 - **VOD-Verlauf** — Lokale SQLite-Datenbank mit Wiedergabe-Historie und Fortschritt
@@ -236,6 +239,7 @@ Geteilt (src/shared/)
 Electron (Renderer)
   ├── React UI      -- Screens: Login, Following, Browse, Category, Channel,
   │                    StreamList (DE/EN), Settings, Account
+  ├── i18n          -- Deutsche/englische Message-Kataloge + Uebersetzungs-Hook
   ├── VideoPlayer   -- hls.js <video> Wrapper (forwardRef, imperative handle)
   ├── ChapterPanel  -- Kapitel-Auswahl-Panel (waehrend Wiedergabe oder VOD-Start)
   ├── QualityPanel  -- Qualitaets-Auswahl-Panel

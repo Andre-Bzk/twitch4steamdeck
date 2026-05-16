@@ -42,7 +42,7 @@ export interface VodProgress {
   completed: boolean
 }
 
-/** Gibt für alle übergebenen vodIds vorhandene History-Einträge zurück. */
+/** Returns existing history entries for all passed vodIds. */
 export function getProgressMap(vodIds: string[]): Record<string, VodProgress> {
   if (vodIds.length === 0) return {}
   const placeholders = vodIds.map(() => '?').join(',')

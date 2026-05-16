@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { HlsUrlPayload, PlaybackEvent } from '../types/t4sd'
 import type { VideoPlayerHandle } from '../components/VideoPlayer'
+import { useT } from '../i18n/useT'
 
 // Shared playback session mechanics for ChannelScreen and AppShell.
 // Owns: HLS payload state, playState transitions (via IPC events), quality list,
@@ -49,6 +50,7 @@ interface Options {
 }
 
 export function usePlaybackSession({ active, onStarted, onStopped, onError }: Options): PlaybackSession {
+  const t = useT()
   const [hlsPayload, setHlsPayload] = useState<HlsUrlPayload | null>(null)
   const [playState, setPlayState] = useState<PlayState>('idle')
   const [availableQualities, setAvailableQualities] = useState<string[] | undefined>()
@@ -88,14 +90,14 @@ export function usePlaybackSession({ active, onStarted, onStopped, onError }: Op
       } else if (ev.kind === 'error') {
         setHlsPayload(null)
         setPlayState('error')
-        setErrorMsg(ev.message ?? 'Unbekannter Fehler')
+        setErrorMsg(ev.message ?? t('app.error.unknown'))
         setAvailableQualities(undefined)
         setQualityPanelOpen(false)
         onErrorRef.current?.()
       }
     })
     return () => { unsubHls(); unsubEvent() }
-  }, [active, reset])
+  }, [active, reset, t])
 
   const startLive = useCallback(async (login: string, quality?: string) => {
     videoRef.current?.stop()

@@ -24,6 +24,7 @@ import StreamListScreen from './StreamListScreen'
 import type { FollowedChannelInfo, GameInfo } from '../types/t4sd'
 import { usePlaybackSession } from '../hooks/usePlaybackSession'
 import { dispatchPlaybackKey, dispatchQualityPanelKey } from '../lib/playbackKeys'
+import { useT } from '../i18n/useT'
 
 type Region = 'sidebar' | 'main'
 type QuitChoice = 'yes' | 'no'
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function AppShell({ onLogout }: Props): JSX.Element {
+  const t = useT()
   const [tab, setTab] = useState<TabKey>('following')
   const [region, setRegion] = useState<Region>('main')
   const [sidebarIndex, setSidebarIndex] = useState(0)
@@ -269,7 +271,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
             {activeItem.screen.kind === 'stream-list' && (
               <StreamListScreen
                 hasFocus={mainFocus}
-                title={activeItem.screen.title}
+                titleKey={activeItem.screen.titleKey}
                 language={activeItem.screen.language}
                 onRequestSidebar={requestSidebar}
                 onSelectChannel={handleSelectChannel}
@@ -293,7 +295,7 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       {/* Globaler Video-Overlay — startet direkt ohne ChannelScreen */}
       {isGlobalPlaying && !selectedChannel && (
         <>
-          {/* Lade-Overlay während streamlink läuft */}
+          {/* Loading overlay while streamlink runs */}
           {!liveHlsPayload && livePlayState !== 'error' && (
             <div style={{
               position: 'fixed', inset: 0, zIndex: 100,
@@ -301,10 +303,10 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
               alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontSize: '1.25rem'
             }}>
-              Starte Wiedergabe…
+              {t('playback.startingOverlay')}
             </div>
           )}
-          {/* Fehler-Overlay */}
+          {/* Error overlay */}
           {livePlayState === 'error' && (
             <div style={{
               position: 'fixed', inset: 0, zIndex: 100,
@@ -315,11 +317,11 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 {liveErrorMsg}
               </p>
               <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
-                B / Esc — Schließen
+                {t('playback.closeHint')}
               </p>
             </div>
           )}
-          {/* VideoPlayer + Overlay sobald HLS-URL da ist */}
+          {/* VideoPlayer + overlay once the HLS URL has arrived */}
           {liveHlsPayload && (
             <>
               <VideoPlayer
@@ -368,14 +370,14 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
       {quitDialogOpen && (
         <div className="quit-dialog-overlay">
           <div className="quit-dialog" role="dialog" aria-modal="true" aria-labelledby="quit-dialog-title">
-            <h2 id="quit-dialog-title" className="quit-dialog__title">App beenden?</h2>
-            <p className="quit-dialog__text">Möchtest du Twitch4SteamDeck wirklich schließen?</p>
+            <h2 id="quit-dialog-title" className="quit-dialog__title">{t('quit.title')}</h2>
+            <p className="quit-dialog__text">{t('quit.message')}</p>
             <p className="quit-dialog__hint gamepad-hint-line">
-              <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>Auswahl</GamepadHintItem>
+              <GamepadHintItem prompt={['dpad-left', 'dpad-right']}>{t('common.selection')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="a">Bestätigen</GamepadHintItem>
+              <GamepadHintItem prompt="a">{t('common.confirm')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="b">Abbrechen</GamepadHintItem>
+              <GamepadHintItem prompt="b">{t('common.cancel')}</GamepadHintItem>
             </p>
             <div className="quit-dialog__actions">
               <button
@@ -386,14 +388,14 @@ export default function AppShell({ onLogout }: Props): JSX.Element {
                 }}
                 tabIndex={-1}
               >
-                Ja
+                {t('common.yes')}
               </button>
               <button
                 className={`btn quit-dialog__button${quitDialogChoice === 'no' ? ' quit-dialog__button--focused' : ''}`}
                 onClick={closeQuitDialog}
                 tabIndex={-1}
               >
-                Nein
+                {t('common.no')}
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { POSITION_REPORT_INTERVAL_MS } from '../constants/playback'
 import { useSettings } from '../context/SettingsContext'
 import { NoCacheLoader } from '../lib/hlsNoCacheLoader'
+import { tStatic } from '../i18n/useT'
 import log from 'electron-log/renderer'
 
 export interface VideoPlayerHandle {
@@ -104,10 +105,10 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
 
         // Attach media first, then load the source — more reliable in Electron/Chromium
         hls.attachMedia(video)
-        log.info('[VideoPlayer] attachMedia aufgerufen')
+        log.info('[VideoPlayer] attachMedia called')
 
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          log.info('[VideoPlayer] MEDIA_ATTACHED — lade Source')
+          log.info('[VideoPlayer] MEDIA_ATTACHED - loading source')
           hls.loadSource(hlsUrl)
         })
 
@@ -119,17 +120,17 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           // With the correct order (attachMedia → MEDIA_ATTACHED → loadSource)
           // the MediaSource is already attached at MANIFEST_PARSED — play() is safe to call.
           video.play().then(() => {
-            log.info('[VideoPlayer] play() erfolgreich')
+            log.info('[VideoPlayer] play() succeeded')
           }).catch((err: unknown) => {
-            log.error('[VideoPlayer] play() fehlgeschlagen:', err)
-            onError?.(`Wiedergabe konnte nicht gestartet werden: ${err}`)
+            log.error('[VideoPlayer] play() failed:', err)
+            onError?.(tStatic('error.playbackFailed', { error: String(err) }))
           })
         })
 
         hls.on(Hls.Events.ERROR, (_evt, data) => {
-          log.warn('[VideoPlayer] hls.js Fehler:', data.type, data.details, data.fatal)
+          log.warn('[VideoPlayer] hls.js error:', data.type, data.details, data.fatal)
           if (data.fatal) {
-            onError?.(`HLS-Fehler: ${data.type} – ${data.details}`)
+            onError?.(`HLS error: ${data.type} - ${data.details}`)
           }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -140,7 +141,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
         }
         video.play().catch(() => {})
       } else {
-        onError?.('HLS wird in dieser Umgebung nicht unterstützt')
+        onError?.(tStatic('error.hlsUnsupported'))
       }
 
       return () => {

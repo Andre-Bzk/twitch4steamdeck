@@ -3,10 +3,11 @@ import FocusableCard from '../components/FocusableCard'
 import { GamepadHintItem } from '../components/GamepadPrompt'
 import type { FollowedChannelInfo } from '../types/t4sd'
 import log from 'electron-log/renderer'
+import { useT, type MessageKey } from '../i18n/useT'
 
 interface Props {
   hasFocus: boolean
-  title: string
+  titleKey: MessageKey
   language: string
   onRequestSidebar: () => void
   onSelectChannel: (ch: FollowedChannelInfo) => void
@@ -17,12 +18,13 @@ type LoadState = 'loading' | 'ok' | 'error'
 
 export default function StreamListScreen({
   hasFocus,
-  title,
+  titleKey,
   language,
   onRequestSidebar,
   onSelectChannel,
   onStartLive
 }: Props): JSX.Element {
+  const t = useT()
   const [streams, setStreams] = useState<FollowedChannelInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -145,14 +147,14 @@ export default function StreamListScreen({
   return (
     <div className="screen screen--stream-list">
       <header className="screen__header">
-        <h2 className="screen__title">{title}</h2>
+        <h2 className="screen__title">{t(titleKey)}</h2>
         {loadState === 'ok' && streams.length > 0 && (
           <div className="screen__meta">
-            <span>{streams.length} Streams</span>
+            <span>{t('streamList.streamCount', { count: streams.length })}</span>
             <span className="screen__hint gamepad-hint-line">
-              <GamepadHintItem prompt="y">Aktualisieren</GamepadHintItem>
+              <GamepadHintItem prompt="y">{t('common.refresh')}</GamepadHintItem>
               <span className="gamepad-hint-separator">·</span>
-              <GamepadHintItem prompt="x">Kanalseite</GamepadHintItem>
+              <GamepadHintItem prompt="x">{t('common.channelPage')}</GamepadHintItem>
             </span>
           </div>
         )}
@@ -160,22 +162,22 @@ export default function StreamListScreen({
 
       {loadState === 'loading' && (
         <div className="screen__state">
-          <p>Lade Streams…</p>
+          <p>{t('category.loading')}</p>
         </div>
       )}
 
       {loadState === 'error' && (
         <div className="screen__state">
-          <p>Fehler beim Laden der Streams.</p>
+          <p>{t('category.loadError')}</p>
           <button className="btn" onClick={() => void load()}>
-            Erneut versuchen
+            {t('common.tryAgain')}
           </button>
         </div>
       )}
 
       {loadState === 'ok' && streams.length === 0 && (
         <div className="screen__state">
-          <p>Keine Live-Streams fuer diese Sprache gefunden.</p>
+          <p>{t('streamList.empty')}</p>
         </div>
       )}
 
@@ -191,7 +193,7 @@ export default function StreamListScreen({
             />
           ))}
           {isLoadingMore && (
-            <div className="card-grid__loading-more">Lade weitere Streams…</div>
+            <div className="card-grid__loading-more">{t('streamList.loadingMore')}</div>
           )}
         </div>
       )}
