@@ -588,7 +588,7 @@ export default function ChannelScreen({ channel, onBack }: Props): JSX.Element {
         </div>
       )}
 
-      {/* HTML5 Video Player — rendert innerhalb des Electron-Fensters */}
+      {/* HTML5 video player — renders inside the Electron window */}
       {hlsPayload && (
         <VideoPlayer
           ref={videoRef}

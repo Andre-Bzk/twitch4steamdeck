@@ -64,15 +64,15 @@ function createWindow(): BrowserWindow {
 }
 
 /**
- * CORS-Bypass für Twitch CDN und HLS-Streams.
- * hls.js im Renderer sendet Requests von localhost/file:// — Twitch CDN erwartet
- * Origin: https://www.twitch.tv. Wir setzen Origin + Referer auf ausgehenden Requests
- * und ergänzen CORS-Response-Header, damit Chromium die Antworten akzeptiert.
+ * CORS bypass for Twitch CDN and HLS streams.
+ * hls.js in the renderer sends requests from localhost/file:// — Twitch CDN expects
+ * Origin: https://www.twitch.tv. We set Origin + Referer on outgoing requests
+ * and inject CORS response headers so Chromium accepts the responses.
  *
- * HLS-Cache-Unterdrückung: xhrSetup in hls.js setzt Cache-Control: no-store auf jedem
- * XHR. Das löst einen CORS-Preflight aus (Cache-Control ist kein safelisted header).
- * Damit der Preflight durchkommt, muss onHeadersReceived auch ttvnw.net-Domains abdecken
- * (Segment-CDN: *.j.cloudfront.hls.ttvnw.net — enthält nicht "cloudfront.net").
+ * HLS cache suppression: xhrSetup in hls.js sets Cache-Control: no-store on every
+ * XHR. This triggers a CORS preflight (Cache-Control is not a safelisted header).
+ * For the preflight to pass, onHeadersReceived must also cover ttvnw.net domains
+ * (segment CDN: *.j.cloudfront.hls.ttvnw.net — does not contain "cloudfront.net").
  */
 function setupTwitchCors(): void {
   const isTwitchCdn = (url: string): boolean =>

@@ -157,7 +157,7 @@ export class HelixClient {
       boxArtUrl: g.box_art_url.replace('{width}', '285').replace('{height}', '380')
     }))
 
-    // Zuschauerzahlen: pro Kategorie die Top-100-Streams abrufen (parallel)
+    // Viewer counts: fetch the top 100 streams per category in parallel
     const headers = await this.authHeaders()
     const viewerCounts = await Promise.all(
       games.map(async (g) => {

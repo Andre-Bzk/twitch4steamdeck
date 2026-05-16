@@ -1,32 +1,32 @@
 /**
- * Liest Gamepad-Events via Linux evdev (/dev/input/event*).
+ * Reads gamepad events via Linux evdev (/dev/input/event*).
  *
- * Erkennt Controller über /dev/input/js* und öffnet deren zugehöriges
- * event*-Interface. Das evdev-Interface liefert standardisierte, benannte
- * Button-Codes (BTN_SOUTH, BTN_NORTH, …) die über alle Controller-Typen
- * (Xbox, PlayStation, Nintendo) und Verbindungsarten (USB, Bluetooth)
- * konsistent sind – unabhängig davon, welchen Treiber der Kernel nutzt.
+ * Detects controllers via /dev/input/js* and opens their corresponding
+ * event* interface. The evdev interface provides standardized, named
+ * button codes (BTN_SOUTH, BTN_NORTH, …) that are consistent across all
+ * controller types (Xbox, PlayStation, Nintendo) and connection methods
+ * (USB, Bluetooth), regardless of which driver the kernel uses.
  *
- * Damit entfällt das alte Problem mit der button-Nummerierung im Joystick-API,
- * bei dem Xbox-One-Controller via Bluetooth (Share-Button verschiebt die
- * Nummerierung) X-Button als Nummer 3 statt 2 lieferten.
+ * This eliminates the old button-numbering problem in the Joystick API,
+ * where Xbox One controllers via Bluetooth (Share button shifts the
+ * numbering) reported the X button as number 3 instead of 2.
  *
- * Unterstützt mehrere Gamepads gleichzeitig (Steam Deck + Bluetooth Xbox).
- * Hotplug wird durch periodisches Scannen von /dev/input/ abgedeckt.
+ * Supports multiple gamepads simultaneously (Steam Deck + Bluetooth Xbox).
+ * Hotplug is handled by periodically scanning /dev/input/.
  *
- * BTN_*-Codes sind konsistent für alle Controller:
+ * BTN_* codes are consistent across all controllers:
  *   BTN_SOUTH (0x130) = A / Cross
  *   BTN_EAST  (0x131) = B / Circle
  *   BTN_NORTH (0x133) = X / Square
  *   BTN_WEST  (0x134) = Y / Triangle
  *   BTN_TL    (0x136) = LB / L1
  *   BTN_TR    (0x137) = RB / R1
- *   BTN_TL2   (0x138) = LT / L2 (als Button bei manchen Controllern)
- *   BTN_TR2   (0x139) = RT / R2 (als Button bei manchen Controllern)
- *   ABS_HAT0X (16)    = D-Pad X-Achse
- *   ABS_HAT0Y (17)    = D-Pad Y-Achse
- *   ABS_X/Y   (0/1)   = Linker Stick
- *   ABS_Z/RZ  (2/5)   = LT/RT als Analog-Achse
+ *   BTN_TL2   (0x138) = LT / L2 (as button on some controllers)
+ *   BTN_TR2   (0x139) = RT / R2 (as button on some controllers)
+ *   ABS_HAT0X (16)    = D-Pad X-axis
+ *   ABS_HAT0Y (17)    = D-Pad Y-axis
+ *   ABS_X/Y   (0/1)   = Left stick
+ *   ABS_Z/RZ  (2/5)   = LT/RT as analog axis
  */
 
 import * as fs from 'node:fs'
@@ -35,8 +35,8 @@ import type { BrowserWindow } from 'electron'
 import { DEDUP_WINDOW_MS, HOTPLUG_SCAN_INTERVAL_MS, TRIGGER_THRESHOLD } from '../constants/input'
 import log from 'electron-log/main'
 
-// evdev input_event auf 64-bit Linux:
-// { u64 tv_sec (8 Bytes), u64 tv_usec (8 Bytes), u16 type (2), u16 code (2), s32 value (4) } = 24 Bytes
+// evdev input_event on 64-bit Linux:
+// { u64 tv_sec (8 bytes), u64 tv_usec (8 bytes), u16 type (2), u16 code (2), s32 value (4) } = 24 bytes
 const INPUT_EVENT_SIZE = 24
 
 const EV_KEY = 0x01
@@ -52,7 +52,7 @@ const BTN_TR    = 0x137
 const BTN_TL2   = 0x138
 const BTN_TR2   = 0x139
 
-// ABS-Achsen-Codes
+// ABS axis codes
 const ABS_X     = 0
 const ABS_Y     = 1
 const ABS_Z     = 2   // LT / L2
@@ -84,8 +84,8 @@ interface AxisState {
 }
 
 /**
- * Sucht das zugehörige evdev-Device (/dev/input/eventN) für ein
- * Joystick-Device (/dev/input/jsN) über den /sys-Dateisystem-Pfad.
+ * Finds the corresponding evdev device (/dev/input/eventN) for a
+ * joystick device (/dev/input/jsN) via the /sys filesystem path.
  */
 function findEventDevice(jsDevicePath: string): string | null {
   try {
@@ -223,9 +223,9 @@ class EvdevReader {
 }
 
 /**
- * Fallback-Reader für den Fall, dass kein evdev-Device gefunden wird.
- * Nutzt das alte Joystick-API (8-Byte-Events, Joystick-Nummern-Mapping).
- * Deckt Controller ab, die kein /sys-Event-Device-Mapping haben.
+ * Fallback reader used when no evdev device is found.
+ * Uses the legacy Joystick API (8-byte events, numeric button mapping).
+ * Covers controllers that have no /sys event device mapping.
  */
 class JoystickFallbackReader {
   private stream: fs.ReadStream | null = null
@@ -350,13 +350,13 @@ class JoystickFallbackReader {
 }
 
 /**
- * Startet das Lesen aller /dev/input/js* Devices (evdev-Interface bevorzugt).
- * Gibt eine Cleanup-Funktion zurück.
+ * Starts reading all /dev/input/js* devices (evdev interface preferred).
+ * Returns a cleanup function.
  */
 export function startGamepadReader(getWindow: () => BrowserWindow | null): () => void {
   if (process.platform !== 'linux') return () => {}
 
-  // Keyed by js-Device-Pfad
+  // Keyed by js device path
   const readers = new Map<string, EvdevReader | JoystickFallbackReader>()
   const lastKeyAt = new Map<string, number>()
 

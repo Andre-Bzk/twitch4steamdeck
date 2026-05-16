@@ -32,8 +32,8 @@ function sortQualities(qualities: string[]): string[] {
 }
 
 /**
- * Fragt streamlink nach allen verfügbaren Qualitätsstufen für eine URL (--json).
- * Gibt eine sortierte Liste zurück; bei Fehler leeres Array.
+ * Queries streamlink for all available quality levels for a URL (--json).
+ * Returns a sorted list; empty array on error.
  */
 export function getAvailableQualities(url: string): Promise<string[]> {
   return new Promise((resolve) => {
@@ -56,8 +56,8 @@ export function getAvailableQualities(url: string): Promise<string[]> {
 }
 
 /**
- * Fragt streamlink nach der direkten HLS-URL für einen Stream oder VOD.
- * Wird für Live-Streams (twitch.tv/<login>) und VODs (twitch.tv/videos/<id>) verwendet.
+ * Queries streamlink for the direct HLS URL of a stream or VOD.
+ * Used for live streams (twitch.tv/<login>) and VODs (twitch.tv/videos/<id>).
  */
 export function getStreamUrl(url: string, quality: string): Promise<string> {
   return new Promise((resolve, reject) => {

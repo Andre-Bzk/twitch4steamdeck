@@ -1,5 +1,5 @@
 // Twitch OAuth 2.0 Device Code Flow.
-// Doku: https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow
+// Docs: https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow
 
 const DEVICE_ENDPOINT = 'https://id.twitch.tv/oauth2/device'
 const TOKEN_ENDPOINT = 'https://id.twitch.tv/oauth2/token'
@@ -100,7 +100,7 @@ export async function pollForToken(opts: PollOptions): Promise<PollOutcome> {
         payload = json as ErrorResponse
       }
     } catch {
-      /* nicht-JSON Antwort, ignorieren */
+      /* non-JSON response, ignore */
     }
     const msg = (payload.message ?? '').toLowerCase()
 

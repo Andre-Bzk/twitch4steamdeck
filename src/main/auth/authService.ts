@@ -49,8 +49,8 @@ export class AuthService extends EventEmitter {
   }
 
   /**
-   * Startet den Device Code Flow. Liefert die Anzeigedaten sofort zurück
-   * und pollt im Hintergrund. Statuswechsel werden als 'auth-event' emittiert.
+   * Starts the Device Code Flow. Returns display data immediately
+   * and polls in the background. Status changes are emitted as 'auth-event'.
    */
   async startDeviceFlow(): Promise<DeviceFlowStartInfo> {
     if (!this.isConfigured()) {
@@ -86,8 +86,8 @@ export class AuthService extends EventEmitter {
   }
 
   /**
-   * Liefert ein gültiges Access-Token, refresht falls nötig.
-   * Wird vom Helix-Client benutzt.
+   * Returns a valid access token, refreshing it if necessary.
+   * Used by the Helix client.
    */
   async getValidAccessToken(): Promise<string | null> {
     if (!this.tokens) return null
@@ -100,7 +100,7 @@ export class AuthService extends EventEmitter {
       await saveTokens(this.tokens)
       return this.tokens.accessToken
     } catch {
-      // Refresh fehlgeschlagen → User muss sich neu einloggen.
+      // Refresh failed — user must log in again.
       this.tokens = null
       await clearTokens()
       return null

@@ -20,14 +20,14 @@ export default function App(): JSX.Element {
     return off
   }, [refresh])
 
-  // Browser Gamepad API (funktioniert im Desktop-Modus / Windows)
+  // Browser Gamepad API (works in desktop mode / Windows)
   useEffect(() => {
     if (navigator.userAgent.toLowerCase().includes('linux')) return
     gamepadService.start()
     return () => gamepadService.stop()
   }, [])
 
-  // Main-Process Gamepad Reader (liest /dev/input/js* direkt, funktioniert in Gaming Mode)
+  // Main-process gamepad reader (reads /dev/input/js* directly, works in Gaming Mode)
   useEffect(() => {
     return window.t4sd.gamepad.onInput((key) => {
       const target = document.activeElement ?? document.body
