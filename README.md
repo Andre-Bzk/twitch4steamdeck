@@ -68,12 +68,36 @@ Electron (Renderer)
 
 ## Installation (Steam Deck)
 
+**1. Install the Flatpak**
+
 ```bash
 flatpak install --user twitch4steamdeck.flatpak
-flatpak run tv.twitch4steamdeck.App
 ```
 
 Finished Flatpak bundles include everything (incl. Streamlink and Twitch integration) — no further setup required.
+
+**2. Add to Steam as a Non-Steam Game**
+
+The app does not appear automatically in Steam's "Add a Non-Steam Game" list. Add it manually:
+
+1. In Steam (Desktop Mode), go to **Games → Add a Non-Steam Game to My Library**
+2. Click **Browse** and select `/usr/bin/flatpak` as the executable
+3. Set the **Launch Options** to: `run tv.twitch4steamdeck.App`
+4. Click **Add Selected Programs**
+
+The app can then be launched from Gaming Mode like any other game.
+
+**3. Optional: Steam Grid Capsule Artwork**
+
+For a polished look in your Steam library, you can set a custom animated capsule image via [SteamGridDB](https://www.steamgriddb.com/grid/99800):
+
+<p align="center">
+  <a href="https://www.steamgriddb.com/grid/99800">
+    <img src="screenshots/twitch_artwork-preview.gif" width="300" alt="Twitch4SteamDeck Steam Grid Artwork" />
+  </a>
+</p>
+
+Download the artwork from SteamGridDB and set it as the grid image for the entry in your Steam library.
 
 ---
 
@@ -248,12 +272,36 @@ Electron (Renderer)
 
 ## Installation (Steam Deck)
 
+**1. Flatpak installieren**
+
 ```bash
 flatpak install --user twitch4steamdeck.flatpak
-flatpak run tv.twitch4steamdeck.App
 ```
 
-Fertige Flatpak-Bundles enthalten alles (inkl. Streamlink und Twitch-Anbindung) -- keine weitere Einrichtung noetig.
+Fertige Flatpak-Bundles enthalten alles (inkl. Streamlink und Twitch-Anbindung) — keine weitere Einrichtung noetig.
+
+**2. In Steam als steamfremdes Spiel hinzufuegen**
+
+Die App erscheint nach der Installation nicht automatisch in der Liste von Steam. Sie muss manuell hinzugefuegt werden:
+
+1. In Steam (Desktop-Modus) auf **Spiele → Steamfremdes Spiel zu meiner Bibliothek hinzufuegen** gehen
+2. Auf **Durchsuchen** klicken und `/usr/bin/flatpak` als Programm auswaehlen
+3. Als **Startoptionen** eintragen: `run tv.twitch4steamdeck.App`
+4. Auf **Ausgewaehlte Programme hinzufuegen** klicken
+
+Die App kann anschliessend im Gaming-Modus wie ein normales Spiel gestartet werden.
+
+**3. Optional: Steam-Grid-Capsule-Artwork**
+
+Fuer eine saubere Darstellung in der Steam-Bibliothek kann ein animiertes Capsule-Bild ueber [SteamGridDB](https://www.steamgriddb.com/grid/99800) gesetzt werden:
+
+<p align="center">
+  <a href="https://www.steamgriddb.com/grid/99800">
+    <img src="screenshots/twitch_artwork-preview.gif" width="300" alt="Twitch4SteamDeck Steam-Grid-Artwork" />
+  </a>
+</p>
+
+Das Artwork von SteamGridDB herunterladen und als Grid-Bild fuer den Eintrag in der Steam-Bibliothek setzen.
 
 ---
 
