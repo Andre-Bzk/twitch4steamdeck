@@ -42,7 +42,7 @@ fi
 # Step 1: verify Flatpak dependencies
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [1/6] Checking Flatpak prerequisites ==="
+echo "=== [1/5] Checking Flatpak prerequisites ==="
 for cmd in flatpak flatpak-builder node npm python3 rsvg-convert; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "ERROR: '$cmd' not found."
@@ -56,44 +56,11 @@ for cmd in flatpak flatpak-builder node npm python3 rsvg-convert; do
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 2: libplacebo-Tarball erzeugen (enthält glad2-Submodul, GitHub-Tarball reicht nicht)
-# Step 2: create the libplacebo tarball (includes the glad2 submodule, GitHub tarball is not enough)
-# ─────────────────────────────────────────────────────────────────────────────
-LIBPLACEBO_VERSION="6.338.2"
-LIBPLACEBO_TARBALL="flatpak/libplacebo-${LIBPLACEBO_VERSION}-full.tar.gz"
-LIBPLACEBO_SHA="7f5da41b872302208f0e10c22d3e108ab9fdb1f253eb47c18651698c65d6b426"
-
-echo ""
-echo "=== [2/7] libplacebo-Tarball ==="
-if [ -f "$LIBPLACEBO_TARBALL" ] && echo "$LIBPLACEBO_SHA  $LIBPLACEBO_TARBALL" | sha256sum -c --quiet 2>/dev/null; then
-  echo "  ✓ libplacebo-${LIBPLACEBO_VERSION}-full.tar.gz already exists and is correct"
-else
-  echo "  → Cloning libplacebo v${LIBPLACEBO_VERSION} with submodules ..."
-  TMPDIR_LP=$(mktemp -d)
-  git clone --recurse-submodules --depth 1 --branch "v${LIBPLACEBO_VERSION}" \
-    https://github.com/haasn/libplacebo.git "$TMPDIR_LP/libplacebo"
-  echo "  → Creating tarball ..."
-  tar czf "$LIBPLACEBO_TARBALL" -C "$TMPDIR_LP" libplacebo/
-  rm -rf "$TMPDIR_LP"
-  ACTUAL_SHA=$(sha256sum "$LIBPLACEBO_TARBALL" | awk '{print $1}')
-  if [ "$ACTUAL_SHA" != "$LIBPLACEBO_SHA" ]; then
-    echo "  WARNING: SHA256 differs!"
-    echo "    Expected: $LIBPLACEBO_SHA"
-    echo "    Received: $ACTUAL_SHA"
-    echo "  → Manifest must be updated. Updating now ..."
-    sed -i "s|sha256: ${LIBPLACEBO_SHA}|sha256: ${ACTUAL_SHA}|" flatpak/tv.twitch4steamdeck.App.yml
-    echo "  ✓ Manifest SHA updated"
-  else
-    echo "  ✓ SHA256 is correct"
-  fi
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Schritt 3: Flatpak-Runtimes prüfen / installieren
-# Step 3: verify / install Flatpak runtimes
+# Schritt 2: Flatpak-Runtimes prüfen / installieren
+# Step 2: verify / install Flatpak runtimes
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [3/7] Checking Flatpak runtimes ==="
+echo "=== [2/5] Checking Flatpak runtimes ==="
 RUNTIMES=(
   "org.freedesktop.Platform//24.08"
   "org.freedesktop.Sdk//24.08"
@@ -110,11 +77,11 @@ for rt in "${RUNTIMES[@]}"; do
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 4: .env prüfen
-# Step 4: verify .env
+# Schritt 3: .env prüfen
+# Step 3: verify .env
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [4/7] Checking .env (Twitch client ID) ==="
+echo "=== [3/5] Checking .env (Twitch client ID) ==="
 if [ ! -f .env ]; then
   echo "ERROR: .env not found."
   echo "  → Copy .env.example to .env and add MAIN_VITE_TWITCH_CLIENT_ID."
@@ -127,11 +94,11 @@ fi
 echo "  ✓ .env found"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 5: npm install (Linux) + better-sqlite3 rebuild + Build
-# Step 5: npm install (Linux) + better-sqlite3 rebuild + build
+# Schritt 4: npm install (Linux) + better-sqlite3 rebuild + Build
+# Step 4: npm install (Linux) + better-sqlite3 rebuild + build
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [5/7] npm install (Linux binaries) + rebuild native modules ==="
+echo "=== [4/5] npm install (Linux binaries) + rebuild native modules ==="
 npm install
 echo "  → Rebuilding better-sqlite3 for Linux x64 ..."
 npx @electron/rebuild --module-dir node_modules/better-sqlite3
@@ -152,15 +119,15 @@ if [ -f "$NATIVE_NODE" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 5b: Python-Deps für streamlink via flatpak-pip-generator
-# Step 5b: generate Python dependencies for streamlink via flatpak-pip-generator
+# Schritt 4b: Python-Deps für streamlink via flatpak-pip-generator
+# Step 4b: generate Python dependencies for streamlink via flatpak-pip-generator
 # Erzeugt flatpak/python3-streamlink.json mit allen pip-Deps + sha256-Hashes.
 # Generates flatpak/python3-streamlink.json with all pip dependencies + sha256 hashes.
 # Die Datei wird von tv.twitch4steamdeck.App.yml per !include eingebunden.
 # The file is included by tv.twitch4steamdeck.App.yml via !include.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [5b] Generating Python dependencies for streamlink ==="
+echo "=== [4b] Generating Python dependencies for streamlink ==="
 if ! python3 -c "import flatpak_pip_generator" &>/dev/null; then
   echo "  → Installing flatpak-pip-generator ..."
   # Ubuntu 24.04: externally-managed-environment → --break-system-packages nötig
@@ -173,42 +140,11 @@ python3 -m flatpak_pip_generator \
 echo "  ✓ Generated flatpak/python3-streamlink.json ($(wc -l < flatpak/python3-streamlink.json) lines)"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schritt 6: Manifest-SHA256-Werte füllen (interaktiv)
-# Step 6: fill manifest SHA256 values (interactive)
+# Schritt 5: flatpak-builder — Build + lokale Installation
+# Step 5: flatpak-builder - build + local install
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== [6/7] SHA256 checksums for manifest sources ==="
-echo ""
-
-MPV_URL="https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"
-SL_URL="https://github.com/streamlink/streamlink/archive/refs/tags/6.11.0.tar.gz"
-MANIFEST="flatpak/tv.twitch4steamdeck.App.yml"
-
-MPV_ARCHIVE="/tmp/mpv-0.41.0.tar.gz"
-SL_ARCHIVE="/tmp/streamlink-6.11.0.tar.gz"
-
-echo "Downloading mpv 0.41.0 ..."
-curl -L --progress-bar -o "$MPV_ARCHIVE" "$MPV_URL"
-MPV_SHA=$(sha256sum "$MPV_ARCHIVE" | awk '{print $1}')
-echo "  mpv sha256: $MPV_SHA"
-
-echo "Downloading streamlink 6.11.0 ..."
-curl -L --progress-bar -o "$SL_ARCHIVE" "$SL_URL"
-SL_SHA=$(sha256sum "$SL_ARCHIVE" | awk '{print $1}')
-echo "  streamlink sha256: $SL_SHA"
-
-# Platzhalter im Manifest ersetzen
-# Replace placeholders in the manifest
-sed -i "s/FILL_IN_sha256sum_of_mpv_0\.41\.0_tarball/$MPV_SHA/" "$MANIFEST"
-sed -i "s/FILL_IN_sha256sum_of_streamlink_tarball/$SL_SHA/" "$MANIFEST"
-echo "  ✓ Manifest updated"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Schritt 7: flatpak-builder — Build + lokale Installation
-# Step 7: flatpak-builder - build + local install
-# ─────────────────────────────────────────────────────────────────────────────
-echo ""
-echo "=== [7/7] flatpak-builder ==="
+echo "=== [5/5] flatpak-builder ==="
 flatpak-builder \
   --user \
   --install \
