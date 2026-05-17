@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- SEO -->
+  <title>Twitch4SteamDeck — The Twitch Client for Steam Deck</title>
+  <meta name="description" content="The open-source Twitch client for Steam Deck. Watch live streams and VODs with full gamepad navigation in Gaming Mode. Free Flatpak — no mouse needed." />
+  <meta name="keywords" content="twitch client steam deck, twitch steamdeck, twitch client for steam deck, steam deck twitch app, flatpak twitch steamdeck" />
+  <link rel="canonical" href="https://Andre-Bzk.github.io/twitch4steamdeck/" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Twitch4SteamDeck — Twitch Client for Steam Deck" />
+  <meta property="og:description" content="Watch live streams and VODs on your Steam Deck with full gamepad navigation. Open-source Twitch client built for Gaming Mode." />
+  <meta property="og:image" content="screenshots/player_overlay.jpg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://Andre-Bzk.github.io/twitch4steamdeck/" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Twitch4SteamDeck — Twitch Client for Steam Deck" />
+  <meta name="twitter:description" content="Open-source Twitch client for Steam Deck with full gamepad navigation. Free Flatpak." />
+  <meta name="twitter:image" content="screenshots/player_overlay.jpg" />
+
+  <!-- Fonts: Chakra Petch (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ===== Reset ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ===== Design tokens ===== */
+    :root {
+      --bg:          #0e0e10;
+      --bg-2:        #18181b;
+      --bg-3:        #1f1f23;
+      --accent:      #9147ff;
+      --accent-dim:  rgba(145, 71, 255, 0.12);
+      --accent-glow: rgba(145, 71, 255, 0.35);
+      --text:        #efeff1;
+      --text-muted:  #adadb8;
+      --text-dim:    #5c5c7a;
+      --border:      rgba(145, 71, 255, 0.18);
+      --border-sub:  rgba(255, 255, 255, 0.06);
+      --fd:          'Chakra Petch', sans-serif;
+      --fb:          'DM Sans', sans-serif;
+      --r:           12px;
+      --r-lg:        18px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--fb);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ===== Language system ===== */
+    .de { display: none; }
+    body.lang-de .de { display: revert; }
+    body.lang-de .en { display: none; }
+
+    /* ===== Subtle noise grain ===== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ===== Navigation ===== */
+    header {
+      position: fixed;
+      inset: 0 0 auto;
+      z-index: 90;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      background: rgba(14, 14, 16, 0.8);
+      backdrop-filter: blur(24px) saturate(1.4);
+      border-bottom: 1px solid var(--border-sub);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 26px;
+      height: 26px;
+      fill: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .logo-wordmark {
+      font-family: var(--fd);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.03em;
+    }
+
+    .logo-wordmark .sep { color: var(--accent); }
+
+    .nav-end {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-sub);
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--fd);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .pill-btn:hover { border-color: var(--accent); color: var(--text); }
+    .pill-btn svg { width: 15px; height: 15px; fill: currentColor; }
+
+    /* ===== Hero ===== */
+    .hero {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 24px 72px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero > * { position: relative; z-index: 1; }
+
+    /* Large purple radial bloom */
+    .hero-bloom {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 600px;
+      background: radial-gradient(ellipse 70% 60% at 50% 20%, rgba(145,71,255,0.10) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* Decorative horizontal line through bloom */
+    .hero-line {
+      position: absolute;
+      top: 25%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 5%, rgba(145,71,255,0.18) 30%, rgba(145,71,255,0.35) 50%, rgba(145,71,255,0.18) 70%, transparent 95%);
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 5px 16px 5px 10px;
+      font-family: var(--fd);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      margin-bottom: 30px;
+      animation: rise 0.7s ease both;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: blink 2.4s ease infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-family: var(--fd);
+      font-size: clamp(2.6rem, 6.5vw, 5.2rem);
+      font-weight: 700;
+      line-height: 1.06;
+      letter-spacing: -0.025em;
+      max-width: 860px;
+      margin-bottom: 22px;
+      animation: rise 0.7s ease 0.08s both;
+    }
+
+    h1 em {
+      font-style: normal;
+      color: var(--accent);
+      position: relative;
+    }
+
+    /* Underline glow on accent word */
+    h1 em::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      border-radius: 2px;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      color: var(--text-muted);
+      max-width: 580px;
+      margin-bottom: 42px;
+      font-weight: 300;
+      line-height: 1.75;
+      animation: rise 0.7s ease 0.16s both;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 64px;
+      animation: rise 0.7s ease 0.24s both;
+    }
+
+    .btn-p {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 13px 28px;
+      border-radius: var(--r);
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--fd);
+      font-weight: 600;
+      font-size: 0.88rem;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      box-shadow: 0 0 36px rgba(145,71,255,0.28);
+      transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+
+    .btn-p:hover {
+      background: #a259ff;
+      box-shadow: 0 0 56px rgba(145,71,255,0.45);
+      transform: translateY(-2px);
+    }
+
+    .btn-s {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 12px 28px;
+      border-radius: var(--r);
+      border: 1px solid var(--border-sub);
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--fd);
+      font-weight: 600;
+      font-size: 0.88rem;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s, transform 0.15s;
+    }
+
+    .btn-s:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      transform: translateY(-2px);
+    }
+
+    .btn-p svg, .btn-s svg { width: 17px; height: 17px; fill: currentColor; flex-shrink: 0; }
+
+    /* Hero screenshot */
+    .hero-shot {
+      width: 100%;
+      max-width: 1020px;
+      position: relative;
+      border-radius: var(--r-lg);
+      animation: rise 0.9s ease 0.32s both;
+    }
+
+    /* Gradient border ring */
+    .hero-shot::before {
+      content: '';
+      position: absolute;
+      inset: -1.5px;
+      border-radius: calc(var(--r-lg) + 1.5px);
+      background: linear-gradient(145deg, rgba(145,71,255,0.7) 0%, rgba(145,71,255,0.1) 40%, rgba(145,71,255,0.4) 100%);
+      z-index: -1;
+    }
+
+    .hero-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: var(--r-lg);
+    }
+
+    /* Scanlines */
+    .hero-shot .scanlines {
+      position: absolute;
+      inset: 0;
+      border-radius: var(--r-lg);
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px);
+      pointer-events: none;
+    }
+
+    /* Bottom reflection fade */
+    .hero-shot .fade-bot {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 35%;
+      border-radius: 0 0 var(--r-lg) var(--r-lg);
+      background: linear-gradient(to bottom, transparent, rgba(14,14,16,0.55));
+      pointer-events: none;
+    }
+
+    /* ===== Section wrapper ===== */
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 88px 28px;
+    }
+
+    .section-label {
+      font-family: var(--fd);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-family: var(--fd);
+      font-size: clamp(1.9rem, 3.5vw, 2.8rem);
+      font-weight: 700;
+      line-height: 1.12;
+      letter-spacing: -0.015em;
+      color: var(--text);
+      margin-bottom: 48px;
+    }
+
+    .rule {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-sub), transparent);
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* ===== Features ===== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .feat {
+      background: var(--bg-2);
+      border: 1px solid var(--border-sub);
+      border-radius: var(--r-lg);
+      padding: 30px 26px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+
+    .feat::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--r-lg);
+      background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(145,71,255,0.06), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feat:hover {
+      border-color: rgba(145,71,255,0.32);
+      transform: translateY(-4px);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 0 48px rgba(145,71,255,0.07);
+    }
+
+    .feat:hover::after { opacity: 1; }
+
+    .feat-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .feat-icon svg { width: 22px; height: 22px; fill: var(--accent); }
+
+    .feat h3 {
+      font-family: var(--fd);
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 10px;
+    }
+
+    .feat p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* ===== Screenshots ===== */
+    .shots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .shot {
+      border-radius: var(--r-lg);
+      border: 1px solid var(--border-sub);
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+
+    .shot:hover {
+      border-color: rgba(145,71,255,0.4);
+      transform: translateY(-5px) scale(1.01);
+      box-shadow: 0 0 48px rgba(145,71,255,0.12), 0 24px 64px rgba(0,0,0,0.5);
+    }
+
+    .shot img { display: block; width: 100%; height: auto; }
+
+    .shot-cap {
+      padding: 13px 16px;
+      background: var(--bg-2);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-sub);
+    }
+
+    /* ===== Install ===== */
+    .install-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border-sub);
+      border-radius: var(--r-lg);
+      padding: 60px 52px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Top accent stripe */
+    .install-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 5%, var(--accent) 30%, rgba(145,71,255,0.4) 70%, transparent 95%);
+    }
+
+    /* Background bloom */
+    .install-card::after {
+      content: '';
+      position: absolute;
+      bottom: -80px;
+      right: -80px;
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, rgba(145,71,255,0.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .install-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 620px;
+    }
+
+    .install-card h2 { margin-bottom: 14px; }
+
+    .install-sub {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-weight: 300;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .install-sub code {
+      font-family: 'Courier New', monospace;
+      color: var(--text);
+      background: var(--bg-3);
+      padding: 1px 7px;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+
+    .code-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #090a0d;
+      border: 1px solid rgba(145,71,255,0.22);
+      border-radius: var(--r);
+      padding: 18px 22px;
+      margin-bottom: 18px;
+    }
+
+    .code-row code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.88rem;
+      color: #bf99ff;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: auto;
+    }
+
+    .copy-btn {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--border-sub);
+      background: var(--bg-3);
+      color: var(--text-muted);
+      font-family: var(--fd);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .install-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .install-note svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
+    .install-note a { color: var(--accent); text-decoration: none; }
+    .install-note a:hover { text-decoration: underline; }
+
+    /* ===== Footer ===== */
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 28px;
+      border-top: 1px solid var(--border-sub);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-brand {
+      font-family: var(--fd);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    .footer-brand .sep { color: var(--accent); }
+
+    .footer-meta {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-left: 4px;
+    }
+
+    .footer-end {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .footer-gh {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.82rem;
+      transition: color 0.2s;
+    }
+
+    .footer-gh:hover { color: var(--accent); }
+    .footer-gh svg { width: 15px; height: 15px; fill: currentColor; }
+
+    /* ===== Scroll reveal ===== */
+    .rv {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+
+    .rv.in { opacity: 1; transform: none; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 860px) {
+      .shots-grid { grid-template-columns: 1fr; }
+      .install-card { padding: 40px 28px; }
+    }
+
+    @media (max-width: 600px) {
+      header { padding: 0 16px; }
+      .logo-wordmark { font-size: 0.88rem; }
+      h1 { font-size: 2.4rem; }
+      .wrap { padding: 64px 18px; }
+      .features-grid { grid-template-columns: 1fr; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== NAV ===== -->
+  <header>
+    <a href="#" class="nav-logo" aria-label="Twitch4SteamDeck Home">
+      <svg class="logo-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+      </svg>
+      <span class="logo-wordmark">Twitch<span class="sep">4</span>SteamDeck</span>
+    </a>
+    <nav class="nav-end">
+      <button class="pill-btn" id="navLang" onclick="toggleLang()" aria-label="Switch language to German">DE</button>
+      <a href="https://github.com/Andre-Bzk/twitch4steamdeck" class="pill-btn" target="_blank" rel="noopener noreferrer" aria-label="View on GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero" aria-label="Hero">
+      <div class="hero-bloom" aria-hidden="true"></div>
+      <div class="hero-line" aria-hidden="true"></div>
+
+      <div class="hero-eyebrow">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="en">Open Source &nbsp;·&nbsp; Free &nbsp;·&nbsp; Steam Deck</span>
+        <span class="de">Open Source &nbsp;·&nbsp; Kostenlos &nbsp;·&nbsp; Steam Deck</span>
+      </div>
+
+      <h1>
+        <span class="en">The Twitch Client<br>for Your <em>Steam Deck</em></span>
+        <span class="de">Der Twitch-Client<br>für dein <em>Steam Deck</em></span>
+      </h1>
+
+      <p class="hero-sub en">Watch live streams and VODs with full gamepad navigation — built for Steam Deck Gaming Mode. The open-source Twitch client for Steam Deck that works without a mouse or keyboard.</p>
+      <p class="hero-sub de">Live-Streams und VODs mit vollständiger Gamepad-Navigation — optimiert für den Steam Deck Gaming Mode. Der Open-Source-Twitch-Client für den Steam Deck, der ohne Maus auskommt.</p>
+
+      <div class="cta-row">
+        <a href="https://github.com/Andre-Bzk/twitch4steamdeck/releases" class="btn-p" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7 7-7z"/></svg>
+          <span class="en">Install via Flatpak</span>
+          <span class="de">Als Flatpak installieren</span>
+        </a>
+        <a href="https://github.com/Andre-Bzk/twitch4steamdeck" class="btn-s" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+          <span class="en">View on GitHub</span>
+          <span class="de">Auf GitHub ansehen</span>
+        </a>
+      </div>
+
+      <div class="hero-shot">
+        <img
+          src="screenshots/player_overlay.jpg"
+          alt="Twitch4SteamDeck — video player with gamepad control overlay running on Steam Deck in Gaming Mode"
+          width="1280"
+          height="800"
+          loading="eager"
+          decoding="async"
+        />
+        <div class="scanlines" aria-hidden="true"></div>
+        <div class="fade-bot" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <div class="rule" aria-hidden="true"></div>
+
+    <!-- ===== FEATURES ===== -->
+    <section aria-labelledby="feat-title">
+      <div class="wrap">
+        <p class="section-label en">Features</p>
+        <p class="section-label de">Funktionen</p>
+        <h2 id="feat-title">
+          <span class="en">Everything you need.<br>Nothing you don't.</span>
+          <span class="de">Alles, was du brauchst.<br>Nichts, was du nicht brauchst.</span>
+        </h2>
+
+        <div class="features-grid">
+
+          <div class="feat rv">
+            <div class="feat-icon">
+              <!-- Gamepad / D-pad icon -->
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 12c0-2.76-2.24-5-5-5s-5 2.24-5 5 2.24 5 5 5 5-2.24 5-5zm-5 3l-2-2h1.5v-2h1v2H14l-2 2zm0-6l2 2h-1.5v2h-1v-2H9l2-2zm-5 3H5.5v-1H7v-1.5l2 2-2 2V13zm10 0v1.5l-2-2 2-2V13H18v1h-1.5z"/></svg>
+            </div>
+            <h3><span class="en">Gamepad Navigation</span><span class="de">Gamepad-Navigation</span></h3>
+            <p class="en">Full controller support with A/B/X/Y, D-Pad, and shoulder buttons. Every screen is navigable from the couch — no mouse, no keyboard.</p>
+            <p class="de">Vollständige Controller-Unterstützung mit A/B/X/Y, D-Pad und Schultertasten. Jede Ansicht vom Sofa bedienen — ohne Maus, ohne Tastatur.</p>
+          </div>
+
+          <div class="feat rv">
+            <div class="feat-icon">
+              <!-- Play icon -->
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <h3><span class="en">Live Streams &amp; VODs</span><span class="de">Live-Streams &amp; VODs</span></h3>
+            <p class="en">Watch live streams and past broadcasts from channels you follow. Browse top streams and categories, filter by language.</p>
+            <p class="de">Live-Streams und vergangene Sendungen gefolgter Kanäle ansehen. Top-Streams und Kategorien durchsuchen, nach Sprache filtern.</p>
+          </div>
+
+          <div class="feat rv">
+            <div class="feat-icon">
+              <!-- Resume / clock icon -->
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 14.24L11 13V7h1.5v5.25l4.5 2.67-1.26 2.32z"/></svg>
+            </div>
+            <h3><span class="en">Resume &amp; Chapters</span><span class="de">Fortsetzen &amp; Kapitel</span></h3>
+            <p class="en">VODs resume exactly where you left off. Jump to any chapter with one button press. Watch history stored locally on the device.</p>
+            <p class="de">VODs werden genau dort fortgesetzt, wo du aufgehört hast. Mit einem Knopfdruck zu jedem Kapitel springen. Verlauf lokal gespeichert.</p>
+          </div>
+
+          <div class="feat rv">
+            <div class="feat-icon">
+              <!-- Display / screen icon -->
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.5 11.5h1v1h-1zm0-3h1v1h-1zm3 3h1v1h-1zm0-3h1v1h-1zm3 3h1v1h-1zm0-3h1v1h-1zM8 14.5H7v-1h1v-1H6.5v-1H8v-1H6v5h2zm1-3.5H8v-1h1z"/></svg>
+            </div>
+            <h3><span class="en">Steam Deck Optimized</span><span class="de">Steam Deck Optimiert</span></h3>
+            <p class="en">Maximized window in Gaming Mode, dark 1280×800 UI, and quality selection up to 1080p60. Delivered as a Flatpak for seamless installation.</p>
+            <p class="de">Maximiertes Fenster im Gaming Mode, dunkle 1280×800-Oberfläche und Qualitätswahl bis 1080p60. Als Flatpak zur einfachen Installation.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <div class="rule" aria-hidden="true"></div>
+
+    <!-- ===== SCREENSHOTS ===== -->
+    <section aria-labelledby="shots-title">
+      <div class="wrap">
+        <p class="section-label en">Screenshots</p>
+        <p class="section-label de">Screenshots</p>
+        <h2 id="shots-title">
+          <span class="en">See it in action</span>
+          <span class="de">In Aktion erleben</span>
+        </h2>
+
+        <div class="shots-grid">
+          <div class="shot rv">
+            <img src="screenshots/follow.jpg" alt="Following screen showing a grid of followed Twitch channels on the Steam Deck client" width="1280" height="800" loading="lazy" decoding="async" />
+            <div class="shot-cap">
+              <span class="en">Your followed channels at a glance</span>
+              <span class="de">Deine gefolgten Kanäle auf einen Blick</span>
+            </div>
+          </div>
+          <div class="shot rv">
+            <img src="screenshots/browse.jpg" alt="Browse screen showing top live streams and game categories in the Steam Deck Twitch client" width="1280" height="800" loading="lazy" decoding="async" />
+            <div class="shot-cap">
+              <span class="en">Browse top streams and categories</span>
+              <span class="de">Top-Streams und Kategorien durchsuchen</span>
+            </div>
+          </div>
+          <div class="shot rv">
+            <img src="screenshots/channelscreen.jpg" alt="Channel page displaying VOD history and channel info in Twitch4SteamDeck" width="1280" height="800" loading="lazy" decoding="async" />
+            <div class="shot-cap">
+              <span class="en">Channel page with VOD history</span>
+              <span class="de">Kanalseite mit VOD-Verlauf</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule" aria-hidden="true"></div>
+
+    <!-- ===== INSTALLATION ===== -->
+    <section aria-labelledby="install-title">
+      <div class="wrap">
+        <div class="install-card rv">
+          <div class="install-inner">
+            <p class="section-label en">Installation</p>
+            <p class="section-label de">Installation</p>
+            <h2 id="install-title">
+              <span class="en">Install on your Steam Deck<br>in seconds</span>
+              <span class="de">In Sekunden auf deinem<br>Steam Deck installieren</span>
+            </h2>
+            <p class="install-sub en">Download the <code>.flatpak</code> file from the GitHub Releases page, transfer it to your Steam Deck, then run:</p>
+            <p class="install-sub de">Lade die <code>.flatpak</code>-Datei von der GitHub-Releases-Seite herunter, übertrage sie auf den Steam Deck und führe aus:</p>
+
+            <div class="code-row">
+              <code>flatpak install --user twitch4steamdeck.flatpak</code>
+              <button class="copy-btn" id="copyBtn" onclick="copyCmd(this)" type="button">
+                <span class="en">COPY</span>
+                <span class="de">KOPIEREN</span>
+              </button>
+            </div>
+
+            <p class="install-note en">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+              Download the latest release from the <a href="https://github.com/Andre-Bzk/twitch4steamdeck/releases" target="_blank" rel="noopener noreferrer">GitHub Releases page</a>.
+            </p>
+            <p class="install-note de">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+              Lade das neueste Release von der <a href="https://github.com/Andre-Bzk/twitch4steamdeck/releases" target="_blank" rel="noopener noreferrer">GitHub-Releases-Seite</a> herunter.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <div>
+      <span class="footer-brand">Twitch<span class="sep">4</span>SteamDeck</span>
+      <span class="footer-meta en">· MIT License · Open Source</span>
+      <span class="footer-meta de">· MIT-Lizenz · Open Source</span>
+    </div>
+    <div class="footer-end">
+      <button class="pill-btn" onclick="toggleLang()" id="footerLang" aria-label="Switch language">DE</button>
+      <a href="https://github.com/Andre-Bzk/twitch4steamdeck" class="footer-gh" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        GitHub
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // ── Language toggle ──────────────────────────────────────────────
+    var lang = 'en';
+
+    function toggleLang() {
+      lang = lang === 'en' ? 'de' : 'en';
+      document.documentElement.lang = lang;
+      document.body.classList.toggle('lang-de', lang === 'de');
+      var label = lang === 'en' ? 'DE' : 'EN';
+      var ariaLabel = lang === 'en' ? 'Switch language to German' : 'Switch language to English';
+      ['navLang', 'footerLang'].forEach(function(id) {
+        var el = document.getElementById(id);
+        el.textContent = label;
+        el.setAttribute('aria-label', ariaLabel);
+      });
+    }
+
+    // ── Copy command ─────────────────────────────────────────────────
+    function copyCmd(btn) {
+      navigator.clipboard.writeText('flatpak install --user twitch4steamdeck.flatpak').then(function() {
+        var enSpan = btn.querySelector('.en');
+        var deSpan = btn.querySelector('.de');
+        var prevEn = enSpan.textContent;
+        var prevDe = deSpan.textContent;
+        enSpan.textContent = 'COPIED!';
+        deSpan.textContent = 'KOPIERT!';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        setTimeout(function() {
+          enSpan.textContent = prevEn;
+          deSpan.textContent = prevDe;
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 2200);
+      });
+    }
+
+    // ── Scroll reveal ─────────────────────────────────────────────────
+    var io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.rv').forEach(function(el) { io.observe(el); });
+  </script>
+
+</body>
+</html>
