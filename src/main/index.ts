@@ -13,14 +13,23 @@ log.transports.file.level = 'error'
 log.transports.console.level = 'debug'
 
 const isDev = !app.isPackaged
+const MAX_CACHE_BYTES = 512 * 1024 * 1024
 
 // Allows video.play() without a prior user gesture — play() is called from hls.js callbacks
 // that fire asynchronously long after the original click event.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 // Explicit cache size prevents Chromium's dynamic sizing, which causes "Invalid cache (current)
 // size" errors when available disk space fluctuates.
+app.commandLine.appendSwitch('disk-cache-size', String(MAX_CACHE_BYTES))
 
-app.commandLine.appendSwitch('disk-cache-size', String(500 * 1024 * 1024))
+async function clearDefaultSessionCache(reason: 'startup' | 'quit'): Promise<void> {
+  try {
+    await session.defaultSession.clearCache()
+    log.info(`[twitch4steamdeck] Cleared Electron cache on ${reason}.`)
+  } catch (err) {
+    log.warn(`[twitch4steamdeck] Failed to clear Electron cache on ${reason}.`, err)
+  }
+}
 
 function createWindow(): BrowserWindow {
   const isLinux = process.platform === 'linux'
@@ -105,6 +114,7 @@ function setupTwitchCors(): void {
 }
 
 app.whenReady().then(async () => {
+  await clearDefaultSessionCache('startup')
   setupTwitchCors()
   const clientId = import.meta.env.MAIN_VITE_TWITCH_CLIENT_ID ?? ''
   const auth = new AuthService(clientId)
@@ -119,10 +129,22 @@ app.whenReady().then(async () => {
   registerIpcHandlers(auth, helix, playback)
 
   const stopGamepad = startGamepadReader(() => BrowserWindow.getAllWindows()[0] ?? null)
+  let servicesStopped = false
+  let quitAfterCacheClear = false
 
-  app.on('before-quit', () => {
-    stopGamepad()
-    playback.stop()
+  app.on('before-quit', (event) => {
+    if (!servicesStopped) {
+      stopGamepad()
+      playback.stop()
+      servicesStopped = true
+    }
+    if (quitAfterCacheClear) return
+
+    event.preventDefault()
+    void clearDefaultSessionCache('quit').finally(() => {
+      quitAfterCacheClear = true
+      app.quit()
+    })
   })
 
   if (!clientId) {

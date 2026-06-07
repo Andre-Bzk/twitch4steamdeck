@@ -1,4 +1,4 @@
-let hlsCacheEnabled = false
+let hlsCacheEnabled = true
 
 export function getHlsCacheEnabled(): boolean {
   return hlsCacheEnabled

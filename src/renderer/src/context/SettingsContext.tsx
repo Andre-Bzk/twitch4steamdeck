@@ -13,6 +13,7 @@ export interface AppSettings {
 }
 
 const STORAGE_KEY = 't4sd:settings'
+const HLS_CACHE_DEFAULT_MIGRATION_KEY = 't4sd:hls-cache-default-enabled-v1'
 const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 400
 const SIDEBAR_DEFAULT = 270
@@ -23,23 +24,37 @@ const DEFAULTS: AppSettings = {
   streamBadgeMode: 'both',
   sidebarWidth: SIDEBAR_DEFAULT,
   badgeGap: BADGE_GAP_DEFAULT,
-  hlsCacheEnabled: false,
+  hlsCacheEnabled: true,
   fileLoggingEnabled: false,
   language: 'en'
 }
 
 export { SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_DEFAULT, BADGE_GAP_MIN, BADGE_GAP_MAX, BADGE_GAP_DEFAULT }
 
+function applyHlsCacheDefaultMigration(settings: AppSettings): AppSettings {
+  try {
+    if (localStorage.getItem(HLS_CACHE_DEFAULT_MIGRATION_KEY) === '1') {
+      return settings
+    }
+    const next = { ...settings, hlsCacheEnabled: true }
+    saveSettings(next)
+    localStorage.setItem(HLS_CACHE_DEFAULT_MIGRATION_KEY, '1')
+    return next
+  } catch {
+    return { ...settings, hlsCacheEnabled: true }
+  }
+}
+
 function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULTS
+    if (!raw) return applyHlsCacheDefaultMigration(DEFAULTS)
     const parsed = JSON.parse(raw) as Partial<AppSettings>
     const modes: StreamBadgeMode[] = ['off', 'language', 'flag', 'both']
     const languages: Language[] = ['de', 'en']
     const sw = Number(parsed.sidebarWidth)
     const bg = Number(parsed.badgeGap)
-    return {
+    return applyHlsCacheDefaultMigration({
       streamBadgeMode: modes.includes(parsed.streamBadgeMode as StreamBadgeMode)
         ? (parsed.streamBadgeMode as StreamBadgeMode)
         : DEFAULTS.streamBadgeMode,
@@ -50,7 +65,7 @@ function loadSettings(): AppSettings {
       language: languages.includes(parsed.language as Language)
         ? (parsed.language as Language)
         : DEFAULTS.language
-    }
+    })
   } catch {
     return DEFAULTS
   }
